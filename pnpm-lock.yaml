@@ -58,9 +58,9 @@ importers:
 
   apps/dashboard:
     dependencies:
-      '@fontsource-variable/onest':
-        specifier: 5.2.11
-        version: 5.2.11
+      '@fontsource-variable/ibm-plex-sans':
+        specifier: 5.2.8
+        version: 5.2.8
       '@gatekeeper/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -659,10 +659,10 @@ packages:
         integrity: sha512-iK/8TvRM/EgNOyQL+EpWu+x3aR6o4GWt+UI+27zmE7w6t/6d80mXqOtWLdEKQ13vL/g1Jry0ae2icj6GP7tGzA==,
       }
 
-  '@fontsource-variable/onest@5.2.11':
+  '@fontsource-variable/ibm-plex-sans@5.2.8':
     resolution:
       {
-        integrity: sha512-knJww1KxK4g66+qu90q3CPBvl4zhL5oDRi3/JMkYMmlhW3OgyRgT4MMfgd6jg2lvho7bLPAXfsYPh59h0yzwUA==,
+        integrity: sha512-n5PF2iFa0CZT0QYTPzxvZ39opC9LnU0zdoRccoADbs+Dtsd+lbXOZF7RNuIPHcQX1dKjF63sxnRImQIB5eD0Ag==,
       }
 
   '@humanfs/core@0.19.2':
@@ -3041,7 +3041,7 @@ snapshots:
       fastq: 1.20.1
       glob: 13.0.6
 
-  '@fontsource-variable/onest@5.2.11': {}
+  '@fontsource-variable/ibm-plex-sans@5.2.8': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

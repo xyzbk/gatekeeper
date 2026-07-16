@@ -1,9 +1,9 @@
 @font-face {
-  font-family: 'Onest Variable';
+  font-family: 'IBM Plex Sans Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url('@fontsource-variable/onest/files/onest-latin-wght-normal.woff2')
+  font-weight: 100 700;
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2')
     format('woff2-variations');
 }
 
@@ -12,13 +12,15 @@
   background: oklch(0.245 0.004 285);
   color-scheme: dark;
   font-family:
-    'Onest Variable',
+    'IBM Plex Sans Variable',
     ui-sans-serif,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
   font-synthesis: none;
+  font-kerning: normal;
+  font-optical-sizing: auto;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   --canvas: oklch(0.245 0.004 285);

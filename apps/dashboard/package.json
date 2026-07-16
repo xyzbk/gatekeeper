@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fontsource-variable/onest": "5.2.11",
+    "@fontsource-variable/ibm-plex-sans": "5.2.8",
     "@gatekeeper/contracts": "workspace:*",
     "@tanstack/react-query": "5.101.2",
     "react": "19.2.7",
