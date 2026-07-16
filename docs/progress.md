@@ -117,4 +117,4 @@ Status: IN PROGRESS
 
 Published green slices now provide the strict status contracts, safe Git repository adapter, and secured loopback Fastify service. The current dashboard slice adds the real React/Vite product shell, contract-validated authenticated status client, repository and environment overview, responsive layout, keyboard focus treatment, and explicit loading, absent-value, retryable-error, and unknown-route states.
 
-The only remaining implementation slice is the foreground `gatekeeper start [path]` lifecycle followed by end-to-end and visual verification. Phase 1 still excludes diff review, policy evaluation, SQLite, Project Memory, MCP, GitHub data access, and model reasoning.
+The foreground `gatekeeper start [path]` lifecycle is now implemented: it fixes one repository snapshot, probes local tool versions, serves the built dashboard, prints only bounded connection details, handles process shutdown, and removes ephemeral metadata. End-to-end and visual verification remain before Phase 1 can be marked complete. Phase 1 still excludes diff review, policy evaluation, SQLite, Project Memory, MCP, GitHub data access, and model reasoning.

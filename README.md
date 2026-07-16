@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phase 0 is complete. Phase 1 now includes strict local-service contracts, safe Git repository inspection, the bearer-authenticated Fastify service spine, and the real React dashboard. `gatekeeper start` integration is the remaining Phase 1 slice. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
+Phase 0 is complete. The Phase 1 implementation now provides strict local-service contracts, safe Git repository inspection, the bearer-authenticated Fastify service, the real React dashboard, and the foreground `gatekeeper start` lifecycle. End-to-end review is the remaining Phase 1 gate. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
 
 ## Quick start
 
@@ -20,9 +20,12 @@ pnpm test
 pnpm build
 pnpm --filter @gatekeeper/cli start -- --help
 pnpm --filter @gatekeeper/cli start -- doctor --format json
+pnpm --filter @gatekeeper/cli start -- start .
 ```
 
-`gh` is optional in Phase 0. Doctor reports its absence as a warning and does not authenticate or make network calls.
+`gh` remains optional in Phase 1. Doctor reports its absence as a warning and does not authenticate or make network calls.
+
+`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Stop it with Ctrl+C; it does not install a service or background process.
 
 ## Foundation
 
@@ -31,7 +34,7 @@ pnpm --filter @gatekeeper/cli start -- doctor --format json
 - `packages/config`: policy parsing and app-data path resolution.
 - `packages/git-adapter`: safe repository-root discovery and truthful Git status.
 - `packages/testkit`: deterministic fixtures shared by tests.
-- `apps/cli`: `--version`, `--help`, and `doctor` only.
+- `apps/cli`: version/help, offline Doctor, and the foreground `start [path]` lifecycle.
 - `apps/server`: loopback-only Fastify service, secure bootstrap, health, and status APIs.
 - `apps/dashboard`: authenticated React/Vite repository overview with explicit loading, empty, and error states.
 

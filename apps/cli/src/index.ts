@@ -4,12 +4,26 @@ import { Command, Option } from 'commander';
 
 import { normalizeArgv } from './argv.js';
 import { runDoctor } from './doctor.js';
+import { formatStartError, GATEKEEPER_VERSION, runStartCommand } from './start.js';
 
 const program = new Command()
   .name('gatekeeper')
   .description('Local-first repository intelligence for Codex.')
-  .version('0.1.0')
+  .version(GATEKEEPER_VERSION)
   .showHelpAfterError();
+
+program
+  .command('start')
+  .description('Start Gatekeeper for one local Git repository.')
+  .argument('[path]', 'repository path', '.')
+  .action(async (path: string) => {
+    try {
+      await runStartCommand(path);
+    } catch (error) {
+      process.stderr.write(`Error: ${formatStartError(error)}\n`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command('doctor')

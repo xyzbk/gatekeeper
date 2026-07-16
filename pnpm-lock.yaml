@@ -40,9 +40,21 @@ importers:
       '@gatekeeper/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@gatekeeper/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@gatekeeper/git-adapter':
+        specifier: workspace:*
+        version: link:../../packages/git-adapter
+      '@gatekeeper/server':
+        specifier: workspace:*
+        version: link:../server
       commander:
         specifier: 15.0.0
         version: 15.0.0
+      execa:
+        specifier: 9.6.1
+        version: 9.6.1
 
   apps/dashboard:
     dependencies:

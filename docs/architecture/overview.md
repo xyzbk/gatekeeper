@@ -13,7 +13,7 @@ Browser dashboard --------------------------^            -> SQLite Project Memor
 The current Phase 1 foundation adds the first concrete infrastructure adapter:
 
 ```text
-apps/cli -> packages/config
+apps/cli -> packages/config + packages/git-adapter + apps/server
 apps/server -> packages/config + packages/contracts
 apps/dashboard -> packages/contracts
 packages/git-adapter -> packages/contracts
@@ -31,6 +31,8 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 
 `apps/dashboard` is the browser presentation adapter. It uses React Router for the small route boundary and TanStack Query for the authenticated status request. A closure reads bootstrap once and retains the bearer token only in memory. The overview renders only contract-validated repository, tool, service, feature, and path data; loading, absent-value, request-error, and unknown-route states are explicit. CSS Modules and shared custom properties provide the restrained product shell without a component framework, charting package, or global state layer.
 
+`gatekeeper start [path]` composes these adapters without adding another application layer. It resolves one repository snapshot, probes only local tool versions, starts Fastify with the built dashboard, prints the loopback URL, and waits for `SIGINT` or `SIGTERM`. Shutdown closes Fastify and removes ephemeral service metadata. It does not open a browser, daemonize, supervise a child process, or persist lifecycle state.
+
 ## Runtime constraints
 
 - Node.js 24 LTS, strict TypeScript ESM, pnpm workspaces, and TypeScript project references.
@@ -40,4 +42,4 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 
 ## Phase 1 boundary
 
-Phase 1 may add only `packages/git-adapter`, `apps/server`, and `apps/dashboard` as defined by the canonical plan. The remaining work is CLI lifecycle integration and end-to-end verification. The phase must stop before diff review, SQLite, MCP, or GitHub calls.
+Phase 1 may add only `packages/git-adapter`, `apps/server`, and `apps/dashboard` as defined by the canonical plan. The remaining work is end-to-end verification and the phase review. The phase must stop before diff review, SQLite, MCP, or GitHub calls.

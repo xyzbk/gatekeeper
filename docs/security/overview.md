@@ -40,6 +40,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - API validation and not-found failures use the shared strict error envelope.
 - Structured Pino logs contain request ID, operation, duration, result count, result state, and error category only. They exclude headers, payloads, repository paths, source, diffs, and tokens.
 - Service metadata is removed during orderly shutdown.
+- `gatekeeper start` prints the repository root and loopback URL but never prints the bearer token. Unexpected startup errors are reduced to a bounded message rather than exposing subprocess or filesystem details.
 
 ## Deferred boundaries
 

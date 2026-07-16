@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@gatekeeper/config": "workspace:*",
-    "commander": "15.0.0"
+    "@gatekeeper/contracts": "workspace:*",
+    "@gatekeeper/git-adapter": "workspace:*",
+    "@gatekeeper/server": "workspace:*",
+    "commander": "15.0.0",
+    "execa": "9.6.1"
   }
 }
