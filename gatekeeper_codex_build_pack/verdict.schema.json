@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gatekeeper.local/schemas/verdict-v1.json",
+  "title": "Gatekeeper Review Verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "reviewId",
+    "repositoryId",
+    "target",
+    "verdict",
+    "summary",
+    "findings",
+    "metrics",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "reviewId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "display"],
+      "properties": {
+        "kind": {
+          "enum": ["worktree", "staged", "branch", "commit_range", "pull_request"]
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        },
+        "pullRequestNumber": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "verdict": {
+      "enum": ["FAST_PATH", "REQUIRE_CHANGES", "ESCALATE", "BLOCK"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filesChanged", "linesAdded", "linesDeleted"],
+      "properties": {
+        "filesChanged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "linesAdded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "linesDeleted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "productionFilesChanged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "testFilesChanged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "documentationFilesChanged": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reasoningProvider": {
+      "type": ["string", "null"]
+    },
+    "model": {
+      "type": ["string", "null"]
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "severity",
+        "authority",
+        "confidence",
+        "title",
+        "explanation",
+        "evidence",
+        "remediation",
+        "humanApprovalRequired"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": ["info", "low", "medium", "high", "critical"]
+        },
+        "authority": {
+          "enum": ["DETERMINISTIC", "EVIDENCE_SUPPORTED", "INFERENCE"]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "affectedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "affectedSymbols": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "remediation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "falsePositiveRisk": {
+          "enum": ["none", "low", "medium", "high"]
+        },
+        "humanApprovalRequired": {
+          "type": "boolean"
+        },
+        "policyId": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceType", "repositoryId", "sourceId"],
+      "properties": {
+        "sourceType": {
+          "enum": [
+            "file",
+            "commit",
+            "pull_request",
+            "issue",
+            "comment",
+            "adr",
+            "policy",
+            "test",
+            "decision"
+          ]
+        },
+        "repositoryId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commitSha": {
+          "type": "string"
+        },
+        "remoteUrl": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "contentHash": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

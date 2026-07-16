@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/domain" },
+    { "path": "packages/testkit" },
+    { "path": "packages/contracts" },
+    { "path": "packages/config" },
+    { "path": "apps/cli" }
+  ]
+}

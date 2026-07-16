@@ -1,0 +1,77 @@
+version: 1
+
+repository:
+  defaultBase: main
+
+review:
+  linkedIssue:
+    required: false
+    enforcement: advisory
+  description:
+    required: true
+    enforcement: required
+  maxChangedFiles:
+    value: 30
+    enforcement: required
+  maxChangedLines:
+    value: 1200
+    enforcement: advisory
+
+paths:
+  ignore:
+    - node_modules/**
+    - dist/**
+    - coverage/**
+
+tests:
+  relationships:
+    - id: application-code-needs-tests
+      source:
+        - src/**
+        - packages/**
+      tests:
+        - tests/**
+        - '**/*.test.ts'
+      enforcement: required
+
+documentation:
+  relationships:
+    - id: public-api-needs-docs
+      source:
+        - packages/contracts/**
+      documentation:
+        - docs/reference/**
+      enforcement: required
+
+riskZones:
+  - id: authentication
+    paths:
+      - src/auth/**
+    level: critical
+    verdictFloor: ESCALATE
+    requirements:
+      - tests
+      - linkedIssue
+
+protectedPaths:
+  - id: generated-lock
+    paths:
+      - internal/protected/**
+    enforcement: hard
+    message: This path requires an explicitly authorized workflow.
+
+architecture:
+  importBoundaries:
+    - id: routes-must-not-access-repositories
+      from:
+        - src/routes/**
+      deny:
+        - src/repositories/**
+      enforcement: required
+      rationale: Routes call services; services own repository access.
+
+generatedFiles:
+  deny:
+    - dist/**
+    - coverage/**
+  enforcement: hard

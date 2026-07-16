@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2024",
+    "types": ["node"],
+    "paths": {
+      "@gatekeeper/config": ["./packages/config/src/index.ts"],
+      "@gatekeeper/contracts": ["./packages/contracts/src/index.ts"],
+      "@gatekeeper/domain": ["./packages/domain/src/index.ts"],
+      "@gatekeeper/testkit": ["./packages/testkit/src/index.ts"]
+    },
+    "verbatimModuleSyntax": true
+  }
+}

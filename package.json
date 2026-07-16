@@ -1,0 +1,31 @@
+{
+  "name": "gatekeeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first repository intelligence for Codex.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "build": "tsc -b --pretty false --force",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint packages apps --max-warnings 0",
+    "test": "vitest run --config vitest.workspace.ts",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.7.0",
+    "prettier": "3.9.5",
+    "tsx": "4.23.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.64.0",
+    "vitest": "4.1.10"
+  }
+}

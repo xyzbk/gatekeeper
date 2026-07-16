@@ -1,0 +1,20 @@
+import { fileURLToPath } from 'node:url';
+
+import { defineConfig } from 'vitest/config';
+
+const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@gatekeeper/config': fromRoot('./packages/config/src/index.ts'),
+      '@gatekeeper/contracts': fromRoot('./packages/contracts/src/index.ts'),
+      '@gatekeeper/domain': fromRoot('./packages/domain/src/index.ts'),
+      '@gatekeeper/testkit': fromRoot('./packages/testkit/src/index.ts'),
+    },
+  },
+  test: {
+    environment: 'node',
+    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
+  },
+});

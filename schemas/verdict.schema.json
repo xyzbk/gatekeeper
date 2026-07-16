@@ -1,0 +1,245 @@
+{
+  "$id": "https://gatekeeper.local/schemas/verdict-v1.json",
+  "title": "Gatekeeper Review Verdict",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "reviewId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["worktree", "staged", "branch", "commit_range", "pull_request"]
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base": { "type": "string" },
+        "head": { "type": "string" },
+        "pullRequestNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["kind", "display"],
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "low", "medium", "high", "critical"]
+          },
+          "authority": {
+            "type": "string",
+            "enum": ["DETERMINISTIC", "EVIDENCE_SUPPORTED", "INFERENCE"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6000
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sourceType": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "commit",
+                    "pull_request",
+                    "issue",
+                    "comment",
+                    "adr",
+                    "policy",
+                    "test",
+                    "decision"
+                  ]
+                },
+                "repositoryId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sourceId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": { "type": "string" },
+                "path": { "type": "string" },
+                "startLine": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "endLine": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "commitSha": { "type": "string" },
+                "remoteUrl": { "type": "string" },
+                "excerpt": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "contentHash": { "type": "string" }
+              },
+              "required": ["sourceType", "repositoryId", "sourceId"],
+              "additionalProperties": false
+            }
+          },
+          "affectedPaths": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "affectedSymbols": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "remediation": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "falsePositiveRisk": {
+            "type": "string",
+            "enum": ["none", "low", "medium", "high"]
+          },
+          "humanApprovalRequired": { "type": "boolean" },
+          "policyId": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }]
+          },
+          "enforcement": {
+            "type": "string",
+            "enum": ["advisory", "required", "hard"]
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "severity",
+          "authority",
+          "confidence",
+          "title",
+          "explanation",
+          "evidence",
+          "remediation",
+          "humanApprovalRequired"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "filesChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "linesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "linesDeleted": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "productionFilesChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "testFilesChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentationFilesChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["filesChanged", "linesAdded", "linesDeleted"],
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["FAST_PATH", "REQUIRE_CHANGES", "ESCALATE", "BLOCK"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "previousReviewId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reasoningProvider": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "model": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "reviewId",
+    "repositoryId",
+    "target",
+    "findings",
+    "metrics",
+    "createdAt",
+    "verdict",
+    "summary"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@gatekeeper/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gatekeeper": "./dist/index.js"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@gatekeeper/config": "workspace:*",
+    "commander": "15.0.0"
+  }
+}

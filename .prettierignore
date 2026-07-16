@@ -1,0 +1,5 @@
+GATEKEEPER_COMPLETE_CODEX_SPEC.md
+gatekeeper_codex_build_pack/
+node_modules/
+dist/
+coverage/
