@@ -31,6 +31,8 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - A 32-byte token is generated with `node:crypto` and written to machine-local service metadata with mode `0600` where supported.
 - Protected `/v1/*` requests require a timing-safe bearer-token comparison.
 - The browser obtains bootstrap configuration from the same origin with `Cache-Control: no-store`; the token is not placed in a URL or log.
+- The dashboard keeps bootstrap and bearer state in a module closure only. It does not use local storage, session storage, cookies, URL state, or rendered markup for the token.
+- Browser responses are validated again with the shared strict Zod contracts before any value is rendered.
 - Host must resolve exactly to `127.0.0.1`; a supplied Origin must match the request Host and use HTTP.
 - No CORS response headers are enabled.
 - CSP permits only same-origin scripts, styles, fonts, images, and API connections. Framing, objects, forms, and base-URL changes are denied.
@@ -41,7 +43,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 ## Deferred boundaries
 
-Dashboard in-memory token handling, SQLite protection, MCP protocol isolation, and the read-only `gh` adapter are required in their scheduled steps and phases. They are not placeholder implementations.
+SQLite protection, MCP protocol isolation, and the read-only `gh` adapter are required in their scheduled phases. They are not placeholder implementations.
 
 ## Logging
 

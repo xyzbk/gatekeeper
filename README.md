@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phase 0 is complete. Phase 1 now includes strict local-service contracts, safe Git repository inspection, and the bearer-authenticated Fastify service spine. The dashboard and `gatekeeper start` integration are the remaining Phase 1 slices. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
+Phase 0 is complete. Phase 1 now includes strict local-service contracts, safe Git repository inspection, the bearer-authenticated Fastify service spine, and the real React dashboard. `gatekeeper start` integration is the remaining Phase 1 slice. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
 
 ## Quick start
 
@@ -33,6 +33,7 @@ pnpm --filter @gatekeeper/cli start -- doctor --format json
 - `packages/testkit`: deterministic fixtures shared by tests.
 - `apps/cli`: `--version`, `--help`, and `doctor` only.
 - `apps/server`: loopback-only Fastify service, secure bootstrap, health, and status APIs.
+- `apps/dashboard`: authenticated React/Vite repository overview with explicit loading, empty, and error states.
 
 The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdict.schema.json), generated from the Zod contract and checked for drift by tests. The canonical policy example is [gatekeeper.policy.example.yaml](gatekeeper.policy.example.yaml).
 

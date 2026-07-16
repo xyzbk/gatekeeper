@@ -15,6 +15,7 @@ The current Phase 1 foundation adds the first concrete infrastructure adapter:
 ```text
 apps/cli -> packages/config
 apps/server -> packages/config + packages/contracts
+apps/dashboard -> packages/contracts
 packages/git-adapter -> packages/contracts
 packages/contracts -> packages/domain
 packages/testkit -> packages/domain
@@ -28,6 +29,8 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 
 `apps/server` is a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, serves the static dashboard, and exposes only `/health`, `/bootstrap.json`, and `/v1/status` in this phase. The repository snapshot is provided at startup and no HTTP input can select another path.
 
+`apps/dashboard` is the browser presentation adapter. It uses React Router for the small route boundary and TanStack Query for the authenticated status request. A closure reads bootstrap once and retains the bearer token only in memory. The overview renders only contract-validated repository, tool, service, feature, and path data; loading, absent-value, request-error, and unknown-route states are explicit. CSS Modules and shared custom properties provide the restrained product shell without a component framework, charting package, or global state layer.
+
 ## Runtime constraints
 
 - Node.js 24 LTS, strict TypeScript ESM, pnpm workspaces, and TypeScript project references.
@@ -37,4 +40,4 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 
 ## Phase 1 boundary
 
-Phase 1 may add only `packages/git-adapter`, `apps/server`, and `apps/dashboard` as defined by the canonical plan. The remaining work is the real dashboard shell and CLI lifecycle integration. The phase must stop before diff review, SQLite, MCP, or GitHub calls.
+Phase 1 may add only `packages/git-adapter`, `apps/server`, and `apps/dashboard` as defined by the canonical plan. The remaining work is CLI lifecycle integration and end-to-end verification. The phase must stop before diff review, SQLite, MCP, or GitHub calls.

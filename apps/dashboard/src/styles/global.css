@@ -1,0 +1,62 @@
+:root {
+  color: oklch(0.2 0.012 80);
+  background: oklch(0.965 0.008 88);
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --canvas: oklch(0.965 0.008 88);
+  --surface: oklch(0.995 0.002 88);
+  --surface-subtle: oklch(0.975 0.006 88);
+  --ink: oklch(0.2 0.012 80);
+  --ink-secondary: oklch(0.46 0.012 80);
+  --ink-tertiary: oklch(0.59 0.01 80);
+  --border: oklch(0.885 0.008 88);
+  --border-strong: oklch(0.78 0.012 80);
+  --focus: oklch(0.24 0.012 80);
+  --radius-panel: 12px;
+  --radius-control: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: oklch(0.84 0.012 80);
+}

@@ -1,0 +1,480 @@
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  padding: 9px 12px;
+  transform: translateY(-160%);
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: transform 160ms ease-out;
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 24px 16px 18px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.brand {
+  padding: 0 10px 28px;
+  font-size: 1.08rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navLink,
+.navUnavailable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.navLink {
+  transition:
+    color 160ms ease-out,
+    background-color 160ms ease-out;
+}
+
+.navLink:hover {
+  background: oklch(0.94 0.007 88);
+  color: var(--ink);
+}
+
+.navLinkActive {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.navUnavailable {
+  color: var(--ink-tertiary);
+  cursor: not-allowed;
+}
+
+.navUnavailable span {
+  font-size: 0.69rem;
+}
+
+.sidebarFooter {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+  padding: 18px 10px 0;
+  border-top: 1px solid var(--border);
+  color: var(--ink-tertiary);
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 34px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 0.82rem;
+}
+
+.localLabel {
+  color: var(--ink-tertiary);
+}
+
+.main {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 46px 40px 72px;
+}
+
+.repositoryHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 34px;
+}
+
+.contextLabel {
+  margin: 0 0 9px;
+  color: var(--ink-secondary);
+  font-size: 0.82rem;
+}
+
+.repositoryHeader h1,
+.errorState h1,
+.notFoundState h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 620;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.repositoryRoot {
+  max-width: 72ch;
+  margin: 10px 0 0;
+  color: var(--ink-secondary);
+  overflow-wrap: anywhere;
+}
+
+.repositoryState {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.repositoryState span {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 0.75rem;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 18px;
+}
+
+.panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.panelHeader {
+  padding: 22px 24px 18px;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.panelHeader p {
+  max-width: 52ch;
+  margin: 6px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.fieldList,
+.pathList {
+  margin: 0;
+  padding: 0 24px 20px;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1fr);
+  gap: 18px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.field dt {
+  color: var(--ink-secondary);
+}
+
+.field dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.77rem;
+}
+
+.pathsPanel {
+  grid-column: 1 / -1;
+}
+
+.serviceSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 24px 18px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.serviceSummary div {
+  display: grid;
+  gap: 5px;
+  padding: 15px 0;
+}
+
+.serviceSummary div + div {
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+
+.serviceSummary span {
+  color: var(--ink-secondary);
+  font-size: 0.72rem;
+}
+
+.serviceSummary strong {
+  font-size: 0.8rem;
+  font-weight: 560;
+}
+
+.loadingState p {
+  margin: 14px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.85rem;
+}
+
+.loadingGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.skeleton {
+  background: var(--border);
+  animation: loadingPulse 1.4s ease-in-out infinite alternate;
+}
+
+.skeletonContext {
+  width: 118px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeletonTitle {
+  width: min(320px, 70%);
+  height: 36px;
+  margin-top: 14px;
+  border-radius: 6px;
+}
+
+.skeletonPanel,
+.skeletonWide {
+  height: 310px;
+  border-radius: var(--radius-panel);
+}
+
+.skeletonWide {
+  grid-column: 1 / -1;
+  height: 238px;
+}
+
+.errorState,
+.notFoundState {
+  max-width: 620px;
+  padding-top: 52px;
+}
+
+.errorState [role='alert'],
+.notFoundState > p:not(.contextLabel) {
+  max-width: 60ch;
+  margin: 22px 0;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+}
+
+.errorState [role='alert'] p {
+  margin: 0;
+}
+
+.errorState [role='alert'] p + p {
+  margin-top: 5px;
+}
+
+.errorState button,
+.notFoundState a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--surface);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 560;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease-out,
+    transform 100ms ease-out;
+}
+
+.errorState button:hover,
+.notFoundState a:hover {
+  background: oklch(0.29 0.012 80);
+}
+
+.errorState button:active,
+.notFoundState a:active {
+  transform: translateY(1px);
+}
+
+@keyframes loadingPulse {
+  from {
+    opacity: 0.58;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .appShell {
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+
+  .main {
+    padding-inline: 28px;
+  }
+
+  .overviewGrid,
+  .loadingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pathsPanel,
+  .skeletonWide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .appShell {
+    display: block;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    padding: 18px 16px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    padding: 0 2px 14px;
+  }
+
+  .navigation {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .navLink,
+  .navUnavailable {
+    flex: 0 0 auto;
+    gap: 10px;
+  }
+
+  .sidebarFooter {
+    display: none;
+  }
+
+  .topbar {
+    position: static;
+    padding-inline: 20px;
+  }
+
+  .main {
+    padding: 32px 20px 56px;
+  }
+
+  .repositoryHeader {
+    display: block;
+  }
+
+  .repositoryState {
+    justify-content: flex-start;
+    margin-top: 20px;
+  }
+
+  .serviceSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceSummary div + div {
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .localLabel,
+  .navUnavailable span {
+    display: none;
+  }
+
+  .field {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipLink,
+  .navLink,
+  .errorState button,
+  .notFoundState a {
+    transition: none;
+  }
+
+  .skeleton {
+    animation: none;
+  }
+}

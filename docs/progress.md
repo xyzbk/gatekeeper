@@ -110,3 +110,11 @@ Phase 1 may begin only when the user explicitly requests it. It may create `pack
 ## Scope boundary audit
 
 No server, dashboard, MCP server, storage, Git adapter, review engine, diff review, GitHub call, or model call exists.
+
+## Phase 1 progress
+
+Status: IN PROGRESS
+
+Published green slices now provide the strict status contracts, safe Git repository adapter, and secured loopback Fastify service. The current dashboard slice adds the real React/Vite product shell, contract-validated authenticated status client, repository and environment overview, responsive layout, keyboard focus treatment, and explicit loading, absent-value, retryable-error, and unknown-route states.
+
+The only remaining implementation slice is the foreground `gatekeeper start [path]` lifecycle followed by end-to-end and visual verification. Phase 1 still excludes diff review, policy evaluation, SQLite, Project Memory, MCP, GitHub data access, and model reasoning.
