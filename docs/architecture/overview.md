@@ -10,15 +10,20 @@ Browser dashboard --------------------------^            -> SQLite Project Memor
                                                            -> local Git / read-only gh
 ```
 
-Phase 0 implements only the pure foundation and CLI Doctor:
+The current Phase 1 foundation adds the first concrete infrastructure adapter:
 
 ```text
 apps/cli -> packages/config
+packages/git-adapter -> packages/contracts
 packages/contracts -> packages/domain
 packages/testkit -> packages/domain
 ```
 
 The `domain` package owns public entities and the safety rule that only a hard deterministic finding can produce `BLOCK`. `contracts` owns strict serialized shapes. Presentation and future adapters must depend inward and must not redefine these rules.
+
+`git-adapter` resolves the repository selected at startup, verifies that Git's discovered top level contains the requested path, and returns a strict `RepositorySnapshot` with root, branch, HEAD, dirty state, and origin. Every Git invocation uses `execa` with an executable plus an argument array. Detached HEAD and an absent `origin` are represented as `null` rather than invented values.
+
+The Phase 1 status contracts also define health, authenticated status, dashboard bootstrap, tool availability, and machine-local service metadata. Fastify JSON Schemas are generated directly from these Zod contracts.
 
 ## Runtime constraints
 

@@ -21,6 +21,7 @@
       "@gatekeeper/config": ["./packages/config/src/index.ts"],
       "@gatekeeper/contracts": ["./packages/contracts/src/index.ts"],
       "@gatekeeper/domain": ["./packages/domain/src/index.ts"],
+      "@gatekeeper/git-adapter": ["./packages/git-adapter/src/index.ts"],
       "@gatekeeper/testkit": ["./packages/testkit/src/index.ts"]
     },
     "verbatimModuleSyntax": true

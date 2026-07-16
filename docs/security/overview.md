@@ -15,9 +15,19 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - App state resolves to a per-user OS data location outside repositories.
 - CI actions are pinned to immutable commit SHAs and receives read-only repository contents permission.
 
+## Phase 1 Git and contract controls
+
+- The requested repository path is canonicalized and must be a directory.
+- Git's reported top level must contain the requested path; an unrelated root is rejected.
+- Git commands use `execa` argument arrays and never use shell interpolation.
+- Git output is parsed into a strict shared `RepositorySnapshot` contract.
+- Adapter errors do not echo subprocess stdout or stderr, preventing accidental source, path, or secret disclosure.
+- Health and status are different strict contracts; the health shape has no repository or path fields.
+- Service metadata and dashboard bootstrap contracts require loopback URLs and a high-entropy bearer-token shape.
+
 ## Deferred boundaries
 
-The localhost bearer token, Host/Origin checks, CSP, Git path containment, secret denial/redaction, SQLite protection, MCP protocol isolation, and read-only `gh` adapter are required in their scheduled phases. They are not placeholder implementations in Phase 0.
+The localhost bearer-token lifecycle, Host/Origin checks, CSP, secret denial/redaction, SQLite protection, MCP protocol isolation, and read-only `gh` adapter are required in their scheduled steps and phases. They are not placeholder implementations.
 
 ## Logging
 

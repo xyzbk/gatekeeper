@@ -5,6 +5,7 @@
     { "path": "packages/testkit" },
     { "path": "packages/contracts" },
     { "path": "packages/config" },
+    { "path": "packages/git-adapter" },
     { "path": "apps/cli" }
   ]
 }
