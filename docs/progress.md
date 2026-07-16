@@ -107,14 +107,46 @@ pnpm audit --audit-level high
 
 Phase 1 may begin only when the user explicitly requests it. It may create `packages/git-adapter`, `apps/server`, and `apps/dashboard`, and must stop before SQLite, MCP, GitHub calls, or model reasoning.
 
-## Scope boundary audit
+## Phase 0 scope boundary audit at completion
 
 No server, dashboard, MCP server, storage, Git adapter, review engine, diff review, GitHub call, or model call exists.
 
-## Phase 1 progress
+## Phase 1 completion report
 
-Status: IN PROGRESS
+Phase: Local service spine and real dashboard shell
 
-Published green slices now provide the strict status contracts, safe Git repository adapter, and secured loopback Fastify service. The current dashboard slice adds the real React/Vite product shell, contract-validated authenticated status client, repository and environment overview, responsive layout, keyboard focus treatment, and explicit loading, absent-value, retryable-error, and unknown-route states.
+Status: COMPLETE
 
-The foreground `gatekeeper start [path]` lifecycle is now implemented: it fixes one repository snapshot, probes local tool versions, serves the built dashboard, prints only bounded connection details, handles process shutdown, and removes ephemeral metadata. End-to-end and visual verification remain before Phase 1 can be marked complete. Phase 1 still excludes diff review, policy evaluation, SQLite, Project Memory, MCP, GitHub data access, and model reasoning.
+### Implemented
+
+- Added strict repository snapshot, health, bootstrap, status, tool-availability, and service-metadata contracts.
+- Added safe Git root discovery and snapshot inspection through `execa` argument arrays.
+- Added the loopback-only Fastify service with bearer authentication, Host and Origin validation, restrictive CSP, strict request and response schemas, bounded Pino logs, and ephemeral machine-local metadata.
+- Added the React/Vite dashboard with React Router, TanStack Query, in-memory bootstrap, real repository and environment data, responsive CSS Modules, and explicit loading, absent-value, retryable-error, and unknown-route states.
+- Added the foreground `gatekeeper start [path]` lifecycle with local tool inspection, built-dashboard serving, signal handling, and orderly cleanup.
+
+### Verification
+
+All commands exited 0 on 2026-07-17:
+
+```text
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm format:check
+pnpm audit --audit-level high
+```
+
+- 14 test files and 51 tests passed.
+- The exact source CLI start command served the built dashboard and authenticated status API on `127.0.0.1`.
+- Health returned only `status` and `version`; an arbitrary repository-path query was rejected with 400.
+- Browser review at desktop and 375-pixel mobile widths found no horizontal overflow, unnamed controls, console warnings, or console errors.
+- The desktop layout, responsive navigation, real null/disabled states, keyboard order, visible focus CSS, and reduced-motion behavior were reviewed.
+- Ctrl+C stopped the service, made the port unreachable, and removed ephemeral service metadata.
+- The dependency audit reported no known vulnerabilities.
+
+### Scope boundary
+
+Phase 1 stops here. No diff review, review engine, SQLite, Project Memory, FTS5, MCP server, Codex skill, GitHub data call, or model reasoning was added. Phase 2 may begin only when the user explicitly requests it.

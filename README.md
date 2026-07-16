@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phase 0 is complete. The Phase 1 implementation now provides strict local-service contracts, safe Git repository inspection, the bearer-authenticated Fastify service, the real React dashboard, and the foreground `gatekeeper start` lifecycle. End-to-end review is the remaining Phase 1 gate. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
+Phases 0 and 1 are complete. Gatekeeper now provides strict local-service contracts, safe Git repository inspection, the bearer-authenticated Fastify service, the real React dashboard, and the foreground `gatekeeper start` lifecycle. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
 
 ## Quick start
 

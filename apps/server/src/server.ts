@@ -142,7 +142,7 @@ export async function buildGatekeeperServer(
     server.log.warn(
       {
         requestId: request.id,
-        operation: `${request.method} ${request.routeOptions.url}`,
+        operation: `${request.method} ${request.routeOptions.url ?? 'unmatched-route'}`,
         errorCategory: validationFailure ? 'validation' : 'internal',
       },
       'request rejected',
@@ -180,7 +180,7 @@ export async function buildGatekeeperServer(
     server.log.info(
       {
         requestId: request.id,
-        operation: `${request.method} ${request.routeOptions.url}`,
+        operation: `${request.method} ${request.routeOptions.url ?? 'unmatched-route'}`,
         durationMs: reply.elapsedTime,
         resultCount: reply.statusCode < 400 ? 1 : 0,
         resultState: reply.statusCode < 400 ? 'success' : 'rejected',

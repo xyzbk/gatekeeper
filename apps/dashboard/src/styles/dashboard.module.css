@@ -176,7 +176,7 @@
 
 .overviewGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
   gap: 18px;
 }
 
@@ -278,7 +278,7 @@
 
 .loadingGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
   gap: 18px;
   margin-top: 34px;
 }

@@ -243,10 +243,18 @@ describe('Gatekeeper local service', () => {
       url: '/v1/status',
       headers: { host, authorization: `Bearer ${bearerToken}` },
     });
+    await server.inject({
+      method: 'GET',
+      url: '/missing?private=detail',
+      headers: { host },
+    });
     await server.close();
 
     expect(logs).toContain('GET /v1/status');
+    expect(logs).toContain('GET unmatched-route');
     expect(logs).toContain('durationMs');
+    expect(logs).not.toContain('GET undefined');
+    expect(logs).not.toContain('private=detail');
     expect(logs).not.toContain(bearerToken);
     expect(logs).not.toContain(repository.root);
   });

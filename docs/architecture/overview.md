@@ -42,4 +42,4 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 
 ## Phase 1 boundary
 
-Phase 1 may add only `packages/git-adapter`, `apps/server`, and `apps/dashboard` as defined by the canonical plan. The remaining work is end-to-end verification and the phase review. The phase must stop before diff review, SQLite, MCP, or GitHub calls.
+Phase 1 is complete with only `packages/git-adapter`, `apps/server`, and `apps/dashboard` added to the Phase 0 workspace. The phase stops before diff review, SQLite, MCP, GitHub calls, and model reasoning; those boundaries remain closed until their scheduled phases.
