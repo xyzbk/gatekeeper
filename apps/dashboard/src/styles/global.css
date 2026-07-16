@@ -1,7 +1,18 @@
+@font-face {
+  font-family: 'Onest Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/onest/files/onest-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
 :root {
-  color: oklch(0.2 0.012 80);
-  background: oklch(0.965 0.008 88);
+  color: oklch(0.94 0.003 285);
+  background: oklch(0.245 0.004 285);
+  color-scheme: dark;
   font-family:
+    'Onest Variable',
     ui-sans-serif,
     -apple-system,
     BlinkMacSystemFont,
@@ -9,15 +20,18 @@
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --canvas: oklch(0.965 0.008 88);
-  --surface: oklch(0.995 0.002 88);
-  --surface-subtle: oklch(0.975 0.006 88);
-  --ink: oklch(0.2 0.012 80);
-  --ink-secondary: oklch(0.46 0.012 80);
-  --ink-tertiary: oklch(0.59 0.01 80);
-  --border: oklch(0.885 0.008 88);
-  --border-strong: oklch(0.78 0.012 80);
-  --focus: oklch(0.24 0.012 80);
+  -webkit-font-smoothing: antialiased;
+  --canvas: oklch(0.245 0.004 285);
+  --sidebar: oklch(0.195 0.004 285);
+  --surface: oklch(0.285 0.005 285);
+  --surface-raised: oklch(0.33 0.006 285);
+  --surface-hover: oklch(0.36 0.006 285);
+  --ink: oklch(0.94 0.003 285);
+  --ink-secondary: oklch(0.76 0.006 285);
+  --ink-tertiary: oklch(0.67 0.006 285);
+  --border: oklch(0.39 0.006 285);
+  --border-strong: oklch(0.48 0.008 285);
+  --focus: oklch(0.82 0.09 248);
   --radius-panel: 12px;
   --radius-control: 8px;
 }
@@ -42,6 +56,7 @@ body {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 button {
@@ -58,5 +73,6 @@ a {
 }
 
 ::selection {
-  background: oklch(0.84 0.012 80);
+  background: oklch(0.43 0.08 248);
+  color: var(--ink);
 }

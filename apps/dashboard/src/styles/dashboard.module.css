@@ -7,7 +7,7 @@
   transform: translateY(-160%);
   border-radius: var(--radius-control);
   background: var(--ink);
-  color: var(--surface);
+  color: var(--sidebar);
   font-size: 0.875rem;
   text-decoration: none;
   transition: transform 160ms ease-out;
@@ -19,8 +19,9 @@
 
 .appShell {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 252px minmax(0, 1fr);
   min-height: 100dvh;
+  background: var(--canvas);
 }
 
 .sidebar {
@@ -29,16 +30,15 @@
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: 24px 16px 18px;
-  border-right: 1px solid var(--border);
-  background: var(--surface-subtle);
+  padding: 18px 12px 16px;
+  background: var(--sidebar);
 }
 
 .brand {
-  padding: 0 10px 28px;
-  font-size: 1.08rem;
-  font-weight: 650;
-  letter-spacing: -0.025em;
+  padding: 5px 10px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.018em;
 }
 
 .navigation {
@@ -52,11 +52,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 40px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 0 11px;
   border-radius: var(--radius-control);
   color: var(--ink-secondary);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   text-decoration: none;
 }
 
@@ -67,14 +67,18 @@
 }
 
 .navLink:hover {
-  background: oklch(0.94 0.007 88);
+  background: var(--surface);
   color: var(--ink);
 }
 
+.navLink:active {
+  background: var(--surface-hover);
+}
+
 .navLinkActive {
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 520;
 }
 
 .navUnavailable {
@@ -83,17 +87,17 @@
 }
 
 .navUnavailable span {
-  font-size: 0.69rem;
+  font-size: 0.66rem;
 }
 
 .sidebarFooter {
   display: grid;
   gap: 4px;
   margin-top: auto;
-  padding: 18px 10px 0;
+  padding: 16px 10px 0;
   border-top: 1px solid var(--border);
   color: var(--ink-tertiary);
-  font-size: 0.73rem;
+  font-size: 0.7rem;
   line-height: 1.45;
 }
 
@@ -108,12 +112,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 58px;
-  padding: 0 34px;
+  min-height: 54px;
+  padding: 0 30px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--canvas);
   color: var(--ink-secondary);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .localLabel {
@@ -121,9 +125,9 @@
 }
 
 .main {
-  width: min(1180px, 100%);
+  width: min(1200px, 100%);
   margin: 0 auto;
-  padding: 46px 40px 72px;
+  padding: 38px 40px 72px;
 }
 
 .repositoryHeader {
@@ -131,29 +135,29 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 32px;
-  margin-bottom: 34px;
+  margin-bottom: 30px;
 }
 
 .contextLabel {
-  margin: 0 0 9px;
+  margin: 0 0 8px;
   color: var(--ink-secondary);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .repositoryHeader h1,
 .errorState h1,
 .notFoundState h1 {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 620;
-  letter-spacing: -0.035em;
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   line-height: 1.15;
   text-wrap: balance;
 }
 
 .repositoryRoot {
   max-width: 72ch;
-  margin: 10px 0 0;
+  margin: 9px 0 0;
   color: var(--ink-secondary);
   overflow-wrap: anywhere;
 }
@@ -166,17 +170,16 @@
 }
 
 .repositoryState span {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
+  padding: 6px 9px;
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--ink-secondary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
 .overviewGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
   gap: 18px;
 }
 
@@ -188,42 +191,43 @@
 }
 
 .panelHeader {
-  padding: 22px 24px 18px;
+  padding: 20px 22px 16px;
 }
 
 .panelHeader h2 {
   margin: 0;
   font-size: 1rem;
-  font-weight: 620;
-  letter-spacing: -0.015em;
+  font-weight: 580;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
 }
 
 .panelHeader p {
   max-width: 52ch;
-  margin: 6px 0 0;
+  margin: 5px 0 0;
   color: var(--ink-secondary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   line-height: 1.55;
 }
 
 .fieldList,
 .pathList {
   margin: 0;
-  padding: 0 24px 20px;
+  padding: 0 22px 18px;
 }
 
 .field {
   display: grid;
   grid-template-columns: 126px minmax(0, 1fr);
   gap: 18px;
-  padding: 11px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--border);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   line-height: 1.5;
 }
 
 .field dt {
-  color: var(--ink-secondary);
+  color: var(--ink-tertiary);
 }
 
 .field dd {
@@ -234,7 +238,8 @@
 
 .mono {
   font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  font-size: 0.77rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .pathsPanel {
@@ -244,7 +249,7 @@
 .serviceSummary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 24px 18px;
+  margin: 0 22px 16px;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
@@ -252,7 +257,7 @@
 .serviceSummary div {
   display: grid;
   gap: 5px;
-  padding: 15px 0;
+  padding: 14px 0;
 }
 
 .serviceSummary div + div {
@@ -261,13 +266,14 @@
 }
 
 .serviceSummary span {
-  color: var(--ink-secondary);
-  font-size: 0.72rem;
+  color: var(--ink-tertiary);
+  font-size: 0.69rem;
 }
 
 .serviceSummary strong {
-  font-size: 0.8rem;
-  font-weight: 560;
+  font-size: 0.78rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
 }
 
 .loadingState p {
@@ -278,13 +284,13 @@
 
 .loadingGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
   gap: 18px;
   margin-top: 34px;
 }
 
 .skeleton {
-  background: var(--border);
+  background: var(--surface-raised);
   animation: loadingPulse 1.4s ease-in-out infinite alternate;
 }
 
@@ -341,13 +347,13 @@
   align-items: center;
   justify-content: center;
   padding: 0 14px;
-  border: 1px solid var(--ink);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--ink);
-  color: var(--surface);
+  color: var(--sidebar);
   cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 560;
+  font-size: 0.82rem;
+  font-weight: 580;
   text-decoration: none;
   transition:
     background-color 160ms ease-out,
@@ -356,7 +362,7 @@
 
 .errorState button:hover,
 .notFoundState a:hover {
-  background: oklch(0.29 0.012 80);
+  background: var(--ink-secondary);
 }
 
 .errorState button:active,
@@ -375,7 +381,7 @@
 
 @media (max-width: 900px) {
   .appShell {
-    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 
   .main {
@@ -401,7 +407,7 @@
   .sidebar {
     position: static;
     height: auto;
-    padding: 18px 16px 14px;
+    padding: 14px 14px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }

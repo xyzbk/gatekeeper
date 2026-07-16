@@ -25,11 +25,11 @@ function Field({ label, mono = false, value }: FieldProps) {
 
 function LoadingState() {
   return (
-    <div aria-label="Reading repository status" className={styles.loadingState} role="status">
+    <div aria-label="Reading repository status…" className={styles.loadingState} role="status">
       <div>
         <div className={`${styles.skeleton} ${styles.skeletonContext}`} />
         <div className={`${styles.skeleton} ${styles.skeletonTitle}`} />
-        <p>Reading repository status</p>
+        <p>Reading repository status…</p>
       </div>
       <div className={styles.loadingGrid}>
         <div className={`${styles.skeleton} ${styles.skeletonPanel}`} />

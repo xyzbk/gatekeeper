@@ -122,7 +122,7 @@ Status: COMPLETE
 - Added strict repository snapshot, health, bootstrap, status, tool-availability, and service-metadata contracts.
 - Added safe Git root discovery and snapshot inspection through `execa` argument arrays.
 - Added the loopback-only Fastify service with bearer authentication, Host and Origin validation, restrictive CSP, strict request and response schemas, bounded Pino logs, and ephemeral machine-local metadata.
-- Added the React/Vite dashboard with React Router, TanStack Query, in-memory bootstrap, real repository and environment data, responsive CSS Modules, and explicit loading, absent-value, retryable-error, and unknown-route states.
+- Added the React/Vite dashboard with React Router, TanStack Query, in-memory bootstrap, real repository and environment data, responsive CSS Modules, a locally bundled Onest variable font, a dark graphite product theme, and explicit loading, absent-value, retryable-error, and unknown-route states.
 - Added the foreground `gatekeeper start [path]` lifecycle with local tool inspection, built-dashboard serving, signal handling, and orderly cleanup.
 
 ### Verification

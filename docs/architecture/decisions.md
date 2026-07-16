@@ -28,7 +28,7 @@ All decisions below are accepted for the Build Week scope as of 2026-07-16.
 
 ## ADR-007: CSS Modules without a component library
 
-**Context:** The dashboard needs a precise, quiet product identity with limited time. **Decision:** Use React, CSS Modules, and shared CSS custom properties. **Consequence:** No Tailwind, component framework, charting library, or global state library unless an implemented requirement proves necessary.
+**Context:** The dashboard needs a precise, quiet product identity with limited time. **Decision:** Use React, CSS Modules, shared CSS custom properties, a locally bundled variable sans, and one dark graphite theme inspired by familiar OpenAI product surfaces without copying their marks or assets. **Consequence:** No Tailwind, component framework, charting library, global state library, remote font request, or theme-switching system unless an implemented requirement proves necessary.
 
 ## ADR-008: pnpm workspaces without Turborepo
 

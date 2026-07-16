@@ -57,8 +57,8 @@ describe('dashboard application shell', () => {
   it('renders an accessible loading state', async () => {
     await renderDashboard(() => new Promise(() => undefined));
 
-    expect(screen.getByRole('status', { name: 'Reading repository status' })).toBeInTheDocument();
-    expect(screen.getByText('Reading repository status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Reading repository status…' })).toBeInTheDocument();
+    expect(screen.getByText('Reading repository status…')).toBeInTheDocument();
   });
 
   it('renders only real repository and environment values', async () => {
