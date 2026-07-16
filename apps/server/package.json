@@ -1,5 +1,5 @@
 {
-  "name": "@gatekeeper/config",
+  "name": "@gatekeeper/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,9 @@
     }
   },
   "dependencies": {
-    "env-paths": "4.0.0",
-    "yaml": "2.9.0",
-    "zod": "4.4.3"
+    "@fastify/static": "10.1.0",
+    "@gatekeeper/config": "workspace:*",
+    "@gatekeeper/contracts": "workspace:*",
+    "fastify": "5.10.0"
   }
 }

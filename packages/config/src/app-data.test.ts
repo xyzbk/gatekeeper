@@ -23,3 +23,13 @@ it('treats an empty data-home variable as unset', async () => {
     }),
   ).toBe('/home/tester/.local/share/gatekeeper');
 });
+
+it('derives all service paths from one machine-local root', async () => {
+  const { resolveServicePaths } = await import('./app-data.js');
+
+  expect(resolveServicePaths('/var/lib/gatekeeper')).toEqual({
+    appData: '/var/lib/gatekeeper',
+    serviceMetadata: '/var/lib/gatekeeper/service.json',
+    storage: '/var/lib/gatekeeper/storage',
+  });
+});

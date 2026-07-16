@@ -81,19 +81,26 @@ export const serviceMetadataSchema = z
   })
   .strict();
 
+export const emptyRequestSchema = z.object({}).strict();
+
 export const healthResponseJsonSchema = {
   $id: 'gatekeeper:health-response',
-  ...z.toJSONSchema(healthResponseSchema, { target: 'draft-2020-12' }),
+  ...z.toJSONSchema(healthResponseSchema, { target: 'draft-7' }),
 };
 
 export const statusResponseJsonSchema = {
   $id: 'gatekeeper:status-response-v1',
-  ...z.toJSONSchema(statusResponseSchema, { target: 'draft-2020-12' }),
+  ...z.toJSONSchema(statusResponseSchema, { target: 'draft-7' }),
 };
 
 export const dashboardBootstrapJsonSchema = {
   $id: 'gatekeeper:dashboard-bootstrap-v1',
-  ...z.toJSONSchema(dashboardBootstrapSchema, { target: 'draft-2020-12' }),
+  ...z.toJSONSchema(dashboardBootstrapSchema, { target: 'draft-7' }),
+};
+
+export const emptyRequestJsonSchema = {
+  $id: 'gatekeeper:empty-request',
+  ...z.toJSONSchema(emptyRequestSchema, { target: 'draft-7' }),
 };
 
 export type RepositorySnapshot = z.infer<typeof repositorySnapshotSchema>;

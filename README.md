@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phase 0 establishes the strict TypeScript workspace, review and policy contracts, verdict invariant, Doctor command, CI, and security/architecture documentation. It intentionally does **not** review diffs, run a server, store data, call GitHub, expose MCP tools, or render a dashboard yet.
+Phase 0 is complete. Phase 1 now includes strict local-service contracts, safe Git repository inspection, and the bearer-authenticated Fastify service spine. The dashboard and `gatekeeper start` integration are the remaining Phase 1 slices. Diff review, persistent storage, MCP, GitHub data, and model reasoning remain behind later phase gates.
 
 ## Quick start
 
@@ -29,8 +29,10 @@ pnpm --filter @gatekeeper/cli start -- doctor --format json
 - `packages/domain`: pure IDs, review entities, and deterministic verdict rules.
 - `packages/contracts`: strict Zod contracts and generated JSON Schema.
 - `packages/config`: policy parsing and app-data path resolution.
+- `packages/git-adapter`: safe repository-root discovery and truthful Git status.
 - `packages/testkit`: deterministic fixtures shared by tests.
 - `apps/cli`: `--version`, `--help`, and `doctor` only.
+- `apps/server`: loopback-only Fastify service, secure bootstrap, health, and status APIs.
 
 The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdict.schema.json), generated from the Zod contract and checked for drift by tests. The canonical policy example is [gatekeeper.policy.example.yaml](gatekeeper.policy.example.yaml).
 
@@ -41,6 +43,7 @@ The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdi
 - [Security model](docs/security/overview.md)
 - [Verdict reference](docs/reference/verdicts.md)
 - [Policy reference](docs/reference/policy.md)
+- [Local API reference](docs/reference/local-api.md)
 - [Development setup](docs/development/setup.md)
 - [Build progress](docs/progress.md)
 - [Build Week execution plan](gatekeeper_codex_build_pack/GATEKEEPER_HACKATHON_PHASED_EXECUTION_PLAN.md)

@@ -6,6 +6,8 @@ export const ERROR_CODES = [
   'ENVIRONMENT_ERROR',
   'NOT_FOUND',
   'CONFLICT',
+  'UNAUTHORIZED',
+  'FORBIDDEN',
   'INTERNAL_ERROR',
 ] as const;
 
@@ -20,5 +22,10 @@ export const errorEnvelopeSchema = z
       .strict(),
   })
   .strict();
+
+export const errorEnvelopeJsonSchema = {
+  $id: 'gatekeeper:error-envelope',
+  ...z.toJSONSchema(errorEnvelopeSchema, { target: 'draft-7' }),
+};
 
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;

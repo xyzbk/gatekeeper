@@ -25,10 +25,24 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Health and status are different strict contracts; the health shape has no repository or path fields.
 - Service metadata and dashboard bootstrap contracts require loopback URLs and a high-entropy bearer-token shape.
 
+## Phase 1 local-service controls
+
+- Fastify binds explicitly to `127.0.0.1` on an available port.
+- A 32-byte token is generated with `node:crypto` and written to machine-local service metadata with mode `0600` where supported.
+- Protected `/v1/*` requests require a timing-safe bearer-token comparison.
+- The browser obtains bootstrap configuration from the same origin with `Cache-Control: no-store`; the token is not placed in a URL or log.
+- Host must resolve exactly to `127.0.0.1`; a supplied Origin must match the request Host and use HTTP.
+- No CORS response headers are enabled.
+- CSP permits only same-origin scripts, styles, fonts, images, and API connections. Framing, objects, forms, and base-URL changes are denied.
+- Fastify rejects unknown query fields instead of silently removing them. In particular, `/v1/status` rejects arbitrary repository paths.
+- API validation and not-found failures use the shared strict error envelope.
+- Structured Pino logs contain request ID, operation, duration, result count, result state, and error category only. They exclude headers, payloads, repository paths, source, diffs, and tokens.
+- Service metadata is removed during orderly shutdown.
+
 ## Deferred boundaries
 
-The localhost bearer-token lifecycle, Host/Origin checks, CSP, secret denial/redaction, SQLite protection, MCP protocol isolation, and read-only `gh` adapter are required in their scheduled steps and phases. They are not placeholder implementations.
+Dashboard in-memory token handling, SQLite protection, MCP protocol isolation, and the read-only `gh` adapter are required in their scheduled steps and phases. They are not placeholder implementations.
 
 ## Logging
 
-Phase 0 has no application logger and Doctor prints only tool availability, versions, and the app-data path. Future structured logs must exclude source, diffs, excerpts, tokens, secrets, and private repository content.
+Doctor prints only tool availability, versions, and the app-data path. The local service disables Fastify's request-header logging and emits its own bounded operational records. Future phases must preserve the same exclusions for source, diffs, excerpts, tokens, secrets, and private repository content.

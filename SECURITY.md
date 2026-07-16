@@ -18,4 +18,4 @@ Include the affected version/commit, reproduction steps with synthetic data, imp
 - Evidence excerpts are bounded to 2,000 characters.
 - Default tests use no network or credentials.
 
-Phase 0 provides contracts and Doctor only. The localhost service, MCP boundary, Git/GitHub adapters, database, and model-data controls do not exist yet and must not be implied by this foundation.
+The current localhost service binds only to `127.0.0.1`, validates Host and Origin, protects `/v1/*` with an ephemeral bearer token, applies a restrictive CSP, and rejects unknown API inputs. The Git adapter uses argument arrays and validates the discovered repository root. SQLite, MCP, GitHub data, and model-data controls do not exist yet and must not be implied by the current phase.
