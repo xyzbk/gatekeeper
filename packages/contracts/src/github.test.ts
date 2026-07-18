@@ -4,6 +4,9 @@ import {
   githubHistoryBatchSchema,
   githubRemoteSchema,
   githubSyncLimitsSchema,
+  githubSyncResultJsonSchema,
+  pullRequestReviewInputJsonSchema,
+  pullRequestReviewInputSchema,
   pullRequestRecordSchema,
 } from './github.js';
 
@@ -93,5 +96,21 @@ describe('GitHub contracts', () => {
 
     expect(parsed.records).toHaveLength(1);
     expect(parsed.failures).toHaveLength(1);
+  });
+
+  it('publishes strict API schemas for pull-request review and GitHub sync', () => {
+    expect(pullRequestReviewInputSchema.parse({ schemaVersion: 1, pullRequestNumber: 12 })).toEqual(
+      { schemaVersion: 1, pullRequestNumber: 12 },
+    );
+    expect(() =>
+      pullRequestReviewInputSchema.parse({
+        schemaVersion: 1,
+        pullRequestNumber: 0,
+        remote: 'attacker/repository',
+      }),
+    ).toThrow();
+    expect(pullRequestReviewInputJsonSchema.$id).toBe('gatekeeper:pull-request-review-input-v1');
+    expect(pullRequestReviewInputJsonSchema.additionalProperties).toBe(false);
+    expect(githubSyncResultJsonSchema.$id).toBe('gatekeeper:github-sync-result-v1');
   });
 });

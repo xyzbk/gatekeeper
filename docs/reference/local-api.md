@@ -105,6 +105,19 @@ The service persists the review transaction before responding. Re-reviewing the 
 
 The shortened example omits optional metrics and uses an empty findings array only for readability; consumers must use the contract rather than copy this example as a complete semantic result.
 
+### `POST /v1/reviews/pull-request`
+
+Runs the same deterministic reviewer for one pull request belonging to the fixed service repository:
+
+```json
+{
+  "schemaVersion": 1,
+  "pullRequestNumber": 12
+}
+```
+
+The pull-request number must be a positive integer. Additional fields—including paths, remotes, repository selectors, tokens, or publication settings—are rejected. The service reads bounded metadata and file changes through authenticated `gh`, verifies the normalized remote still matches the service-start snapshot, records GitHub check state and suspicious instruction-like text as inert evidence, persists the strict ReviewRun v1, and indexes the current pull request in Project Memory before responding. A later review of the same pull-request number receives the prior review ID, including after a service restart.
+
 ### `POST /v1/repositories`
 
 Returns the already-registered repository fixed at service start. The request body must be exactly `{}`; no path, remote, or repository selector is accepted.
@@ -116,6 +129,12 @@ Returns the fixed strict RepositoryRecord v1. Any other repository ID returns `N
 ### `POST /v1/repositories/:repositoryId/index`
 
 Runs bounded incremental indexing for the fixed repository. The body must be exactly `{}`. The strict IndexResult v1 reports scanned, written, unchanged, and deleted counts for files, evidence documents, and commits.
+
+### `POST /v1/repositories/:repositoryId/sync/github`
+
+Synchronizes bounded GitHub issues, pull requests, comments, and reviews for the fixed repository. The body must be exactly `{}` and any other repository ID returns `NOT_FOUND`. The strict GitHubSyncResult v1 reports document/link counts, partial failures, and the resulting cursor. A partial import is a successful typed result: valid records persist, while the cursor stays unchanged so malformed records can be retried.
+
+This endpoint is read-only with respect to GitHub. It cannot publish comments, checks, labels, branches, commits, merges, closes, or any other remote mutation.
 
 ### `GET /v1/repositories/:repositoryId/memory/status`
 
@@ -207,4 +226,4 @@ All controlled API failures use the shared strict envelope:
 }
 ```
 
-The API uses `USAGE_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, and `INTERNAL_ERROR` as applicable. Responses never include stacks, subprocess output, tokens, repository content beyond bounded evidence, diff text, database details, or rejected input values. Failed Project Memory and review operations return a stable internal error; server logs retain only bounded operation metadata.
+The API uses `USAGE_ERROR`, `ENVIRONMENT_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, and `INTERNAL_ERROR` as applicable. Missing `gh` or authentication returns status `503` with bounded repair guidance. Responses never include stacks, subprocess output, tokens, remote bodies, repository content beyond bounded evidence, diff text, database details, or rejected input values. Failed Project Memory and review operations return a stable internal error; server logs retain only bounded operation metadata.

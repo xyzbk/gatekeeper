@@ -11,6 +11,7 @@ import {
 import { execa } from 'execa';
 
 import { runWorktreeReview } from './worktree-review.js';
+import { runPullRequestReview } from './pull-request-review.js';
 
 export const GATEKEEPER_VERSION = '0.1.0';
 
@@ -36,6 +37,11 @@ export interface StartCommandDependencies {
     repositoryPath: string,
     context: PersistentReviewContext,
   ) => ReturnType<typeof runWorktreeReview>;
+  reviewPullRequest: (
+    repositoryPath: string,
+    pullRequestNumber: number,
+    context: PersistentReviewContext,
+  ) => ReturnType<typeof runPullRequestReview>;
   startService: StartService;
   waitUntilShutdown: () => Promise<void>;
   write: (message: string) => void;
@@ -96,6 +102,8 @@ const defaultDependencies: StartCommandDependencies = {
   inspectTool: inspectLocalTool,
   reviewWorktree: (repositoryPath, context) =>
     runWorktreeReview(repositoryPath, undefined, context),
+  reviewPullRequest: (repositoryPath, number, context) =>
+    runPullRequestReview(repositoryPath, number, context),
   startService: startGatekeeperService,
   waitUntilShutdown: waitForShutdownSignal,
   write: (message) => {
@@ -115,6 +123,8 @@ export async function runStartCommand(
   const service = await dependencies.startService({
     dashboardRoot: dependencies.dashboardRoot,
     repository,
+    reviewPullRequest: (number, context) =>
+      dependencies.reviewPullRequest(repository.root, number, context),
     reviewWorktree: (context) => dependencies.reviewWorktree(repository.root, context),
     tools: { git, gh },
     version: GATEKEEPER_VERSION,

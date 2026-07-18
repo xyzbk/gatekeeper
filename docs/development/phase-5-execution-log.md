@@ -134,3 +134,34 @@ GREEN:
 - Compiled command help and invalid zero-number rejection: PASS.
 
 Further RED states, GREEN commands, unexpected failures, corrections, aggressive-test findings, and commit hashes will be appended per verified task.
+
+### Task 5 — fixed-repository Fastify GitHub operations
+
+Expected RED:
+
+- Shared contracts did not expose strict pull-request input or GitHub-sync response JSON Schemas.
+- The authenticated sync and pull-request routes returned `404` because no Fastify boundary existed.
+
+Implemented:
+
+- Added strict `{ schemaVersion: 1, pullRequestNumber }` input and GitHubSyncResult draft-7 schemas.
+- Added authenticated `POST /v1/reviews/pull-request` and `POST /v1/repositories/:repositoryId/sync/github` routes without path, remote, token, or arbitrary-repository selectors.
+- Reused the read-only provider, incremental memory operations, deterministic PR composition, current-PR evidence normalization, persisted review transaction, and previous-review linkage from the CLI path.
+- Added bounded `ENVIRONMENT_ERROR` status `503` responses with repair guidance for missing `gh` or authentication.
+
+Aggressive checks and corrections:
+
+- Extra remote selectors, zero pull-request numbers, wrong repository IDs, and unknown query/body fields are rejected before application callbacks.
+- Partial history sync remains a typed `200` result and does not become an exception.
+- An authentication error containing simulated private body/token detail produced only a fixed message and repair action; neither the response nor operational logs contained the detail.
+- The first PR API fixture used `baseRef`/`headRef`, which strict ReviewRun correctly rejected. It was corrected to the established `base`/`head` contract rather than weakening validation.
+- A complete Fastify/SQLite close and reopen preserved a PR review, its indexed pull-request evidence, and the next same-number review's `previousReviewId`.
+- A break test found that the PR adapter re-inspected `origin` at request time. The service now compares the adapter's normalized remote with the startup snapshot before persisting anything; simulated remote drift returns a bounded repair response and leaves no review behind.
+
+GREEN:
+
+- Focused contracts, Fastify API, restart, remote-drift, and start-command suites: PASS (36 tests).
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (34 files, 215 tests).
+- `pnpm build`: PASS.

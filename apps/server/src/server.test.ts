@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type {
+  GitHubSyncResult,
   IndexResult,
   IndexState,
   MemorySearchResult,
+  PullRequestRecord,
   RepositoryRecord,
   ReviewCompletionInput,
   ReviewDraftContract,
@@ -14,6 +16,7 @@ import type {
   StatusResponse,
 } from '@gatekeeper/contracts';
 import { reviewRunSchema } from '@gatekeeper/contracts';
+import { GitHubProviderError } from '@gatekeeper/github-gh';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectMemoryApi } from './server.js';
@@ -166,6 +169,63 @@ const completedReview: ReviewRunContract = {
   model: 'active-codex-model',
 };
 
+const pullRequestReview: ReviewRunContract = {
+  ...reviewResponse,
+  reviewId: 'review_api_pr_12',
+  target: {
+    kind: 'pull_request',
+    display: 'Pull request #12',
+    pullRequestNumber: 12,
+    base: 'master',
+    head: 'redis-cache',
+  },
+};
+
+const githubSyncResult: GitHubSyncResult = {
+  schemaVersion: 1,
+  repositoryId: repositoryRecord.repositoryId,
+  provider: 'github',
+  syncedAt: '2026-07-18T12:00:00Z',
+  cursor: null,
+  partial: true,
+  documents: { received: 2, written: 1, unchanged: 0 },
+  links: { received: 1, written: 1, unchanged: 0 },
+  failures: [{ source: 'review:99', code: 'malformed_record' }],
+};
+
+const pullRequestRecord: PullRequestRecord = {
+  number: 12,
+  title: 'Require Redis cache',
+  body: 'Restore the required cache.',
+  state: 'OPEN',
+  url: 'https://github.com/xyzbk/gatekeeper/pull/12',
+  author: 'octocat',
+  baseRefName: 'master',
+  headRefName: 'redis-cache',
+  headRefOid: 'c'.repeat(40),
+  additions: 2,
+  deletions: 1,
+  changedFiles: 1,
+  checks: 'pass',
+  isDraft: false,
+  closingIssueNumbers: [],
+  createdAt: '2026-07-18T10:00:00Z',
+  updatedAt: '2026-07-18T12:00:00Z',
+  closedAt: null,
+  mergedAt: null,
+};
+
+const githubRemote = {
+  host: 'github.com',
+  owner: 'xyzbk',
+  name: 'gatekeeper',
+  nameWithOwner: 'xyzbk/gatekeeper',
+  url: 'https://github.com/xyzbk/gatekeeper',
+} as const;
+
+const unexercisedPullRequestReview = () =>
+  Promise.reject(new Error('pull-request review was not expected in this test'));
+
 async function createDashboardFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'gatekeeper-dashboard-'));
   await writeFile(join(root, 'index.html'), '<!doctype html><title>Gatekeeper</title>', 'utf8');
@@ -181,6 +241,7 @@ async function buildTestServer(
     logger?: unknown;
     prepareReview?: (reviewId: string) => Promise<ReviewDraftContract | null>;
     projectMemory?: Partial<ProjectMemoryApi>;
+    reviewPullRequest?: (pullRequestNumber: number) => Promise<ReviewRunContract>;
     reviewWorktree?: () => Promise<ReviewRunContract>;
   } = {},
 ) {
@@ -205,17 +266,111 @@ async function buildTestServer(
         Promise.resolve(reviewId === reviewResponse.reviewId ? reviewResponse : null),
       indexRepository: () => Promise.resolve(indexResult),
       searchMemory: () => Promise.resolve([memoryResult]),
+      syncGitHub: () => Promise.resolve(githubSyncResult),
       ...options.projectMemory,
     },
     prepareReview:
       options.prepareReview ??
       ((reviewId) => Promise.resolve(reviewId === reviewResponse.reviewId ? reviewDraft : null)),
+    reviewPullRequest: options.reviewPullRequest ?? (() => Promise.resolve(pullRequestReview)),
     reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
     version: '0.1.0',
   });
 }
 
 describe('Gatekeeper local service', () => {
+  it('syncs the fixed GitHub repository and reviews one strict positive pull-request number', async () => {
+    const syncGitHub = vi.fn(() => Promise.resolve(githubSyncResult));
+    const reviewPullRequest = vi.fn(() => Promise.resolve(pullRequestReview));
+    const server = await buildTestServer({ projectMemory: { syncGitHub }, reviewPullRequest });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const sync = await server.inject({
+      method: 'POST',
+      url: `/v1/repositories/${repositoryRecord.repositoryId}/sync/github`,
+      headers,
+      payload: {},
+    });
+    const review = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request',
+      headers,
+      payload: { schemaVersion: 1, pullRequestNumber: 12 },
+    });
+    const wrongRepository = await server.inject({
+      method: 'POST',
+      url: '/v1/repositories/repository_other/sync/github',
+      headers,
+      payload: {},
+    });
+    const injectedSelector = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request',
+      headers,
+      payload: {
+        schemaVersion: 1,
+        pullRequestNumber: 12,
+        remote: 'attacker/repository',
+      },
+    });
+    const invalidNumber = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request',
+      headers,
+      payload: { schemaVersion: 1, pullRequestNumber: 0 },
+    });
+    await server.close();
+
+    expect(sync.statusCode).toBe(200);
+    expect(sync.json()).toEqual(githubSyncResult);
+    expect(review.statusCode).toBe(200);
+    expect(review.json()).toEqual(pullRequestReview);
+    expect(wrongRepository.statusCode).toBe(404);
+    expect(injectedSelector.statusCode).toBe(400);
+    expect(invalidNumber.statusCode).toBe(400);
+    expect(syncGitHub).toHaveBeenCalledOnce();
+    expect(reviewPullRequest).toHaveBeenCalledWith(12);
+  });
+
+  it('maps missing GitHub authentication to a bounded repair response without logging details', async () => {
+    const stream = new PassThrough();
+    let logs = '';
+    stream.setEncoding('utf8');
+    stream.on('data', (chunk: string) => {
+      logs += chunk;
+    });
+    const server = await buildTestServer({
+      logger: { level: 'info', stream },
+      reviewPullRequest: () =>
+        Promise.reject(
+          new GitHubProviderError(
+            'AUTH_REQUIRED',
+            'private remote body and token detail',
+            'Run gh auth login --hostname github.com.',
+          ),
+        ),
+    });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request',
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: { schemaVersion: 1, pullRequestNumber: 12 },
+    });
+    await server.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'ENVIRONMENT_ERROR',
+        message: 'GitHub authentication is required for this local operation.',
+        repair: 'Run gh auth login --hostname github.com.',
+      },
+    });
+    expect(response.body).not.toContain('private remote body');
+    expect(logs).not.toContain('private remote body');
+  });
+
   it('returns minimal unauthenticated health with restrictive headers', async () => {
     const server = await buildTestServer();
 
@@ -684,6 +839,8 @@ describe('Gatekeeper local service', () => {
     expect(server.getSchema('gatekeeper:review-run-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-draft-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-completion-input-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:pull-request-review-input-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:github-sync-result-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:repository-record-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:index-result-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:repository-status-v1')).toBeDefined();
@@ -705,6 +862,7 @@ describe('Gatekeeper local service', () => {
       logger: false,
       paths: { appData, serviceMetadata, storage },
       repository,
+      reviewPullRequest: unexercisedPullRequestReview,
       reviewWorktree: ({ repositoryId, previousReviewId }) =>
         Promise.resolve({
           ...reviewResponse,
@@ -763,6 +921,7 @@ describe('Gatekeeper local service', () => {
         logger: false,
         paths,
         repository,
+        reviewPullRequest: unexercisedPullRequestReview,
         reviewWorktree,
         startedAt: '2026-07-17T00:00:00.000Z',
         tools: statusResponse.tools,
@@ -783,6 +942,7 @@ describe('Gatekeeper local service', () => {
         logger: false,
         paths,
         repository,
+        reviewPullRequest: unexercisedPullRequestReview,
         reviewWorktree,
         startedAt: '2026-07-17T01:00:00.000Z',
         tools: statusResponse.tools,
@@ -816,6 +976,164 @@ describe('Gatekeeper local service', () => {
     }
   });
 
+  it('persists pull-request evidence and links repeated PR reviews across restart', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-pr-restart-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let sequence = 0;
+    const reviewPullRequest = vi.fn(
+      (pullRequestNumber: number, { repositoryId, previousReviewId }: PersistentReviewContext) => {
+        sequence += 1;
+        return Promise.resolve({
+          pullRequest: { ...pullRequestRecord, number: pullRequestNumber },
+          remote: githubRemote,
+          review: {
+            ...pullRequestReview,
+            reviewId: `review_pr_restart_${sequence}`,
+            repositoryId,
+            target: {
+              ...pullRequestReview.target,
+              pullRequestNumber,
+              display: `Pull request #${pullRequestNumber}`,
+            },
+            ...(previousReviewId === undefined ? {} : { previousReviewId }),
+          },
+        });
+      },
+    );
+
+    try {
+      const first = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest,
+        reviewWorktree: () => Promise.resolve(reviewResponse),
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const firstResponse = await first.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/pull-request',
+        headers: {
+          host: new URL(first.baseUrl).host,
+          authorization: `Bearer ${bearerToken}`,
+        },
+        payload: { schemaVersion: 1, pullRequestNumber: 12 },
+      });
+      const firstReview = reviewRunSchema.parse(firstResponse.json());
+      await first.close();
+
+      const second = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest,
+        reviewWorktree: () => Promise.resolve(reviewResponse),
+        startedAt: '2026-07-17T01:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(second.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const persisted = await second.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${firstReview.reviewId}`,
+        headers,
+      });
+      const secondResponse = await second.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/pull-request',
+        headers,
+        payload: { schemaVersion: 1, pullRequestNumber: 12 },
+      });
+      const secondReview = reviewRunSchema.parse(secondResponse.json());
+      await second.close();
+
+      expect(firstResponse.statusCode).toBe(200);
+      expect(persisted.json()).toEqual(firstReview);
+      expect(secondReview.previousReviewId).toBe(firstReview.reviewId);
+      expect(reviewPullRequest).toHaveBeenCalledTimes(2);
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects pull-request results if the repository remote changes after service start', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-pr-remote-drift-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+
+    try {
+      const service = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: () =>
+          Promise.resolve({
+            pullRequest: pullRequestRecord,
+            remote: {
+              ...githubRemote,
+              owner: 'attacker',
+              nameWithOwner: 'attacker/gatekeeper',
+              url: 'https://github.com/attacker/gatekeeper',
+            },
+            review: pullRequestReview,
+          }),
+        reviewWorktree: () => Promise.resolve(reviewResponse),
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const response = await service.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/pull-request',
+        headers,
+        payload: { schemaVersion: 1, pullRequestNumber: 12 },
+      });
+      const persisted = await service.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${pullRequestReview.reviewId}`,
+        headers,
+      });
+      await service.close();
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({
+        error: {
+          code: 'ENVIRONMENT_ERROR',
+          message: 'The fixed repository does not have a usable GitHub remote.',
+          repair: 'Restart Gatekeeper after confirming the repository origin.',
+        },
+      });
+      expect(persisted.statusCode).toBe(404);
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
   it('prepares, validates, persists, and reloads a completed Codex review', async () => {
     const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-completion-'));
     const paths = {
@@ -835,6 +1153,7 @@ describe('Gatekeeper local service', () => {
         logger: false,
         paths,
         repository,
+        reviewPullRequest: unexercisedPullRequestReview,
         reviewWorktree,
         startedAt: '2026-07-17T00:00:00.000Z',
         tools: statusResponse.tools,
@@ -892,6 +1211,7 @@ describe('Gatekeeper local service', () => {
         logger: false,
         paths,
         repository,
+        reviewPullRequest: unexercisedPullRequestReview,
         reviewWorktree,
         startedAt: '2026-07-17T01:00:00.000Z',
         tools: statusResponse.tools,

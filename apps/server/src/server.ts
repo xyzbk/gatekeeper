@@ -10,6 +10,8 @@ import {
   errorEnvelopeSchema,
   healthResponseJsonSchema,
   healthResponseSchema,
+  githubSyncResultJsonSchema,
+  githubSyncResultSchema,
   indexResultJsonSchema,
   indexResultSchema,
   indexStateJsonSchema,
@@ -22,6 +24,8 @@ import {
   repositoryRecordSchema,
   repositoryStatusJsonSchema,
   repositoryStatusSchema,
+  pullRequestReviewInputJsonSchema,
+  pullRequestReviewInputSchema,
   reviewCompletionInputJsonSchema,
   reviewCompletionInputSchema,
   reviewDraftJsonSchema,
@@ -33,14 +37,17 @@ import {
   statusResponseSchema,
   type IndexResult,
   type IndexState,
+  type GitHubSyncResult,
   type MemorySearchInput,
   type MemorySearchResult,
   type RepositoryRecord,
+  type PullRequestReviewInput,
   type ReviewCompletionInput,
   type ReviewDraftContract,
   type ReviewRunContract,
   type StatusResponse,
 } from '@gatekeeper/contracts';
+import { GitHubProviderError } from '@gatekeeper/github-gh';
 import { InvalidReviewCompletionError } from '@gatekeeper/review-engine';
 import fastify, { type FastifyInstance, LogController } from 'fastify';
 
@@ -73,6 +80,7 @@ export interface BuildGatekeeperServerOptions {
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
   prepareReview: (reviewId: string) => Promise<ReviewDraftContract | null>;
+  reviewPullRequest: (pullRequestNumber: number) => Promise<ReviewRunContract>;
   reviewWorktree: () => Promise<ReviewRunContract>;
   version: string;
 }
@@ -83,13 +91,23 @@ export interface ProjectMemoryApi {
   getReview: (reviewId: string) => Promise<ReviewRunContract | null>;
   indexRepository: () => Promise<IndexResult>;
   searchMemory: (input: MemorySearchInput) => Promise<MemorySearchResult[]>;
+  syncGitHub: () => Promise<GitHubSyncResult>;
 }
 
 function createError(
-  code: 'FORBIDDEN' | 'UNAUTHORIZED' | 'INTERNAL_ERROR' | 'NOT_FOUND' | 'USAGE_ERROR',
+  code:
+    | 'ENVIRONMENT_ERROR'
+    | 'FORBIDDEN'
+    | 'UNAUTHORIZED'
+    | 'INTERNAL_ERROR'
+    | 'NOT_FOUND'
+    | 'USAGE_ERROR',
   message: string,
+  repair?: string,
 ) {
-  return errorEnvelopeSchema.parse({ error: { code, message } });
+  return errorEnvelopeSchema.parse({
+    error: { code, message, ...(repair === undefined ? {} : { repair }) },
+  });
 }
 
 function isAllowedHost(host: string | undefined): boolean {
@@ -157,12 +175,14 @@ export async function buildGatekeeperServer(
 
   server.addSchema(errorEnvelopeJsonSchema);
   server.addSchema(healthResponseJsonSchema);
+  server.addSchema(githubSyncResultJsonSchema);
   server.addSchema(statusResponseJsonSchema);
   server.addSchema(dashboardBootstrapJsonSchema);
   server.addSchema(emptyRequestJsonSchema);
   server.addSchema(reviewRunApiJsonSchema);
   server.addSchema(reviewDraftJsonSchema);
   server.addSchema(reviewCompletionInputJsonSchema);
+  server.addSchema(pullRequestReviewInputJsonSchema);
   server.addSchema(repositoryRecordJsonSchema);
   server.addSchema(indexStateJsonSchema);
   server.addSchema(indexResultJsonSchema);
@@ -192,6 +212,28 @@ export async function buildGatekeeperServer(
   });
 
   server.setErrorHandler((error, request, reply) => {
+    if (
+      error instanceof GitHubProviderError &&
+      (error.code === 'AUTH_REQUIRED' ||
+        error.code === 'GH_UNAVAILABLE' ||
+        error.code === 'INVALID_REMOTE')
+    ) {
+      server.log.warn(
+        {
+          requestId: request.id,
+          operation: `${request.method} ${request.routeOptions.url ?? 'unmatched-route'}`,
+          errorCategory: 'environment',
+        },
+        'request rejected',
+      );
+      const message =
+        error.code === 'AUTH_REQUIRED'
+          ? 'GitHub authentication is required for this local operation.'
+          : error.code === 'GH_UNAVAILABLE'
+            ? 'GitHub CLI is required for this local operation.'
+            : 'The fixed repository does not have a usable GitHub remote.';
+      return reply.code(503).send(createError('ENVIRONMENT_ERROR', message, error.repair));
+    }
     const validationFailure =
       isValidationError(error) || error instanceof InvalidReviewCompletionError;
     server.log.warn(
@@ -277,6 +319,28 @@ export async function buildGatekeeperServer(
     async () => reviewRunSchema.parse(await options.reviewWorktree()),
   );
 
+  server.post<{ Body: PullRequestReviewInput }>(
+    '/v1/reviews/pull-request',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:pull-request-review-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-run-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+          503: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request) => {
+      const input = pullRequestReviewInputSchema.parse(request.body);
+      return reviewRunSchema.parse(await options.reviewPullRequest(input.pullRequestNumber));
+    },
+  );
+
   server.post(
     '/v1/repositories',
     {
@@ -343,6 +407,34 @@ export async function buildGatekeeperServer(
           .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
       }
       return indexResultSchema.parse(await options.projectMemory.indexRepository());
+    },
+  );
+
+  server.post<{ Params: { repositoryId: string } }>(
+    '/v1/repositories/:repositoryId/sync/github',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:repository-id-params-v1#' },
+        body: { $ref: 'gatekeeper:empty-request#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:github-sync-result-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+          503: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (request.params.repositoryId !== options.projectMemory.repository.repositoryId) {
+        return reply
+          .code(404)
+          .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
+      }
+      return githubSyncResultSchema.parse(await options.projectMemory.syncGitHub());
     },
   );
 

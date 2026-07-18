@@ -9,9 +9,12 @@ import {
   type ServicePaths,
 } from '@gatekeeper/config';
 import {
+  githubSyncLimitsSchema,
   serviceMetadataSchema,
   statusResponseSchema,
+  type GitHubRemote,
   type ReviewCompletionInput,
+  type PullRequestRecord,
   type RepositorySnapshot,
   type MemorySearchInput,
   type ReviewRunContract,
@@ -20,6 +23,13 @@ import {
 } from '@gatekeeper/contracts';
 import type { RepositoryId, ReviewId, ReviewRun } from '@gatekeeper/domain';
 import { createGitProvider } from '@gatekeeper/git-adapter';
+import {
+  createGitHubProvider,
+  GitHubProviderError,
+  normalizeGitHubRemote,
+  pullRequestToRemoteRecord,
+  type GitHubProvider,
+} from '@gatekeeper/github-gh';
 import { createProjectMemory } from '@gatekeeper/project-memory';
 import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
@@ -33,6 +43,11 @@ export interface StartGatekeeperServiceOptions {
   logger?: BuildGatekeeperServerOptions['logger'];
   paths?: ServicePaths;
   repository: RepositorySnapshot;
+  githubProvider?: GitHubProvider;
+  reviewPullRequest: (
+    pullRequestNumber: number,
+    context: PersistentReviewContext,
+  ) => Promise<PersistentPullRequestReviewResult>;
   reviewWorktree: (context: PersistentReviewContext) => Promise<ReviewRunContract>;
   startedAt?: string;
   tools: {
@@ -45,6 +60,12 @@ export interface StartGatekeeperServiceOptions {
 export interface PersistentReviewContext {
   repositoryId: RepositoryId;
   previousReviewId?: ReviewId;
+}
+
+export interface PersistentPullRequestReviewResult {
+  pullRequest: PullRequestRecord;
+  remote: GitHubRemote;
+  review: ReviewRunContract;
 }
 
 export interface RunningGatekeeperService {
@@ -77,6 +98,17 @@ export async function startGatekeeperService(
     databasePath: resolveProjectMemoryDatabasePath(paths.appData),
   });
   const memory = createProjectMemory({ persistence: store, git: createGitProvider() });
+  const github = options.githubProvider ?? createGitHubProvider();
+  const fixedGitHubRemote = () => {
+    if (options.repository.remote === null) {
+      throw new GitHubProviderError(
+        'INVALID_REMOTE',
+        'The fixed repository has no GitHub remote.',
+        'Configure an origin remote for a GitHub repository.',
+      );
+    }
+    return normalizeGitHubRemote(options.repository.remote);
+  };
   let status: StatusResponse | undefined;
   let server: FastifyInstance | undefined;
 
@@ -137,8 +169,61 @@ export async function startGatekeeperService(
           });
         },
         searchMemory: (input: MemorySearchInput) => memory.search(input),
+        syncGitHub: async () => {
+          const remote = fixedGitHubRemote();
+          await github.preflight(remote);
+          const cursor = await memory.getRemoteSyncCursor(
+            registeredRepository.repositoryId,
+            'github',
+          );
+          const batch = await github.listHistoricalDocuments(
+            remote,
+            githubSyncLimitsSchema.parse({}),
+            cursor,
+          );
+          return memory.indexRemoteDocuments({
+            repositoryId: registeredRepository.repositoryId,
+            provider: 'github',
+            batch,
+          });
+        },
       },
       prepareReview: prepareStoredReview,
+      reviewPullRequest: async (pullRequestNumber) => {
+        const target = {
+          kind: 'pull_request' as const,
+          display: `Pull request #${pullRequestNumber}`,
+          pullRequestNumber,
+        };
+        const previousReviewId = await memory.latestReviewId(
+          registeredRepository.repositoryId,
+          target,
+        );
+        const result = await options.reviewPullRequest(pullRequestNumber, {
+          repositoryId: registeredRepository.repositoryId as RepositoryId,
+          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
+        });
+        if (result.remote.url !== fixedGitHubRemote().url) {
+          throw new GitHubProviderError(
+            'INVALID_REMOTE',
+            'The repository remote changed after the local service started.',
+            'Restart Gatekeeper after confirming the repository origin.',
+          );
+        }
+        await memory.indexRemoteDocuments({
+          repositoryId: registeredRepository.repositoryId,
+          provider: 'github',
+          batch: {
+            schemaVersion: 1,
+            records: [pullRequestToRemoteRecord(result.pullRequest)],
+            failures: [],
+            cursor: null,
+            partial: false,
+          },
+        });
+        await memory.saveReview(result.review);
+        return result.review;
+      },
       reviewWorktree: async () => {
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
         const previousReviewId = await memory.latestReviewId(

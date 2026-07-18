@@ -60,6 +60,7 @@ describe('start command lifecycle', () => {
         events.push(`review:${root}`);
         return Promise.resolve({ ...review, repositoryId: context.repositoryId });
       },
+      reviewPullRequest: () => Promise.reject(new Error('not exercised')),
       startService: async (options) => {
         events.push('start');
         expect(options).toMatchObject({
@@ -112,6 +113,7 @@ describe('start command lifecycle', () => {
         inspectRepository: () => Promise.resolve(repository),
         inspectTool: (name) => Promise.resolve(name === 'git' ? git : gh),
         reviewWorktree: () => Promise.resolve(review),
+        reviewPullRequest: () => Promise.reject(new Error('not exercised')),
         startService: () => Promise.resolve({ baseUrl: 'http://127.0.0.1:43127', close }),
         waitUntilShutdown: () => Promise.reject(new Error('signal failure')),
         write: () => undefined,

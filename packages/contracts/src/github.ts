@@ -116,6 +116,23 @@ export const githubSyncResultSchema = z
   })
   .strict();
 
+export const pullRequestReviewInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    pullRequestNumber: z.int().positive(),
+  })
+  .strict();
+
+export const pullRequestReviewInputJsonSchema = {
+  $id: 'gatekeeper:pull-request-review-input-v1',
+  ...z.toJSONSchema(pullRequestReviewInputSchema, { target: 'draft-7' }),
+};
+
+export const githubSyncResultJsonSchema = {
+  $id: 'gatekeeper:github-sync-result-v1',
+  ...z.toJSONSchema(githubSyncResultSchema, { target: 'draft-7' }),
+};
+
 export type GitHubRemote = z.infer<typeof githubRemoteSchema>;
 export type GitHubPreflight = z.infer<typeof githubPreflightSchema>;
 export type GitHubSyncLimits = z.infer<typeof githubSyncLimitsSchema>;
@@ -124,3 +141,4 @@ export type GitHubRemoteRecord = z.infer<typeof githubRemoteRecordSchema>;
 export type GitHubHistoryFailure = z.infer<typeof githubHistoryFailureSchema>;
 export type GitHubHistoryBatch = z.infer<typeof githubHistoryBatchSchema>;
 export type GitHubSyncResult = z.infer<typeof githubSyncResultSchema>;
+export type PullRequestReviewInput = z.infer<typeof pullRequestReviewInputSchema>;
