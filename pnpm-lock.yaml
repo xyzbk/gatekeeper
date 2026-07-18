@@ -159,6 +159,21 @@ importers:
         specifier: 7.0.6
         version: 7.0.6
 
+  packages/review-engine:
+    dependencies:
+      '@gatekeeper/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gatekeeper/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@gatekeeper/domain':
+        specifier: workspace:*
+        version: link:../domain
+      ignore:
+        specifier: 7.0.6
+        version: 7.0.6
+
   packages/testkit:
     dependencies:
       '@gatekeeper/domain':

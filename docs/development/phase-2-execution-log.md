@@ -61,12 +61,26 @@ Corrections and learning:
 
 No repository content, diff text, tokens, or secrets were written to this log.
 
+## Task 2 evidence
+
+Expected RED:
+
+- The focused engine suite failed to load because `review-worktree` did not exist.
+- Nine behavior cases passed after the minimum pure engine and package wiring were added.
+
+Corrections and learning:
+
+- The first root typecheck rejected a rest-destructured optional `previousPath` under `exactOptionalPropertyTypes`, and lint rejected the unused discarded `addedLines` binding. A small explicit summary mapper now omits `previousPath` when absent and never carries inspected source lines into ReviewRun.
+- The same pre-format gate correctly reported the new files and lockfile as unformatted. No formatting exception was added.
+
+No policy finding is produced from model inference, and the existing verdict regression confirms that an inference finding cannot produce `BLOCK`.
+
 ## Task ledger
 
 | Task                                 | State    | Commit    | Verification                                                               | Failures and corrections  |
 | ------------------------------------ | -------- | --------- | -------------------------------------------------------------------------- | ------------------------- |
 | 1. Contracts and worktree extraction | complete | this step | Focused: 20/20 PASS; root lint/typecheck/test (63)/build/format/audit PASS | See Task 1 evidence above |
-| 2. Deterministic review engine       | pending  | —         | —                                                                          | —                         |
+| 2. Deterministic review engine       | complete | this step | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
 | 3. Policy loader, CLI, fixtures      | pending  | —         | —                                                                          | —                         |
 | 4. Local review API                  | pending  | —         | —                                                                          | —                         |
 | 5. Review Inspector                  | pending  | —         | —                                                                          | —                         |

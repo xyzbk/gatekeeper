@@ -6,6 +6,7 @@
     { "path": "packages/contracts" },
     { "path": "packages/config" },
     { "path": "packages/git-adapter" },
+    { "path": "packages/review-engine" },
     { "path": "apps/cli" },
     { "path": "apps/server" }
   ]

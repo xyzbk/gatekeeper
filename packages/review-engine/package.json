@@ -1,0 +1,18 @@
+{
+  "name": "@gatekeeper/review-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@gatekeeper/config": "workspace:*",
+    "@gatekeeper/contracts": "workspace:*",
+    "@gatekeeper/domain": "workspace:*",
+    "ignore": "7.0.6"
+  }
+}

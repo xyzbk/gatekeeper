@@ -125,12 +125,12 @@ function reviewWorktree(input: ReviewWorktreeInput): ReviewRun;
 function createLocalRepositoryId(canonicalRoot: string): RepositoryId;
 ```
 
-- [ ] Write one RED test each for clean-with-test `FAST_PATH`, source-without-test `REQUIRE_CHANGES`, critical auth `ESCALATE`, protected path `BLOCK`, changed-file/line limits, import-boundary violation from added relative imports, metrics/path groups, policy-ignored files, and inference unable to produce `BLOCK`.
-- [ ] Run `pnpm test packages/review-engine/src/review-worktree.test.ts`; verify failures are missing behavior, not setup errors.
-- [ ] Implement pure helpers for classification, glob matching through `ignore`, import-specifier resolution, finding construction, deterministic summary, and `assembleVerdict` delegation.
-- [ ] Keep documentation/generated-file policy evaluation deferred because the canonical hackathon Phase 2 lists exactly five policies.
-- [ ] Run focused tests; verify GREEN, then run the full repository gates and audit.
-- [ ] Record RED/GREEN evidence and any correction in the execution log.
+- [x] Write one RED test each for clean-with-test `FAST_PATH`, source-without-test `REQUIRE_CHANGES`, critical auth `ESCALATE`, protected path `BLOCK`, changed-file/line limits, import-boundary violation from added relative imports, metrics/path groups, policy-ignored files, and inference unable to produce `BLOCK`.
+- [x] Run `pnpm test packages/review-engine/src/review-worktree.test.ts`; verify failures are missing behavior, not setup errors.
+- [x] Implement pure helpers for classification, glob matching through `ignore`, import-specifier resolution, finding construction, deterministic summary, and `assembleVerdict` delegation.
+- [x] Keep documentation/generated-file policy evaluation deferred because the canonical hackathon Phase 2 lists exactly five policies.
+- [x] Run focused tests; verify GREEN, then run the full repository gates and audit.
+- [x] Record RED/GREEN evidence and any correction in the execution log.
 - [ ] Commit and push `feat(review): evaluate deterministic worktree policy`.
 
 ### Task 3: Policy loader, CLI, and disposable acceptance fixtures
