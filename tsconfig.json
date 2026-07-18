@@ -11,6 +11,7 @@
     { "path": "packages/review-engine" },
     { "path": "packages/store-sqlite" },
     { "path": "apps/cli" },
+    { "path": "apps/mcp-server" },
     { "path": "apps/server" }
   ]
 }

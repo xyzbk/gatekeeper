@@ -72,3 +72,31 @@ GREEN:
 Unexpected failure and correction:
 
 - The first root lint rejected two intentionally unused names in a test double. The test double now omits those parameters; production behavior was unaffected.
+
+### Task 4 — six-tool stdio MCP adapter
+
+Expected RED:
+
+- MCP client and server test suites could not import the not-yet-created modules.
+
+Implemented:
+
+- Added `apps/mcp-server` with exact `@modelcontextprotocol/sdk` v1.29.0, its documented `.js` import subpaths, stdio transport, native fetch, and Zod v4 contracts.
+- The client reads validated machine-local service metadata for each operation, calls only the recorded loopback origin, applies the bearer token in memory, uses a 30-second default timeout, and returns bounded repair/errors without response bodies or secrets.
+- Registered exactly six local Phase 4 tools with strict input/output schemas, structured content, concise text, accurate read/write/idempotence/open-world annotations, and no pull-request or publication tool.
+- MCP server instructions and tool descriptions label repository evidence as untrusted data. Unknown internal failures become a fixed repair instruction rather than leaking exception text.
+- Official SDK in-memory and real stdio clients exercise discovery and all six handlers; successful stdio initialization/listing proves protocol stdout is uncontaminated.
+
+Unexpected failures and corrections:
+
+- The first client fixture incorrectly spread ReviewRun-only `verdict` and `summary` fields into a strict ReviewDraft. The fixture now represents the actual draft contract.
+- One repair-text assertion expected a shorthand command instead of the repository's real CLI command and was corrected.
+- Initial lint found one unused mock argument and unsafe matcher values from SDK result types. The mock now omits the argument, and assertions parse structured output through shared schemas.
+
+GREEN:
+
+- Focused MCP client/protocol suite: PASS (8 tests).
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (30 files, 180 tests).
+- `pnpm build`: PASS.

@@ -26,6 +26,7 @@
       "@gatekeeper/review-engine": ["./packages/review-engine/src/index.ts"],
       "@gatekeeper/store-sqlite": ["./packages/store-sqlite/src/index.ts"],
       "@gatekeeper/server": ["./apps/server/src/index.ts"],
+      "@gatekeeper/mcp-server": ["./apps/mcp-server/src/server.ts"],
       "@gatekeeper/testkit": ["./packages/testkit/src/index.ts"]
     },
     "verbatimModuleSyntax": true

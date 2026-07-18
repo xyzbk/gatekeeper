@@ -1,0 +1,24 @@
+{
+  "name": "@gatekeeper/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gatekeeper-mcp": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    }
+  },
+  "dependencies": {
+    "@gatekeeper/config": "workspace:*",
+    "@gatekeeper/contracts": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@gatekeeper/testkit": "workspace:*"
+  }
+}
