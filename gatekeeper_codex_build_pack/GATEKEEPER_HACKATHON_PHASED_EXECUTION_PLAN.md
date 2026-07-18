@@ -935,6 +935,9 @@ Deliver the differentiated historical-reasoning experience on a real pull reques
   - prompt injection in the new PR body
 - Create demo/scenarios.json and an idempotent seeder.
 - Seeder defaults to dry-run, requires explicit --apply, and never deletes unrelated content.
+- Keep the seeder outside the production GitHub adapter. Building and testing its
+  explicit `--apply` path does not authorize a live GitHub write; executing that
+  path still requires separate user approval for the exact target repository.
 - Add a local exported fixture so automated tests do not require GitHub.
 
 ## Tests
@@ -960,16 +963,23 @@ Deliver the differentiated historical-reasoning experience on a real pull reques
     pnpm test
     pnpm build
     codex mcp list
-    gatekeeper sync github demo/gatekeeper-demo-repo
-    gatekeeper review pr <redis-pr-number> demo/gatekeeper-demo-repo --format json
+    gatekeeper sync github <local-demo-repository-path>
+    gatekeeper review pr <redis-pr-number> <local-demo-repository-path> --format json
 
 Expected:
 
 - Deterministic checks acknowledge passing tests.
 - Historical evidence returns the exact Redis chain.
-- Completed verdict is ESCALATE, not BLOCK.
+- The CLI persists the deterministic pull-request review; the Codex completion
+  handshake adds the evidence-supported historical conclusion.
+- The completed Codex review verdict is ESCALATE, not BLOCK.
 - Evidence is clickable in the dashboard.
 - Prompt injection is visible and inert.
+
+The live commands require an installed, authenticated `gh` and an already seeded
+demo repository. The network-free automated gate uses the exported fixture and
+the same provider parsing, normalization, persistence, retrieval, review, API,
+and MCP path. Do not seed or otherwise mutate GitHub merely to satisfy acceptance.
 
 ## Stop gate
 
