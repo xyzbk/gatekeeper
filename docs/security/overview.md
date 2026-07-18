@@ -42,9 +42,23 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Service metadata is removed during orderly shutdown.
 - `gatekeeper start` prints the repository root and loopback URL but never prints the bearer token. Unexpected startup errors are reduced to a bounded message rather than exposing subprocess or filesystem details.
 
+## Phase 2 worktree-review controls
+
+- Staged, unstaged, and untracked inputs are path-contained and bounded before the pure review engine receives them.
+- Raw source and raw diffs never enter ReviewRun, CLI output, HTTP responses, dashboard state, or logs.
+- Deterministic policy remains the only authority capable of producing `BLOCK`.
+
+## Phase 3 Project Memory controls
+
+- The machine-local SQLite database is outside the target repository by default and starts only after WAL, foreign-key, migration, and FTS5 checks.
+- Index batches and persisted reviews are atomic. Repository ownership is enforced for document and review identities, including collision attempts.
+- Selected Markdown, ADR, policy, and commit evidence is bounded to 2,000-character excerpts; known secret files, ignore matches, non-regular files, oversized content, and invalid UTF-8 are denied before persistence.
+- Search is repository-scoped, exact-first, FTS-tokenized, parameterized, capped, and labelled `untrusted_repository_content`.
+- Corrupt persisted review JSON fails closed. Restart tests prove durable reads without widening repository selection.
+
 ## Deferred boundaries
 
-SQLite protection, MCP protocol isolation, and the read-only `gh` adapter are required in their scheduled phases. They are not placeholder implementations.
+MCP protocol isolation, the Codex skill, and the read-only `gh` adapter are required in their scheduled phases. They are not placeholder implementations.
 
 ## Logging
 

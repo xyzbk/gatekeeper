@@ -120,6 +120,19 @@ describe('SQLite Project Memory store', () => {
     second.close();
   });
 
+  it('fails with a stable error when the database parent is not a directory', async () => {
+    const root = await temporaryRoot();
+    const blockedParent = join(root, 'blocked');
+    await writeFile(blockedParent, 'not a directory', 'utf8');
+
+    expect(() => openStore({ databasePath: join(blockedParent, 'gatekeeper.db') })).toThrowError(
+      expect.objectContaining({
+        code: 'DATABASE_OPEN_FAILED',
+        message: 'Project Memory could not open its local database. Check the app-data directory.',
+      }),
+    );
+  });
+
   it('reports an actionable stable error when migrations cannot load', async () => {
     const root = await temporaryRoot();
     const databasePath = join(root, 'gatekeeper.db');
@@ -191,6 +204,57 @@ describe('SQLite Project Memory store', () => {
       }),
     );
     store.close();
+  });
+
+  it('rolls back an index transaction that fails after writing files', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    const registration = {
+      schemaVersion: 1 as const,
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    };
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+    });
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_other',
+      root: 'D:/work/other',
+      normalizedRoot: 'd:/work/other',
+    });
+    store.applyIndex(createBatch());
+
+    expect(() => store.applyIndex(createBatch({ repositoryId: 'repository_other' }))).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_INDEX_BATCH',
+        message: 'Project Memory received a document identity owned by another repository.',
+      }),
+    );
+    expect(store.getIndexState('repository_other')).toBeNull();
+    store.close();
+
+    const database = new Database(databasePath, { readonly: true });
+    expect(
+      database
+        .prepare('select count(*) from files where repository_id = ?')
+        .pluck()
+        .get('repository_other'),
+    ).toBe(0);
+    expect(
+      database
+        .prepare('select count(*) from documents where repository_id = ?')
+        .pluck()
+        .get('repository_other'),
+    ).toBe(0);
+    database.close();
   });
 
   it('keeps FTS5 synchronized across insert, update, and delete', async () => {
@@ -349,6 +413,48 @@ describe('SQLite Project Memory store', () => {
       }),
     );
     expect(store.getReview(review.reviewId)).toBeNull();
+    store.close();
+  });
+
+  it('does not let a colliding review ID move a review between repositories', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    const registration = {
+      schemaVersion: 1 as const,
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    };
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+    });
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_other',
+      root: 'D:/work/other',
+      normalizedRoot: 'd:/work/other',
+    });
+    const original = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    store.saveReview(original);
+
+    expect(() =>
+      store.saveReview({
+        ...original,
+        repositoryId: 'repository_other',
+        summary: 'This collision must not replace the original review.',
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'REVIEW_WRITE_FAILED',
+        message: 'Project Memory could not persist the review transaction.',
+      }),
+    );
+    expect(store.getReview(original.reviewId)).toEqual(original);
     store.close();
   });
 

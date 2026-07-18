@@ -35,6 +35,18 @@ All Phase 2 findings use `DETERMINISTIC` authority. `BLOCK` still requires both 
 
 ## Local service
 
-The localhost service binds only to `127.0.0.1`, validates Host and Origin, protects `/v1/*` with an ephemeral bearer token, applies a restrictive CSP, and rejects unknown API inputs. `POST /v1/reviews/worktree` accepts exactly `{}` with no query or repository selector; its callback is bound to the repository selected when `gatekeeper start` began. The dashboard keeps the token only in memory and sends it only in the Authorization header.
+The localhost service binds only to `127.0.0.1`, validates Host and Origin, protects `/v1/*` with an ephemeral bearer token, applies a restrictive CSP, and rejects unknown API inputs. `POST /v1/reviews/worktree` accepts exactly `{}` with no query or repository selector; repository, index, memory-search, and review-read APIs are all bound to the repository selected when `gatekeeper start` began. The dashboard keeps the token only in memory and sends it only in the Authorization header.
 
-SQLite, Project Memory, MCP, GitHub data, and model-data controls do not exist yet and must not be implied by Phase 2.
+## Phase 3 Project Memory boundary
+
+- The SQLite database lives under Gatekeeper's per-user machine app-data directory, outside target repositories by default.
+- Startup enables foreign keys and WAL, verifies FTS5, and applies reviewed versioned migrations before serving requests.
+- Incremental index writes and review/finding/evidence writes are immediate transactions; a failure rolls back the complete batch.
+- Document and review IDs cannot be reused to transfer records across repository identities.
+- Only tracked metadata/hashes, selected bounded Markdown/ADR/policy excerpts, and bounded recent commit metadata/messages are indexed. Full private source files and raw diffs are not persisted.
+- Known credential filenames, ignore-matched files, symlinks, oversized documents, and invalid UTF-8 are denied before content enters documents or FTS.
+- Exact and FTS searches are repository-scoped. Search syntax is tokenized and parameterized rather than interpolated as SQL.
+- Every repository-derived result is capped and labelled `untrusted_repository_content`; the dashboard renders excerpts as plain text.
+- Corrupt stored review JSON fails closed with a stable error. API and logs do not expose database errors, source, diffs, secrets, or bearer tokens.
+
+MCP, Codex skill, GitHub data, embeddings, and model-data controls do not exist yet and must not be implied by Phase 3.

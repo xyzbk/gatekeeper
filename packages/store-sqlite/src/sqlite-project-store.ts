@@ -398,7 +398,7 @@ export class SqliteProjectStore {
         if (current !== undefined && sameDocument(current, document)) {
           continue;
         }
-        this.#database
+        const write = this.#database
           .prepare(
             `INSERT INTO documents (
                id, repository_id, source_type, source_id, title, path, commit_sha, excerpt,
@@ -415,7 +415,8 @@ export class SqliteProjectStore {
                status = excluded.status,
                occurred_at = excluded.occurred_at,
                chunk_index = excluded.chunk_index,
-               indexed_at = excluded.indexed_at`,
+               indexed_at = excluded.indexed_at
+             WHERE documents.repository_id = excluded.repository_id`,
           )
           .run(
             document.documentId,
@@ -432,6 +433,12 @@ export class SqliteProjectStore {
             document.chunkIndex,
             batch.indexedAt,
           );
+        if (write.changes !== 1) {
+          throw new SqliteProjectStoreError(
+            'INVALID_INDEX_BATCH',
+            'Project Memory received a document identity owned by another repository.',
+          );
+        }
         documentsWritten += 1;
       }
       let documentsDeleted = 0;
@@ -613,7 +620,7 @@ export class SqliteProjectStore {
   public saveReview(review: ReviewRunContract): void {
     const parsed = reviewRunSchema.parse(review);
     const save = this.#database.transaction(() => {
-      this.#database
+      const write = this.#database
         .prepare(
           `INSERT INTO review_runs (
              review_id, repository_id, target_kind, target_display, verdict, summary,
@@ -627,7 +634,8 @@ export class SqliteProjectStore {
              summary = excluded.summary,
              created_at = excluded.created_at,
              previous_review_id = excluded.previous_review_id,
-             review_json = excluded.review_json`,
+             review_json = excluded.review_json
+           WHERE review_runs.repository_id = excluded.repository_id`,
         )
         .run(
           parsed.reviewId,
@@ -640,6 +648,12 @@ export class SqliteProjectStore {
           parsed.previousReviewId ?? null,
           JSON.stringify(parsed),
         );
+      if (write.changes !== 1) {
+        throw new SqliteProjectStoreError(
+          'REVIEW_WRITE_FAILED',
+          'Project Memory could not persist the review transaction.',
+        );
+      }
       this.#database.prepare('DELETE FROM findings WHERE review_id = ?').run(parsed.reviewId);
       for (const finding of parsed.findings) {
         this.#database
@@ -669,6 +683,9 @@ export class SqliteProjectStore {
     try {
       save.immediate();
     } catch (error) {
+      if (error instanceof SqliteProjectStoreError) {
+        throw error;
+      }
       throw new SqliteProjectStoreError(
         'REVIEW_WRITE_FAILED',
         'Project Memory could not persist the review transaction.',

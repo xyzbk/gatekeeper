@@ -40,15 +40,15 @@ The requested feature branch is `codex/phase-3-project-memory`.
 
 ## Task ledger
 
-| Task                                  | State    | Commit    | Verification                         | Failures and corrections  |
-| ------------------------------------- | -------- | --------- | ------------------------------------ | ------------------------- |
-| 1. Storage contracts and migrations   | complete | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
-| 2. Bounded Git indexing sources       | complete | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
-| 3. Incremental indexing and retrieval | complete | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
-| 4. Doctor, CLI, and fixture           | complete | f07210a   | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
-| 5. Persistent local API               | complete | 762a514   | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
-| 6. Dashboard memory and review routes | complete | this step | Root gates: 27 files, 153 tests PASS | See Task 6 evidence below |
-| 7. Aggressive acceptance and docs     | pending  | —         | —                                    | —                         |
+| Task                                  | State       | Commit    | Verification                         | Failures and corrections  |
+| ------------------------------------- | ----------- | --------- | ------------------------------------ | ------------------------- |
+| 1. Storage contracts and migrations   | complete    | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
+| 2. Bounded Git indexing sources       | complete    | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
+| 3. Incremental indexing and retrieval | complete    | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
+| 4. Doctor, CLI, and fixture           | complete    | f07210a   | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
+| 5. Persistent local API               | complete    | 762a514   | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
+| 6. Dashboard memory and review routes | complete    | 262a308   | Root gates: 27 files, 153 tests PASS | See Task 6 evidence below |
+| 7. Aggressive acceptance and docs     | in progress | this step | Shuffled: 27 files, 156 tests PASS   | See Task 7 evidence below |
 
 ## Task 1 evidence
 
@@ -283,6 +283,37 @@ pnpm test                       PASS — 27 files, 153 tests
 pnpm build                      PASS
 pnpm format:check               PASS
 pnpm audit --audit-level high   PASS — no known vulnerabilities
+```
+
+## Task 7 evidence
+
+Failure-path audit:
+
+- Existing tests already prove fresh and idempotent migrations, interrupted-migration rollback, FTS5 insert/update/delete synchronization, hostile FTS syntax handling, ignored/secret/symlink/oversized denial, review transaction rollback, corrupt-review fail-closed behavior, service restart persistence, and bounded logs without paths, source, diffs, tokens, or database details.
+- A new unusable-parent-path test confirms database startup returns stable `DATABASE_OPEN_FAILED` guidance rather than a raw filesystem error.
+- Two shuffled whole-workspace runs with seeds `31001` and `99173` passed all 27 files and 156 tests, ruling out observed file/test order dependencies.
+
+Unexpected RED and root-cause corrections:
+
+- A forged index batch reused a global document ID from another repository. SQLite kept the original owner but the upsert replaced its document fields and let the second index report a write. The document upsert now updates only when repository ownership matches, checks the affected-row count inside the immediate transaction, and returns stable `INVALID_INDEX_BATCH`; regression assertions prove earlier file writes roll back and neither repository is corrupted.
+- A forged review reused an ID owned by another repository and could move the stored run. The review upsert now has the same repository-ownership predicate and affected-row check; the immediate transaction preserves the original run and returns stable `REVIEW_WRITE_FAILED`.
+- The first review-ownership fix accidentally checked an undeclared result because the prepared statement result had not been assigned. The focused suite exposed it immediately; assigning the native better-sqlite3 result fixed the implementation without adding a wrapper.
+
+Ponytail review:
+
+- The phase diff uses only the mandated SQLite/Drizzle runtime additions and the already-installed application stack. Package boundaries, the focused schema (including the future-populated but plan-mandated `document_links` table), and injected inward-facing interfaces match the canonical plan. No dependency, speculative worker, cache, generic repository layer, or plugin mechanism can be removed without deleting required Phase 3 behavior. Lean already.
+
+Compiled acceptance against a fresh app-data root:
+
+```text
+first index document writes     6
+second index file writes        0
+second index document writes    0
+second index commit writes      0
+search source types             adr, commit, documentation
+all search trust labels         untrusted_repository_content
+worktree verdict                FAST_PATH
+stored review round trip        true
 ```
 
 ## Scope boundary
