@@ -10,8 +10,8 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   return (
     <>
-      <a className={styles.skipLink} href="#repository-overview">
-        Skip to repository overview
+      <a className={styles.skipLink} href="#main-content">
+        Skip to main content
       </a>
       <div className={styles.appShell}>
         <aside className={styles.sidebar}>
@@ -27,10 +27,15 @@ export function AppShell({ children }: AppShellProps) {
             >
               Overview
             </NavLink>
-            <span aria-disabled="true" className={styles.navUnavailable}>
+            <NavLink
+              aria-label="Worktree reviews"
+              className={({ isActive }) =>
+                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+              }
+              to="/reviews/worktree"
+            >
               Reviews
-              <span>Unavailable</span>
-            </span>
+            </NavLink>
             <span aria-disabled="true" className={styles.navUnavailable}>
               Memory
               <span>Unavailable</span>
@@ -38,7 +43,7 @@ export function AppShell({ children }: AppShellProps) {
           </nav>
           <div className={styles.sidebarFooter}>
             <span>Local workspace</span>
-            <span>Read-only foundation</span>
+            <span>Deterministic review</span>
           </div>
         </aside>
         <div className={styles.workspace}>
@@ -46,7 +51,7 @@ export function AppShell({ children }: AppShellProps) {
             <span>Repository intelligence</span>
             <span className={styles.localLabel}>Local dashboard</span>
           </header>
-          <main className={styles.main} id="repository-overview" tabIndex={-1}>
+          <main className={styles.main} id="main-content" tabIndex={-1}>
             {children}
           </main>
         </div>

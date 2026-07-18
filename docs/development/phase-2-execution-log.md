@@ -122,6 +122,42 @@ Implemented boundary:
 - `gatekeeper start` binds the callback to its already-inspected repository through the same `runWorktreeReview` composition used by direct CLI review.
 - Failure responses and logs contain only stable error/operation metadata; the regression input includes private source/diff/token text and proves none is emitted.
 
+## Task 5 evidence
+
+Expected RED:
+
+- The dashboard client suite failed to load because `review-client` did not exist.
+- The component suite initially had no Review Inspector route or generic main-content skip target.
+- The empty-worktree regression rendered an empty table until the inspector gained an explicit no-change state.
+- The server returned `404` for a direct request to `/reviews/worktree`; one exact dashboard entry route now serves `index.html` without adding a generic catch-all.
+
+Corrections and learning:
+
+- The first assertion for repeated addition counts assumed a single match. It now checks both the metrics value and table value explicitly.
+- TypeScript's unchecked CSS-module indexing rejected a verdict-to-class lookup. An exhaustive switch keeps the four verdicts visible to the type checker without adding an abstraction.
+- Unicode punctuation entered the first component draft as mojibake. Explicit Unicode escapes now render the ellipsis, minus sign, and middle dot consistently, and the regression tests assert the rendered characters.
+- A package-filtered server typecheck command failed because that package intentionally has no local `typecheck` script. The supported root `pnpm typecheck` remains the single project-reference gate and passes.
+- The first full gate found one redundant test stringification rejected by `no-base-to-string` and one unformatted route file. The exact request assertion already proved the URL, so the redundant assertion was removed and the file was formatted normally.
+- The first live browser load was blank because the server had indexed the previous dashboard build. Rebuilding and restarting the ephemeral local service loaded the current asset manifest; no product workaround was added.
+- Live navigation and the exact direct route were verified at desktop width and 375 pixels. The completed result had no page-wide horizontal overflow, the bounded table remained intentionally scrollable on small screens, and the console contained no warnings or errors.
+
+Design and safety evidence:
+
+```text
+Dashboard-focused tests                 PASS - 23 tests
+Dashboard + server focused tests        PASS - 32 tests
+All verdicts and authorities as text    PASS
+Direct /reviews/worktree entry          PASS
+Impeccable detector                     PASS - 0 findings
+Desktop live review                     PASS
+375-pixel live review                   PASS
+Browser console                         PASS - 0 warnings/errors
+Root lint/typecheck/test/build/format    PASS - 20 files, 97 tests
+pnpm audit --audit-level high           PASS - no known vulnerabilities
+```
+
+The dashboard sends only an empty JSON object and the bearer Authorization header. It displays the already-bounded ReviewRun contract and never receives raw source or diff content.
+
 ## Task ledger
 
 | Task                                 | State    | Commit    | Verification                                                               | Failures and corrections  |
@@ -129,8 +165,8 @@ Implemented boundary:
 | 1. Contracts and worktree extraction | complete | e510f2a   | Focused: 20/20 PASS; root lint/typecheck/test (63)/build/format/audit PASS | See Task 1 evidence above |
 | 2. Deterministic review engine       | complete | dd6b1a9   | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
 | 3. Policy loader, CLI, fixtures      | complete | d7d2676   | Focused: 8/8 PASS; root lint/typecheck/test (80)/build/format/audit PASS   | See Task 3 evidence above |
-| 4. Local review API                  | complete | this step | Focused: 21/21 PASS; root lint/typecheck/test (83)/build/format/audit PASS | See Task 4 evidence above |
-| 5. Review Inspector                  | pending  | —         | —                                                                          | —                         |
+| 4. Local review API                  | complete | 6008345   | Focused: 21/21 PASS; root lint/typecheck/test (83)/build/format/audit PASS | See Task 4 evidence above |
+| 5. Review Inspector                  | complete | this step | Focused: 32/32 PASS; root lint/typecheck/test (97)/build/format/audit PASS | See Task 5 evidence above |
 | 6. Acceptance and documentation      | pending  | —         | —                                                                          | —                         |
 
 ## Scope boundary

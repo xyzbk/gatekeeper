@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import type { StatusResponse } from '@gatekeeper/contracts';
+import type { ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -38,7 +38,58 @@ const status: StatusResponse = {
   },
 };
 
-async function renderDashboard(loadStatus: () => Promise<StatusResponse>, initialEntry = '/') {
+const review: ReviewRunContract = {
+  schemaVersion: 1,
+  reviewId: 'review_dashboard_test',
+  repositoryId: 'repository_dashboard_test',
+  target: { kind: 'worktree', display: 'Current worktree' },
+  verdict: 'REQUIRE_CHANGES',
+  summary: 'REQUIRE_CHANGES: 1 changed file, 1 deterministic finding.',
+  findings: [
+    {
+      id: 'finding:test:source-needs-tests',
+      category: 'test-coverage',
+      severity: 'medium',
+      authority: 'DETERMINISTIC',
+      confidence: 1,
+      title: 'Related test change required',
+      explanation: 'A related source changed without a test change.',
+      evidence: [],
+      affectedPaths: ['src/app.ts'],
+      remediation: ['Add a matching test change.'],
+      falsePositiveRisk: 'low',
+      humanApprovalRequired: false,
+      policyId: 'source-needs-tests',
+      enforcement: 'required',
+    },
+  ],
+  metrics: {
+    filesChanged: 1,
+    linesAdded: 2,
+    linesDeleted: 1,
+    productionFilesChanged: 1,
+    testFilesChanged: 0,
+    documentationFilesChanged: 0,
+    pathGroups: [{ name: 'src', count: 1 }],
+  },
+  changes: [
+    {
+      path: 'src/app.ts',
+      status: 'modified',
+      additions: 2,
+      deletions: 1,
+      binary: false,
+      contentTruncated: false,
+    },
+  ],
+  createdAt: '2026-07-18T12:00:00.000Z',
+};
+
+async function renderDashboard(
+  loadStatus: () => Promise<StatusResponse>,
+  initialEntry = '/',
+  reviewWorktree: () => Promise<ReviewRunContract> = () => Promise.resolve(review),
+) {
   const { DashboardApp } = await import('./dashboard-app.js');
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -47,7 +98,7 @@ async function renderDashboard(loadStatus: () => Promise<StatusResponse>, initia
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <DashboardApp loadStatus={loadStatus} />
+        <DashboardApp loadStatus={loadStatus} reviewWorktree={reviewWorktree} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -111,7 +162,7 @@ describe('dashboard application shell', () => {
     await renderDashboard(() => Promise.resolve(status));
 
     await user.tab();
-    expect(screen.getByRole('link', { name: 'Skip to repository overview' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('link', { name: 'Repository overview' })).toHaveFocus();
   });
@@ -122,4 +173,132 @@ describe('dashboard application shell', () => {
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Return to overview' })).toHaveAttribute('href', '/');
   });
+});
+
+describe('worktree Review Inspector', () => {
+  it('starts in a ready-to-run state without reviewing on navigation', async () => {
+    const reviewWorktree = vi.fn(() => Promise.resolve(review));
+    await renderDashboard(() => Promise.resolve(status), '/reviews/worktree', reviewWorktree);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Review current worktree' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run worktree review' })).toBeEnabled();
+    expect(reviewWorktree).not.toHaveBeenCalled();
+  });
+
+  it('renders a scoped pending state while the review runs', async () => {
+    const user = userEvent.setup();
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/reviews/worktree',
+      () => new Promise(() => undefined),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+
+    expect(
+      screen.getByRole('status', { name: 'Reviewing current worktree\u2026' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Review in progress' })).toBeDisabled();
+  });
+
+  it('renders a safe retryable error state', async () => {
+    const reviewWorktree = vi
+      .fn<() => Promise<ReviewRunContract>>()
+      .mockRejectedValueOnce(new Error('private source detail'))
+      .mockResolvedValue(review);
+    const user = userEvent.setup();
+    await renderDashboard(() => Promise.resolve(status), '/reviews/worktree', reviewWorktree);
+
+    await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Gatekeeper could not complete the local review.',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private source detail');
+
+    await user.click(screen.getByRole('button', { name: 'Retry worktree review' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'REQUIRE_CHANGES' })).toBeVisible();
+    expect(reviewWorktree).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders verdict, authority, metrics, remediation, and bounded changes as text', async () => {
+    const user = userEvent.setup();
+    await renderDashboard(() => Promise.resolve(status), '/reviews/worktree');
+
+    await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'REQUIRE_CHANGES' })).toBeVisible();
+    expect(screen.getByText('Authority: DETERMINISTIC')).toBeVisible();
+    expect(screen.getByText('Severity: medium')).toBeVisible();
+    expect(screen.getByText('Add a matching test change.')).toBeVisible();
+    expect(screen.getByRole('cell', { name: 'src/app.ts' })).toBeVisible();
+    expect(screen.getByText('1 file')).toBeVisible();
+    expect(screen.getAllByText('+2')).toHaveLength(2);
+    expect(screen.getAllByText('\u22121')).toHaveLength(2);
+  });
+
+  it('explains an empty worktree instead of rendering an empty change table', async () => {
+    const user = userEvent.setup();
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/reviews/worktree',
+      () =>
+        Promise.resolve({
+          ...review,
+          verdict: 'FAST_PATH',
+          findings: [],
+          changes: [],
+          metrics: {
+            ...review.metrics,
+            filesChanged: 0,
+            linesAdded: 0,
+            linesDeleted: 0,
+            productionFilesChanged: 0,
+            pathGroups: [],
+          },
+        }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+
+    expect(await screen.findByText('No worktree changes were detected.')).toBeVisible();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it.each(['FAST_PATH', 'REQUIRE_CHANGES', 'ESCALATE', 'BLOCK'] as const)(
+    'renders the %s verdict as readable text',
+    async (verdict) => {
+      const user = userEvent.setup();
+      await renderDashboard(
+        () => Promise.resolve(status),
+        '/reviews/worktree',
+        () => Promise.resolve({ ...review, verdict }),
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+
+      expect(await screen.findByRole('heading', { level: 1, name: verdict })).toBeVisible();
+    },
+  );
+
+  it.each(['DETERMINISTIC', 'EVIDENCE_SUPPORTED', 'INFERENCE'] as const)(
+    'renders %s authority as readable text',
+    async (authority) => {
+      const user = userEvent.setup();
+      await renderDashboard(
+        () => Promise.resolve(status),
+        '/reviews/worktree',
+        () =>
+          Promise.resolve({
+            ...review,
+            findings: review.findings.map((finding) => ({ ...finding, authority })),
+          }),
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
+
+      expect(await screen.findByText(`Authority: ${authority}`)).toBeVisible();
+    },
+  );
 });

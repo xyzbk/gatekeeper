@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { createStatusClient } from './api/status-client.js';
+import { createReviewClient } from './api/review-client.js';
+import { createBootstrapLoader, createStatusClient } from './api/status-client.js';
 import { DashboardApp } from './app/dashboard-app.js';
 import './styles/global.css';
 
@@ -22,13 +23,18 @@ const queryClient = new QueryClient({
     },
   },
 });
-const statusClient = createStatusClient();
+const loadBootstrap = createBootstrapLoader();
+const reviewClient = createReviewClient(globalThis.fetch, loadBootstrap);
+const statusClient = createStatusClient(globalThis.fetch, loadBootstrap);
 
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <DashboardApp loadStatus={statusClient.getStatus} />
+        <DashboardApp
+          loadStatus={statusClient.getStatus}
+          reviewWorktree={reviewClient.reviewWorktree}
+        />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

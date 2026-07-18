@@ -290,6 +290,11 @@ describe('Gatekeeper local service', () => {
       headers: { host },
     });
     const dashboard = await server.inject({ method: 'GET', url: '/', headers: { host } });
+    const reviewInspector = await server.inject({
+      method: 'GET',
+      url: '/reviews/worktree',
+      headers: { host },
+    });
     await server.close();
 
     expect(bootstrap.statusCode).toBe(200);
@@ -297,6 +302,8 @@ describe('Gatekeeper local service', () => {
     expect(bootstrap.headers['cache-control']).toBe('no-store');
     expect(dashboard.statusCode).toBe(200);
     expect(dashboard.body).toContain('<title>Gatekeeper</title>');
+    expect(reviewInspector.statusCode).toBe(200);
+    expect(reviewInspector.body).toContain('<title>Gatekeeper</title>');
   });
 
   it('registers JSON Schemas generated from shared contracts', async () => {

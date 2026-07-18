@@ -192,7 +192,7 @@ Response: ReviewRun v1
 - [x] Add `reviewWorktree: () => Promise<ReviewRunContract>` to service composition and register the endpoint without importing Git/config behavior into Fastify.
 - [x] Wire `gatekeeper start` to the same CLI composition used by direct review.
 - [x] Run focused server/start tests and full gates; record evidence.
-- [ ] Commit and push `feat(server): expose local worktree reviews`.
+- [x] Commit and push `feat(server): expose local worktree reviews`.
 
 ### Task 5: Accessible Review Inspector
 
@@ -207,13 +207,13 @@ Response: ReviewRun v1
 - Modify: `apps/dashboard/src/main.tsx`
 - Modify: `apps/dashboard/src/styles/dashboard.module.css`
 
-- [ ] Write RED client tests proving the token appears only in the Authorization header and malformed/failing responses do not echo content.
-- [ ] Write RED component tests for ready-to-run, pending, retryable error, and completed states; every verdict and authority must have readable text, not color-only meaning.
-- [ ] Implement one mutation-backed review request and a single route at `/reviews/worktree` with verdict header, deterministic findings, metrics, affected paths, remediation, and bounded diff summary.
-- [ ] Change the skip link target to generic main content and make Reviews a real navigation link; keep Memory unavailable.
-- [ ] Reuse existing panels, tokens, type, focus, and reduced-motion rules; add no dependency.
-- [ ] Run dashboard tests, full gates, Impeccable detector, desktop browser review, 375-pixel browser review, and console audit.
-- [ ] Record evidence, then commit and push `feat(dashboard): inspect worktree reviews`.
+- [x] Write RED client tests proving the token appears only in the Authorization header and malformed/failing responses do not echo content.
+- [x] Write RED component tests for ready-to-run, pending, retryable error, and completed states; every verdict and authority must have readable text, not color-only meaning.
+- [x] Implement one mutation-backed review request and a single route at `/reviews/worktree` with verdict header, deterministic findings, metrics, affected paths, remediation, and bounded diff summary.
+- [x] Change the skip link target to generic main content and make Reviews a real navigation link; keep Memory unavailable.
+- [x] Reuse existing panels, tokens, type, focus, and reduced-motion rules; add no dependency.
+- [x] Run dashboard tests, full gates, Impeccable detector, desktop browser review, 375-pixel browser review, and console audit.
+- [x] Record evidence, then commit and push `feat(dashboard): inspect worktree reviews`.
 
 ### Task 6: Phase acceptance, public documentation, and stop gate
 

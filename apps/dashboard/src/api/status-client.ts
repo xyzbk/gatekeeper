@@ -9,6 +9,8 @@ export interface StatusClient {
   getStatus: (signal?: AbortSignal) => Promise<StatusResponse>;
 }
 
+export type BootstrapLoader = (signal?: AbortSignal) => Promise<DashboardBootstrap>;
+
 async function readJson(
   response: Response,
   unavailableMessage: string,
@@ -25,10 +27,10 @@ async function readJson(
   }
 }
 
-export function createStatusClient(fetcher: typeof fetch = globalThis.fetch): StatusClient {
+export function createBootstrapLoader(fetcher: typeof fetch = globalThis.fetch): BootstrapLoader {
   let bootstrapPromise: Promise<DashboardBootstrap> | undefined;
 
-  const loadBootstrap = (signal?: AbortSignal): Promise<DashboardBootstrap> => {
+  return (signal) => {
     bootstrapPromise ??= fetcher('/bootstrap.json', {
       cache: 'no-store',
       credentials: 'same-origin',
@@ -55,7 +57,12 @@ export function createStatusClient(fetcher: typeof fetch = globalThis.fetch): St
 
     return bootstrapPromise;
   };
+}
 
+export function createStatusClient(
+  fetcher: typeof fetch = globalThis.fetch,
+  loadBootstrap: BootstrapLoader = createBootstrapLoader(fetcher),
+): StatusClient {
   return {
     getStatus: async (signal) => {
       const bootstrap = await loadBootstrap(signal);
