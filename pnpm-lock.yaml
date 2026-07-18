@@ -128,6 +128,18 @@ importers:
       '@gatekeeper/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@gatekeeper/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@gatekeeper/git-adapter':
+        specifier: workspace:*
+        version: link:../../packages/git-adapter
+      '@gatekeeper/project-memory':
+        specifier: workspace:*
+        version: link:../../packages/project-memory
+      '@gatekeeper/store-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/store-sqlite
       fastify:
         specifier: 5.10.0
         version: 5.10.0

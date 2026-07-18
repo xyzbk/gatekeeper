@@ -67,6 +67,10 @@ export const repositoryStatusSchema = z.discriminatedUnion('state', [
     .strict(),
 ]);
 
+export const repositoryIdParamsSchema = z.object({ repositoryId: identifierSchema }).strict();
+
+export const reviewIdParamsSchema = z.object({ reviewId: identifierSchema }).strict();
+
 export const memorySearchInputSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -124,10 +128,22 @@ export const repositoryStatusJsonSchema = {
   ...z.toJSONSchema(repositoryStatusSchema, { target: 'draft-7' }),
 };
 
+export const repositoryIdParamsJsonSchema = {
+  $id: 'gatekeeper:repository-id-params-v1',
+  ...z.toJSONSchema(repositoryIdParamsSchema, { target: 'draft-7' }),
+};
+
+export const reviewIdParamsJsonSchema = {
+  $id: 'gatekeeper:review-id-params-v1',
+  ...z.toJSONSchema(reviewIdParamsSchema, { target: 'draft-7' }),
+};
+
 export type RepositoryRecord = z.infer<typeof repositoryRecordSchema>;
 export type IndexState = z.infer<typeof indexStateSchema>;
 export type IndexResult = z.infer<typeof indexResultSchema>;
 export type RepositoryStatus = z.infer<typeof repositoryStatusSchema>;
+export type RepositoryIdParams = z.infer<typeof repositoryIdParamsSchema>;
+export type ReviewIdParams = z.infer<typeof reviewIdParamsSchema>;
 export type MemorySearchInput = z.infer<typeof memorySearchInputSchema>;
 export type MemorySearchResult = z.infer<typeof memorySearchResultSchema>;
 export type MemorySearchResponse = z.infer<typeof memorySearchResponseSchema>;

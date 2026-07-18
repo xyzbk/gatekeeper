@@ -6,8 +6,10 @@ import {
   memorySearchInputSchema,
   memorySearchResponseJsonSchema,
   memorySearchResponseSchema,
+  repositoryIdParamsSchema,
   repositoryRecordSchema,
   repositoryStatusSchema,
+  reviewIdParamsSchema,
 } from './memory.js';
 
 const repository = {
@@ -60,6 +62,18 @@ describe('Project Memory contracts', () => {
         repository,
         indexState: null,
       }),
+    ).toThrow();
+  });
+
+  it('strictly validates repository and review route parameters', () => {
+    expect(repositoryIdParamsSchema.parse({ repositoryId: 'repository_fixture' })).toEqual({
+      repositoryId: 'repository_fixture',
+    });
+    expect(reviewIdParamsSchema.parse({ reviewId: 'review_fixture' })).toEqual({
+      reviewId: 'review_fixture',
+    });
+    expect(() =>
+      repositoryIdParamsSchema.parse({ repositoryId: 'repository_fixture', path: '/private' }),
     ).toThrow();
   });
 

@@ -2,15 +2,25 @@ import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 
-import { resolveServicePaths, type ServicePaths } from '@gatekeeper/config';
+import {
+  loadRepositoryPolicy,
+  resolveProjectMemoryDatabasePath,
+  resolveServicePaths,
+  type ServicePaths,
+} from '@gatekeeper/config';
 import {
   serviceMetadataSchema,
   statusResponseSchema,
   type RepositorySnapshot,
+  type MemorySearchInput,
   type ReviewRunContract,
   type StatusResponse,
   type ToolAvailability,
 } from '@gatekeeper/contracts';
+import type { RepositoryId, ReviewId } from '@gatekeeper/domain';
+import { createGitProvider } from '@gatekeeper/git-adapter';
+import { createProjectMemory } from '@gatekeeper/project-memory';
+import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
 
 import { buildGatekeeperServer, type BuildGatekeeperServerOptions } from './server.js';
@@ -21,13 +31,18 @@ export interface StartGatekeeperServiceOptions {
   logger?: BuildGatekeeperServerOptions['logger'];
   paths?: ServicePaths;
   repository: RepositorySnapshot;
-  reviewWorktree: () => Promise<ReviewRunContract>;
+  reviewWorktree: (context: PersistentReviewContext) => Promise<ReviewRunContract>;
   startedAt?: string;
   tools: {
     git: ToolAvailability;
     gh: ToolAvailability;
   };
   version: string;
+}
+
+export interface PersistentReviewContext {
+  repositoryId: RepositoryId;
+  previousReviewId?: ReviewId;
 }
 
 export interface RunningGatekeeperService {
@@ -56,26 +71,62 @@ export async function startGatekeeperService(
   const bearerToken = options.bearerToken ?? randomBytes(32).toString('base64url');
   const paths = options.paths ?? resolveServicePaths();
   const startedAt = options.startedAt ?? new Date().toISOString();
+  const store = openSqliteProjectStore({
+    databasePath: resolveProjectMemoryDatabasePath(paths.appData),
+  });
+  const memory = createProjectMemory({ persistence: store, git: createGitProvider() });
   let status: StatusResponse | undefined;
-  const serverOptions: BuildGatekeeperServerOptions = {
-    bearerToken,
-    dashboardRoot: options.dashboardRoot,
-    getStatus: () => {
-      if (status === undefined) {
-        throw new Error('Service status is not ready.');
-      }
-
-      return status;
-    },
-    reviewWorktree: options.reviewWorktree,
-    version: options.version,
-    ...(options.logger === undefined ? {} : { logger: options.logger }),
-  };
-  const server = await buildGatekeeperServer(serverOptions);
+  let server: FastifyInstance | undefined;
 
   try {
-    await server.listen({ host: '127.0.0.1', port: 0 });
-    const address = server.server.address() as AddressInfo;
+    await memory.migrate();
+    const registeredRepository = await memory.registerRepository({
+      root: options.repository.root,
+      remote: options.repository.remote,
+    });
+    const serverOptions: BuildGatekeeperServerOptions = {
+      bearerToken,
+      dashboardRoot: options.dashboardRoot,
+      getStatus: () => {
+        if (status === undefined) {
+          throw new Error('Service status is not ready.');
+        }
+
+        return status;
+      },
+      projectMemory: {
+        repository: registeredRepository,
+        getIndexState: () => memory.getIndexState(registeredRepository.repositoryId),
+        getReview: (reviewId) => memory.getReview(reviewId),
+        indexRepository: async () => {
+          const loadedPolicy = await loadRepositoryPolicy(options.repository.root);
+          return memory.indexLocalRepository({
+            repositoryId: registeredRepository.repositoryId,
+            ignorePatterns: loadedPolicy.policy.paths?.ignore ?? [],
+          });
+        },
+        searchMemory: (input: MemorySearchInput) => memory.search(input),
+      },
+      reviewWorktree: async () => {
+        const target = { kind: 'worktree' as const, display: 'Current worktree' };
+        const previousReviewId = await memory.latestReviewId(
+          registeredRepository.repositoryId,
+          target,
+        );
+        const review = await options.reviewWorktree({
+          repositoryId: registeredRepository.repositoryId as RepositoryId,
+          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
+        });
+        await memory.saveReview(review);
+        return review;
+      },
+      version: options.version,
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
+    };
+    server = await buildGatekeeperServer(serverOptions);
+    const activeServer = server;
+    await activeServer.listen({ host: '127.0.0.1', port: 0 });
+    const address = activeServer.server.address() as AddressInfo;
     const baseUrl = `http://127.0.0.1:${address.port}`;
     status = statusResponseSchema.parse({
       schemaVersion: 1,
@@ -89,7 +140,7 @@ export async function startGatekeeperService(
       tools: options.tools,
       features: {
         modelReasoning: 'disabled',
-        projectMemory: 'not_initialized',
+        projectMemory: 'ready',
       },
       paths,
     });
@@ -107,21 +158,29 @@ export async function startGatekeeperService(
     return {
       baseUrl,
       bearerToken,
-      server,
+      server: activeServer,
       status,
       close: async () => {
         try {
-          await server.close();
+          await activeServer.close();
         } finally {
-          await rm(paths.serviceMetadata, { force: true });
+          try {
+            store.close();
+          } finally {
+            await rm(paths.serviceMetadata, { force: true });
+          }
         }
       },
     };
   } catch (error) {
     try {
-      await server.close();
+      await server?.close();
     } finally {
-      await rm(paths.serviceMetadata, { force: true });
+      try {
+        store.close();
+      } finally {
+        await rm(paths.serviceMetadata, { force: true });
+      }
     }
     throw error;
   }

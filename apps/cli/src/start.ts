@@ -4,6 +4,7 @@ import type { ToolAvailability } from '@gatekeeper/contracts';
 import { createGitProvider, RepositoryInspectionError } from '@gatekeeper/git-adapter';
 import {
   startGatekeeperService,
+  type PersistentReviewContext,
   type RunningGatekeeperService,
   type StartGatekeeperServiceOptions,
 } from '@gatekeeper/server';
@@ -31,7 +32,10 @@ export interface StartCommandDependencies {
   dashboardRoot: string;
   inspectRepository: ReturnType<typeof createGitProvider>['inspectRepository'];
   inspectTool: (name: 'gh' | 'git') => Promise<ToolAvailability>;
-  reviewWorktree: typeof runWorktreeReview;
+  reviewWorktree: (
+    repositoryPath: string,
+    context: PersistentReviewContext,
+  ) => ReturnType<typeof runWorktreeReview>;
   startService: StartService;
   waitUntilShutdown: () => Promise<void>;
   write: (message: string) => void;
@@ -90,7 +94,8 @@ const defaultDependencies: StartCommandDependencies = {
   dashboardRoot: fileURLToPath(new URL('../../dashboard/dist', import.meta.url)),
   inspectRepository: (repositoryPath) => gitProvider.inspectRepository(repositoryPath),
   inspectTool: inspectLocalTool,
-  reviewWorktree: runWorktreeReview,
+  reviewWorktree: (repositoryPath, context) =>
+    runWorktreeReview(repositoryPath, undefined, context),
   startService: startGatekeeperService,
   waitUntilShutdown: waitForShutdownSignal,
   write: (message) => {
@@ -110,7 +115,7 @@ export async function runStartCommand(
   const service = await dependencies.startService({
     dashboardRoot: dependencies.dashboardRoot,
     repository,
-    reviewWorktree: () => dependencies.reviewWorktree(repository.root),
+    reviewWorktree: (context) => dependencies.reviewWorktree(repository.root, context),
     tools: { git, gh },
     version: GATEKEEPER_VERSION,
   });

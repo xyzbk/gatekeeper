@@ -13,6 +13,10 @@
     "@fastify/static": "10.1.0",
     "@gatekeeper/config": "workspace:*",
     "@gatekeeper/contracts": "workspace:*",
+    "@gatekeeper/domain": "workspace:*",
+    "@gatekeeper/git-adapter": "workspace:*",
+    "@gatekeeper/project-memory": "workspace:*",
+    "@gatekeeper/store-sqlite": "workspace:*",
     "fastify": "5.10.0"
   }
 }

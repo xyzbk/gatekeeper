@@ -10,12 +10,30 @@ import {
   errorEnvelopeSchema,
   healthResponseJsonSchema,
   healthResponseSchema,
+  indexResultJsonSchema,
+  indexResultSchema,
+  indexStateJsonSchema,
+  memorySearchInputJsonSchema,
+  memorySearchInputSchema,
+  memorySearchResponseJsonSchema,
+  memorySearchResponseSchema,
+  repositoryIdParamsJsonSchema,
+  repositoryRecordJsonSchema,
+  repositoryRecordSchema,
+  repositoryStatusJsonSchema,
+  repositoryStatusSchema,
+  reviewIdParamsJsonSchema,
   reviewRunApiJsonSchema,
   reviewRunSchema,
   statusResponseJsonSchema,
   statusResponseSchema,
-  type StatusResponse,
+  type IndexResult,
+  type IndexState,
+  type MemorySearchInput,
+  type MemorySearchResult,
+  type RepositoryRecord,
   type ReviewRunContract,
+  type StatusResponse,
 } from '@gatekeeper/contracts';
 import fastify, { type FastifyInstance, LogController } from 'fastify';
 
@@ -42,8 +60,17 @@ export interface BuildGatekeeperServerOptions {
   dashboardRoot: string;
   getStatus: () => StatusResponse;
   logger?: false | GatekeeperLoggerOptions;
+  projectMemory: ProjectMemoryApi;
   reviewWorktree: () => Promise<ReviewRunContract>;
   version: string;
+}
+
+export interface ProjectMemoryApi {
+  repository: RepositoryRecord;
+  getIndexState: () => Promise<IndexState | null>;
+  getReview: (reviewId: string) => Promise<ReviewRunContract | null>;
+  indexRepository: () => Promise<IndexResult>;
+  searchMemory: (input: MemorySearchInput) => Promise<MemorySearchResult[]>;
 }
 
 function createError(
@@ -122,6 +149,14 @@ export async function buildGatekeeperServer(
   server.addSchema(dashboardBootstrapJsonSchema);
   server.addSchema(emptyRequestJsonSchema);
   server.addSchema(reviewRunApiJsonSchema);
+  server.addSchema(repositoryRecordJsonSchema);
+  server.addSchema(indexStateJsonSchema);
+  server.addSchema(indexResultJsonSchema);
+  server.addSchema(repositoryStatusJsonSchema);
+  server.addSchema(memorySearchInputJsonSchema);
+  server.addSchema(memorySearchResponseJsonSchema);
+  server.addSchema(repositoryIdParamsJsonSchema);
+  server.addSchema(reviewIdParamsJsonSchema);
 
   server.addHook('onRequest', async (request, reply) => {
     if (!isAllowedHost(request.headers.host)) {
@@ -225,6 +260,162 @@ export async function buildGatekeeperServer(
       },
     },
     async () => reviewRunSchema.parse(await options.reviewWorktree()),
+  );
+
+  server.post(
+    '/v1/repositories',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:empty-request#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:repository-record-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    () => repositoryRecordSchema.parse(options.projectMemory.repository),
+  );
+
+  server.get<{ Params: { repositoryId: string } }>(
+    '/v1/repositories/:repositoryId',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:repository-id-params-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:repository-record-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    (request, reply) =>
+      request.params.repositoryId === options.projectMemory.repository.repositoryId
+        ? repositoryRecordSchema.parse(options.projectMemory.repository)
+        : reply
+            .code(404)
+            .send(createError('NOT_FOUND', 'The requested local resource was not found.')),
+  );
+
+  server.post<{ Params: { repositoryId: string } }>(
+    '/v1/repositories/:repositoryId/index',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:repository-id-params-v1#' },
+        body: { $ref: 'gatekeeper:empty-request#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:index-result-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (request.params.repositoryId !== options.projectMemory.repository.repositoryId) {
+        return reply
+          .code(404)
+          .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
+      }
+      return indexResultSchema.parse(await options.projectMemory.indexRepository());
+    },
+  );
+
+  server.get<{ Params: { repositoryId: string } }>(
+    '/v1/repositories/:repositoryId/memory/status',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:repository-id-params-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:repository-status-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (request.params.repositoryId !== options.projectMemory.repository.repositoryId) {
+        return reply
+          .code(404)
+          .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
+      }
+      return repositoryStatusSchema.parse({
+        schemaVersion: 1,
+        state: 'ready',
+        repository: options.projectMemory.repository,
+        indexState: await options.projectMemory.getIndexState(),
+      });
+    },
+  );
+
+  server.post<{ Body: MemorySearchInput }>(
+    '/v1/memory/search',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:memory-search-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:memory-search-response-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = memorySearchInputSchema.parse(request.body);
+      if (input.repositoryId !== options.projectMemory.repository.repositoryId) {
+        return reply
+          .code(404)
+          .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
+      }
+      return memorySearchResponseSchema.parse({
+        schemaVersion: 1,
+        results: await options.projectMemory.searchMemory(input),
+      });
+    },
+  );
+
+  server.get<{ Params: { reviewId: string } }>(
+    '/v1/reviews/:reviewId',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:review-id-params-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-run-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const review = await options.projectMemory.getReview(request.params.reviewId);
+      return review === null
+        ? reply
+            .code(404)
+            .send(createError('NOT_FOUND', 'The requested local resource was not found.'))
+        : reviewRunSchema.parse(review);
+    },
   );
 
   server.get(

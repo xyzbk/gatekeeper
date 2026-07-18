@@ -37,6 +37,12 @@ describe('Phase 1 service contracts', () => {
     const { statusResponseSchema } = await import('./status.js');
 
     expect(statusResponseSchema.parse(status)).toEqual(status);
+    expect(
+      statusResponseSchema.parse({
+        ...status,
+        features: { ...status.features, projectMemory: 'ready' },
+      }).features.projectMemory,
+    ).toBe('ready');
   });
 
   it('rejects unknown status and repository fields', async () => {

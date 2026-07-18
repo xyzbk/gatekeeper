@@ -49,7 +49,7 @@ export const statusResponseSchema = z
     features: z
       .object({
         modelReasoning: z.literal('disabled'),
-        projectMemory: z.literal('not_initialized'),
+        projectMemory: z.enum(['not_initialized', 'ready']),
       })
       .strict(),
     paths: z

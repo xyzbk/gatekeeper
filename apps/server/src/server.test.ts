@@ -1,10 +1,21 @@
 import { PassThrough } from 'node:stream';
-import { access, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
+import type {
+  IndexResult,
+  IndexState,
+  MemorySearchResult,
+  RepositoryRecord,
+  ReviewRunContract,
+  StatusResponse,
+} from '@gatekeeper/contracts';
+import { reviewRunSchema } from '@gatekeeper/contracts';
 import { describe, expect, it, vi } from 'vitest';
+
+import type { ProjectMemoryApi } from './server.js';
+import type { PersistentReviewContext } from './service.js';
 
 const host = '127.0.0.1:43127';
 const bearerToken = 'a'.repeat(43);
@@ -70,6 +81,47 @@ const reviewResponse: ReviewRunContract = {
   createdAt: '2026-07-18T12:00:00.000Z',
 };
 
+const repositoryRecord: RepositoryRecord = {
+  schemaVersion: 1,
+  repositoryId: reviewResponse.repositoryId,
+  root: repository.root,
+  remote: repository.remote,
+  createdAt: '2026-07-18T11:00:00.000Z',
+  updatedAt: '2026-07-18T11:00:00.000Z',
+};
+
+const indexState: IndexState = {
+  schemaVersion: 1,
+  repositoryId: repositoryRecord.repositoryId,
+  head: repository.head,
+  indexedAt: '2026-07-18T11:30:00.000Z',
+  files: 4,
+  documents: 3,
+  commits: 2,
+};
+
+const indexResult: IndexResult = {
+  ...indexState,
+  files: { scanned: 4, written: 0, unchanged: 4, deleted: 0 },
+  documents: { scanned: 3, written: 0, unchanged: 3, deleted: 0 },
+  commits: { scanned: 2, written: 0, unchanged: 2, deleted: 0 },
+};
+
+const memoryResult: MemorySearchResult = {
+  documentId: 'document_api_test',
+  match: 'fts',
+  trust: 'untrusted_repository_content',
+  status: 'active',
+  occurredAt: null,
+  evidence: {
+    sourceType: 'adr',
+    repositoryId: repositoryRecord.repositoryId,
+    sourceId: 'docs/adr/0003-no-redis.md',
+    path: 'docs/adr/0003-no-redis.md',
+    excerpt: 'Redis is not required for the local cache.',
+  },
+};
+
 async function createDashboardFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'gatekeeper-dashboard-'));
   await writeFile(join(root, 'index.html'), '<!doctype html><title>Gatekeeper</title>', 'utf8');
@@ -79,6 +131,7 @@ async function createDashboardFixture(): Promise<string> {
 async function buildTestServer(
   options: {
     logger?: unknown;
+    projectMemory?: Partial<ProjectMemoryApi>;
     reviewWorktree?: () => Promise<ReviewRunContract>;
   } = {},
 ) {
@@ -92,6 +145,15 @@ async function buildTestServer(
     dashboardRoot,
     getStatus: () => statusResponse,
     logger: options.logger ?? false,
+    projectMemory: {
+      repository: repositoryRecord,
+      getIndexState: () => Promise.resolve(indexState),
+      getReview: (reviewId) =>
+        Promise.resolve(reviewId === reviewResponse.reviewId ? reviewResponse : null),
+      indexRepository: () => Promise.resolve(indexResult),
+      searchMemory: () => Promise.resolve([memoryResult]),
+      ...options.projectMemory,
+    },
     reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
     version: '0.1.0',
   });
@@ -270,7 +332,7 @@ describe('Gatekeeper local service', () => {
 
     const response = await server.inject({
       method: 'GET',
-      url: '/v1/repositories',
+      url: '/v1/unknown',
       headers: { host, authorization: `Bearer ${bearerToken}` },
     });
     await server.close();
@@ -279,6 +341,169 @@ describe('Gatekeeper local service', () => {
     expect(response.json()).toEqual({
       error: { code: 'NOT_FOUND', message: 'The requested local resource was not found.' },
     });
+  });
+
+  it('exposes only the fixed repository and rejects selectors in registration bodies', async () => {
+    const server = await buildTestServer();
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const registered = await server.inject({
+      method: 'POST',
+      url: '/v1/repositories',
+      headers,
+      payload: {},
+    });
+    const selected = await server.inject({
+      method: 'GET',
+      url: `/v1/repositories/${repositoryRecord.repositoryId}`,
+      headers,
+    });
+    const wrong = await server.inject({
+      method: 'GET',
+      url: '/v1/repositories/repository_other',
+      headers,
+    });
+    const bodySelector = await server.inject({
+      method: 'POST',
+      url: '/v1/repositories',
+      headers,
+      payload: { path: 'C:\\private' },
+    });
+    await server.close();
+
+    expect(registered.statusCode).toBe(200);
+    expect(registered.json()).toEqual(repositoryRecord);
+    expect(selected.json()).toEqual(repositoryRecord);
+    expect(wrong.statusCode).toBe(404);
+    expect(bodySelector.statusCode).toBe(400);
+    expect(bodySelector.body).not.toContain('C:\\private');
+  });
+
+  it('indexes and reports memory status only for the fixed repository', async () => {
+    const indexRepository = vi.fn(() => Promise.resolve(indexResult));
+    const server = await buildTestServer({ projectMemory: { indexRepository } });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const indexed = await server.inject({
+      method: 'POST',
+      url: `/v1/repositories/${repositoryRecord.repositoryId}/index`,
+      headers,
+      payload: {},
+    });
+    const status = await server.inject({
+      method: 'GET',
+      url: `/v1/repositories/${repositoryRecord.repositoryId}/memory/status`,
+      headers,
+    });
+    const wrong = await server.inject({
+      method: 'POST',
+      url: '/v1/repositories/repository_other/index',
+      headers,
+      payload: {},
+    });
+    await server.close();
+
+    expect(indexed.json()).toEqual(indexResult);
+    expect(status.json()).toEqual({
+      schemaVersion: 1,
+      state: 'ready',
+      repository: repositoryRecord,
+      indexState,
+    });
+    expect(wrong.statusCode).toBe(404);
+    expect(indexRepository).toHaveBeenCalledOnce();
+  });
+
+  it('strictly bounds memory search and contains it to the fixed repository', async () => {
+    const searchMemory = vi.fn(() => Promise.resolve([memoryResult]));
+    const server = await buildTestServer({ projectMemory: { searchMemory } });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const found = await server.inject({
+      method: 'POST',
+      url: '/v1/memory/search',
+      headers,
+      payload: {
+        schemaVersion: 1,
+        repositoryId: repositoryRecord.repositoryId,
+        query: 'redis cache',
+        limit: 7,
+      },
+    });
+    const wrongRepository = await server.inject({
+      method: 'POST',
+      url: '/v1/memory/search',
+      headers,
+      payload: { schemaVersion: 1, repositoryId: 'repository_other', query: 'redis cache' },
+    });
+    const invalidLimit = await server.inject({
+      method: 'POST',
+      url: '/v1/memory/search',
+      headers,
+      payload: {
+        schemaVersion: 1,
+        repositoryId: repositoryRecord.repositoryId,
+        query: 'redis cache',
+        limit: 51,
+      },
+    });
+    await server.close();
+
+    expect(found.statusCode).toBe(200);
+    expect(found.json()).toEqual({ schemaVersion: 1, results: [memoryResult] });
+    expect(wrongRepository.statusCode).toBe(404);
+    expect(invalidLimit.statusCode).toBe(400);
+    expect(searchMemory).toHaveBeenCalledOnce();
+  });
+
+  it('reads persisted reviews and returns a stable not-found response', async () => {
+    const server = await buildTestServer();
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const found = await server.inject({
+      method: 'GET',
+      url: `/v1/reviews/${reviewResponse.reviewId}`,
+      headers,
+    });
+    const missing = await server.inject({
+      method: 'GET',
+      url: '/v1/reviews/review_missing',
+      headers,
+    });
+    await server.close();
+
+    expect(found.json()).toEqual(reviewResponse);
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({
+      error: { code: 'NOT_FOUND', message: 'The requested local resource was not found.' },
+    });
+  });
+
+  it('maps Project Memory failures without logging source or database details', async () => {
+    const stream = new PassThrough();
+    let logs = '';
+    stream.setEncoding('utf8');
+    stream.on('data', (chunk: string) => {
+      logs += chunk;
+    });
+    const server = await buildTestServer({
+      logger: { level: 'info', stream },
+      projectMemory: {
+        indexRepository: () => Promise.reject(new Error('private database and source detail')),
+      },
+    });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: `/v1/repositories/${repositoryRecord.repositoryId}/index`,
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: {},
+    });
+    await server.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain('private database');
+    expect(logs).not.toContain('private database');
   });
 
   it('bootstraps the token without caching and serves the dashboard', async () => {
@@ -315,6 +540,11 @@ describe('Gatekeeper local service', () => {
     expect(server.getSchema('gatekeeper:dashboard-bootstrap-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:error-envelope')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-run-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:repository-record-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:index-result-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:repository-status-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:memory-search-input-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:memory-search-response-v1')).toBeDefined();
     await server.close();
   });
 
@@ -331,13 +561,19 @@ describe('Gatekeeper local service', () => {
       logger: false,
       paths: { appData, serviceMetadata, storage },
       repository,
-      reviewWorktree: () => Promise.resolve(reviewResponse),
+      reviewWorktree: ({ repositoryId, previousReviewId }) =>
+        Promise.resolve({
+          ...reviewResponse,
+          repositoryId,
+          ...(previousReviewId === undefined ? {} : { previousReviewId }),
+        }),
       startedAt: '2026-07-17T00:00:00.000Z',
       tools: statusResponse.tools,
       version: '0.1.0',
     });
 
     expect(service.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(service.status.features.projectMemory).toBe('ready');
     expect(service.server.addresses()).toEqual([expect.objectContaining({ address: '127.0.0.1' })]);
     expect(JSON.parse(await readFile(serviceMetadata, 'utf8'))).toEqual({
       schemaVersion: 1,
@@ -354,6 +590,86 @@ describe('Gatekeeper local service', () => {
 
     await service.close();
     await expect(access(serviceMetadata)).rejects.toThrow();
+  });
+
+  it('persists a review before response and reads it after a complete service restart', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-restart-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let sequence = 0;
+    const reviewWorktree = vi.fn(({ repositoryId, previousReviewId }: PersistentReviewContext) => {
+      sequence += 1;
+      return Promise.resolve({
+        ...reviewResponse,
+        reviewId: `review_restart_${sequence}`,
+        repositoryId,
+        ...(previousReviewId === undefined ? {} : { previousReviewId }),
+      });
+    });
+
+    try {
+      const first = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewWorktree,
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const firstReviewResponse = await first.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree',
+        headers: { host: new URL(first.baseUrl).host, authorization: `Bearer ${bearerToken}` },
+        payload: {},
+      });
+      const firstReview = reviewRunSchema.parse(firstReviewResponse.json());
+      await first.close();
+
+      const second = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewWorktree,
+        startedAt: '2026-07-17T01:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(second.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const persisted = await second.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${firstReview.reviewId}`,
+        headers,
+      });
+      const secondReviewResponse = await second.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree',
+        headers,
+        payload: {},
+      });
+      const secondReview = reviewRunSchema.parse(secondReviewResponse.json());
+      await second.close();
+
+      expect(firstReviewResponse.statusCode).toBe(200);
+      expect(persisted.statusCode).toBe(200);
+      expect(persisted.json()).toEqual(firstReview);
+      expect(secondReview.previousReviewId).toBe(firstReview.reviewId);
+      expect(reviewWorktree).toHaveBeenCalledTimes(2);
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
   });
 
   it('logs operational metadata without tokens or repository paths', async () => {

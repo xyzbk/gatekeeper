@@ -56,9 +56,9 @@ describe('start command lifecycle', () => {
         events.push(`tool:${name}`);
         return Promise.resolve(name === 'git' ? git : gh);
       },
-      reviewWorktree: (root) => {
+      reviewWorktree: (root, context) => {
         events.push(`review:${root}`);
-        return Promise.resolve(review);
+        return Promise.resolve({ ...review, repositoryId: context.repositoryId });
       },
       startService: async (options) => {
         events.push('start');
@@ -68,7 +68,9 @@ describe('start command lifecycle', () => {
           tools: { git, gh },
           version: '0.1.0',
         });
-        await expect(options.reviewWorktree()).resolves.toEqual(review);
+        await expect(
+          options.reviewWorktree({ repositoryId: 'repository_start_test' as never }),
+        ).resolves.toEqual(review);
         return { baseUrl: 'http://127.0.0.1:43127', close };
       },
       waitUntilShutdown: () => {

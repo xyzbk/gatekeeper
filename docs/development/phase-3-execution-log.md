@@ -45,8 +45,8 @@ The requested feature branch is `codex/phase-3-project-memory`.
 | 1. Storage contracts and migrations   | complete | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
 | 2. Bounded Git indexing sources       | complete | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
 | 3. Incremental indexing and retrieval | complete | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
-| 4. Doctor, CLI, and fixture           | complete | this step | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
-| 5. Persistent local API               | pending  | —         | —                                    | —                         |
+| 4. Doctor, CLI, and fixture           | complete | f07210a   | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
+| 5. Persistent local API               | complete | this step | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
 | 6. Dashboard memory and review routes | pending  | —         | —                                    | —                         |
 | 7. Aggressive acceptance and docs     | pending  | —         | —                                    | —                         |
 
@@ -204,6 +204,44 @@ pnpm test                       PASS — 26 files, 137 tests
 pnpm build                      PASS
 pnpm format:check               PASS
 pnpm audit --audit-level high   PASS — no known vulnerabilities
+```
+
+## Task 5 evidence
+
+Expected RED:
+
+- The status contract rejected a ready Project Memory state, route parameter contracts did not exist, all repository/index/search/review-read endpoints returned 404, and the server lacked their shared response schemas.
+- Making Project Memory required at the HTTP boundary correctly broke the existing service composition until lifecycle ownership was added.
+
+Corrections and learning:
+
+- The server project needed explicit references to domain types, Git indexing, Project Memory, and SQLite after taking ownership of the durable lifecycle.
+- TypeScript correctly rejected a mutable optional server reference captured by the close callback. Capturing the successfully built instance in a local constant made the close order explicit.
+- The first restart-test lint pass found an import-expression type and untyped Fastify JSON values. Static type imports and parsing responses through the shared ReviewRun schema removed both unsafe paths without suppressions.
+- A dependency lock refresh produced mechanical ordering churn after the prior formatting pass. Formatting the final lockfile only after dependency resolution restored a minimal, reproducible final state.
+
+Behavior proven:
+
+- The service migrates SQLite and registers exactly one normalized repository before binding to `127.0.0.1`; status reports Project Memory ready.
+- Repository registration/read, incremental index, memory status, bounded memory search, persisted review read, and worktree review all require bearer authentication and strict shared contracts.
+- Wrong repository IDs return `NOT_FOUND` before index/search callbacks run, and no route accepts a path or alternate repository selector.
+- Review persistence completes before the POST response. A complete Fastify/database close followed by reopening the same database returned the identical review, and the next review linked to it.
+- Injected Project Memory failures returned stable internal envelopes and logs contained only bounded operation metadata.
+- A live compiled-service acceptance against the deterministic history fixture wrote six documents once, wrote zero on the second index, returned ADR/commit/documentation evidence, persisted a `FAST_PATH` review, and read it back through HTTP.
+
+Task gate:
+
+```text
+focused contract/server/start tests       PASS — 35 tests
+restart integration                       PASS — persisted read + previousReviewId
+compiled live API acceptance              PASS — second writes 0; review round trip true
+pnpm install --frozen-lockfile             PASS
+pnpm lint                                  PASS
+pnpm typecheck                             PASS
+pnpm test                                  PASS — 26 files, 144 tests
+pnpm build                                 PASS
+pnpm format:check                          PASS
+pnpm audit --audit-level high              PASS — no known vulnerabilities
 ```
 
 ## Scope boundary
