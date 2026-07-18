@@ -1,3 +1,5 @@
+import type { ChangedFileSummary } from './change.js';
+
 declare const brand: unique symbol;
 
 export type Brand<T, Name extends string> = T & { readonly [brand]: Name };
@@ -80,6 +82,7 @@ export interface ReviewMetrics {
   filesChanged: number;
   linesAdded: number;
   linesDeleted: number;
+  pathGroups: Array<{ name: string; count: number }>;
   productionFilesChanged?: number;
   testFilesChanged?: number;
   documentationFilesChanged?: number;
@@ -99,6 +102,7 @@ export interface ReviewDraft {
 export interface ReviewRun extends Omit<ReviewDraft, 'evidenceCandidates'> {
   verdict: Verdict;
   summary: string;
+  changes: ChangedFileSummary[];
   previousReviewId?: ReviewId;
   reasoningProvider?: string | null;
   model?: string | null;

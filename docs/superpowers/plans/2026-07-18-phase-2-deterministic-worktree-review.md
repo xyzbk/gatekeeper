@@ -44,6 +44,8 @@
 
 - Create: `packages/contracts/src/change.ts`
 - Create: `packages/contracts/src/change.test.ts`
+- Create: `packages/contracts/scripts/generate-verdict-schema.ts`
+- Create: `packages/domain/src/change.ts`
 - Create: `packages/git-adapter/src/worktree-diff.ts`
 - Create: `packages/git-adapter/src/worktree-diff.test.ts`
 - Modify: `packages/contracts/src/index.ts`
@@ -66,6 +68,7 @@ interface ChangedFile {
   additions: number;
   deletions: number;
   binary: boolean;
+  contentTruncated: boolean;
   addedLines: string[];
 }
 
@@ -80,16 +83,16 @@ interface WorktreeDiffOptions {
 }
 ```
 
-- [ ] Write strict Zod contract tests that reject unknown fields, traversal paths, more than 500 files, more than 500 added lines, and lines over 2,000 characters.
-- [ ] Run `pnpm test packages/contracts/src/change.test.ts`; verify RED because the contract does not exist.
-- [ ] Implement the minimum strict change contract and export it.
-- [ ] Run the focused contract tests; verify GREEN.
-- [ ] Write real temporary-repository tests for combined staged/unstaged/untracked extraction, `.gitignore`, `.gatekeeperignore`, policy ignores, rename/binary metrics, 2 MiB output rejection, malformed stat rejection, traversal rejection, and out-of-root symlink rejection.
-- [ ] Run `pnpm test packages/git-adapter/src/worktree-diff.test.ts`; verify RED because `getWorktreeDiff` does not exist.
-- [ ] Implement `getWorktreeDiff` with `git diff HEAD --numstat -z --find-renames`, `git diff HEAD --name-status -z --find-renames`, `git diff HEAD --unified=0 --no-ext-diff --find-renames`, and `git ls-files --others --exclude-standard -z`; use `ignore` for Gatekeeper/policy patterns and execa limits/timeouts.
-- [ ] Run the focused adapter and contract tests; verify GREEN.
-- [ ] Extend `ReviewMetrics` with `pathGroups: { name: string; count: number }[]` and `ReviewRun` with `changes: ChangedFileSummary[]`, regenerate `schemas/verdict.schema.json`, and keep its drift test green.
-- [ ] Run root lint, typecheck, test, build, format check, and audit; record outcomes in the execution log.
+- [x] Write strict Zod contract tests that reject unknown fields, traversal paths, more than 500 files, more than 500 added lines, and lines over 2,000 characters.
+- [x] Run `pnpm test packages/contracts/src/change.test.ts`; verify RED because the contract does not exist.
+- [x] Implement the minimum strict change contract and export it.
+- [x] Run the focused contract tests; verify GREEN.
+- [x] Write real temporary-repository tests for combined staged/unstaged/untracked extraction, `.gitignore`, `.gatekeeperignore`, policy ignores, rename/binary metrics, 2 MiB output rejection, malformed stat rejection, traversal rejection, and out-of-root symlink rejection.
+- [x] Run `pnpm test packages/git-adapter/src/worktree-diff.test.ts`; verify RED because `getWorktreeDiff` does not exist.
+- [x] Implement `getWorktreeDiff` with `git diff HEAD --numstat -z --find-renames`, `git diff HEAD --name-status -z --find-renames`, `git diff HEAD --unified=0 --no-ext-diff --find-renames`, and `git ls-files --others --exclude-standard -z`; use `ignore` for Gatekeeper/policy patterns and execa limits/timeouts.
+- [x] Run the focused adapter and contract tests; verify GREEN.
+- [x] Extend `ReviewMetrics` with `pathGroups: { name: string; count: number }[]` and `ReviewRun` with `changes: ChangedFileSummary[]`, regenerate `schemas/verdict.schema.json`, and keep its drift test green.
+- [x] Run root lint, typecheck, test, build, format check, and audit; record outcomes in the execution log.
 - [ ] Commit and push `feat(git): extract bounded worktree changes`.
 
 ### Task 2: Deterministic review engine

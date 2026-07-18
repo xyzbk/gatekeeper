@@ -9,7 +9,22 @@ export function createReviewRunFixture(): ReviewRun {
     verdict: 'FAST_PATH',
     summary: 'The change is ready for review.',
     findings: [],
-    metrics: { filesChanged: 1, linesAdded: 3, linesDeleted: 1 },
+    metrics: {
+      filesChanged: 1,
+      linesAdded: 3,
+      linesDeleted: 1,
+      pathGroups: [{ name: 'src', count: 1 }],
+    },
+    changes: [
+      {
+        path: 'src/index.ts',
+        status: 'modified',
+        additions: 3,
+        deletions: 1,
+        binary: false,
+        contentTruncated: false,
+      },
+    ],
     createdAt: '2026-07-16T20:00:00.000Z',
   };
 }

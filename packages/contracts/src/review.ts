@@ -8,6 +8,8 @@ import {
 } from '@gatekeeper/domain';
 import { z } from 'zod';
 
+import { changedFileSummarySchema } from './change.js';
+
 const identifierSchema = z.string().trim().min(1);
 
 export const evidencePointerSchema = z
@@ -61,6 +63,14 @@ export const reviewMetricsSchema = z
     filesChanged: z.int().nonnegative(),
     linesAdded: z.int().nonnegative(),
     linesDeleted: z.int().nonnegative(),
+    pathGroups: z.array(
+      z
+        .object({
+          name: z.string().trim().min(1).max(4_096),
+          count: z.int().positive(),
+        })
+        .strict(),
+    ),
     productionFilesChanged: z.int().nonnegative().optional(),
     testFilesChanged: z.int().nonnegative().optional(),
     documentationFilesChanged: z.int().nonnegative().optional(),
@@ -89,6 +99,7 @@ export const reviewRunSchema = z
     ...reviewBaseShape,
     verdict: z.enum(VERDICTS),
     summary: z.string().trim().min(1).max(4_000),
+    changes: z.array(changedFileSummarySchema).max(500),
     previousReviewId: identifierSchema.optional(),
     reasoningProvider: z.string().nullable().optional(),
     model: z.string().nullable().optional(),

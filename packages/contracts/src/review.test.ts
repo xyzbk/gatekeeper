@@ -11,7 +11,13 @@ describe('reviewRunSchema', () => {
       import('@gatekeeper/testkit'),
     ]);
 
-    expect(reviewRunSchema.parse(createReviewRunFixture()).verdict).toBe('FAST_PATH');
+    const review = reviewRunSchema.parse(createReviewRunFixture());
+
+    expect(review.verdict).toBe('FAST_PATH');
+    expect(review.metrics.pathGroups).toEqual([{ name: 'src', count: 1 }]);
+    expect(review.changes).toEqual([
+      expect.objectContaining({ path: 'src/index.ts', contentTruncated: false }),
+    ]);
   });
 
   it('rejects unknown fields', async () => {
@@ -41,6 +47,7 @@ describe('reviewRunSchema', () => {
     expect(reviewRunJsonSchema.required).toContain('schemaVersion');
     expect(reviewRunJsonSchema.required).toContain('reviewId');
     expect(reviewRunJsonSchema.required).toContain('verdict');
+    expect(reviewRunJsonSchema.required).toContain('changes');
   });
 
   it('keeps the committed verdict schema synchronized with Zod', async () => {

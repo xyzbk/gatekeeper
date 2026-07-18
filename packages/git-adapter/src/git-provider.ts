@@ -1,55 +1,41 @@
-import { realpath, stat } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
-
 import { repositorySnapshotSchema, type RepositorySnapshot } from '@gatekeeper/contracts';
 import { execa } from 'execa';
 
-interface GitCommandResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
-
-type RunGit = (arguments_: readonly string[]) => Promise<GitCommandResult>;
+import {
+  RepositoryInspectionError,
+  resolveRepositoryRoot,
+  type GitCommandResult,
+  type RunGit,
+} from './repository-path.js';
+import { extractWorktreeDiff, type WorktreeDiffOptions } from './worktree-diff.js';
 
 interface GitProviderOptions {
   runGit?: RunGit;
 }
 
 export interface GitProvider {
+  getWorktreeDiff(
+    repositoryPath: string,
+    options?: WorktreeDiffOptions,
+  ): ReturnType<typeof extractWorktreeDiff>;
   inspectRepository(repositoryPath: string): Promise<RepositorySnapshot>;
-}
-
-export type RepositoryInspectionErrorCode =
-  'INVALID_REPOSITORY_PATH' | 'INVALID_REPOSITORY_ROOT' | 'NOT_A_REPOSITORY' | 'GIT_COMMAND_FAILED';
-
-export class RepositoryInspectionError extends Error {
-  public readonly code: RepositoryInspectionErrorCode;
-
-  public constructor(code: RepositoryInspectionErrorCode, message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'RepositoryInspectionError';
-    this.code = code;
-  }
 }
 
 async function runGitCommand(arguments_: readonly string[]): Promise<GitCommandResult> {
   const result = await execa('git', arguments_, {
+    maxBuffer: 2 * 1_024 * 1_024,
     reject: false,
     stdin: 'ignore',
+    timeout: 30_000,
   });
 
   return {
     exitCode: result.exitCode ?? -1,
     stdout: result.stdout,
     stderr: result.stderr,
+    ...(result.isMaxBuffer ? { failureReason: 'max_buffer' as const } : {}),
+    ...(result.timedOut ? { failureReason: 'timeout' as const } : {}),
   };
-}
-
-function isPathWithin(root: string, candidate: string): boolean {
-  const pathFromRoot = relative(root, candidate);
-
-  return pathFromRoot === '' || (!pathFromRoot.startsWith('..') && !isAbsolute(pathFromRoot));
 }
 
 function requireSuccessfulCommand(result: GitCommandResult, message: string): GitCommandResult {
@@ -60,63 +46,11 @@ function requireSuccessfulCommand(result: GitCommandResult, message: string): Gi
   return result;
 }
 
-async function resolveRequestedDirectory(repositoryPath: string): Promise<string> {
-  try {
-    const requestedPath = await realpath(resolve(repositoryPath));
-    const requestedPathStat = await stat(requestedPath);
-
-    if (!requestedPathStat.isDirectory()) {
-      throw new RepositoryInspectionError(
-        'INVALID_REPOSITORY_PATH',
-        'The requested repository path must be a directory.',
-      );
-    }
-
-    return requestedPath;
-  } catch (error) {
-    if (error instanceof RepositoryInspectionError) {
-      throw error;
-    }
-
-    throw new RepositoryInspectionError(
-      'INVALID_REPOSITORY_PATH',
-      'The requested repository path is not accessible.',
-      { cause: error },
-    );
-  }
-}
-
 async function inspectRepository(
   repositoryPath: string,
   runGit: RunGit,
 ): Promise<RepositorySnapshot> {
-  const requestedPath = await resolveRequestedDirectory(repositoryPath);
-  const rootResult = await runGit(['-C', requestedPath, 'rev-parse', '--show-toplevel']);
-
-  if (rootResult.exitCode !== 0) {
-    throw new RepositoryInspectionError(
-      'NOT_A_REPOSITORY',
-      'Git could not resolve the repository root.',
-    );
-  }
-
-  let root: string;
-  try {
-    root = await realpath(resolve(rootResult.stdout.trim()));
-  } catch (error) {
-    throw new RepositoryInspectionError(
-      'INVALID_REPOSITORY_ROOT',
-      'Git returned an inaccessible repository root.',
-      { cause: error },
-    );
-  }
-
-  if (!isPathWithin(root, requestedPath)) {
-    throw new RepositoryInspectionError(
-      'INVALID_REPOSITORY_ROOT',
-      'Git returned a repository root unrelated to the requested path.',
-    );
-  }
+  const root = await resolveRepositoryRoot(repositoryPath, runGit);
 
   const [branchResult, headResult, statusResult, remoteResult] = await Promise.all([
     runGit(['-C', root, 'symbolic-ref', '--quiet', '--short', 'HEAD']),
@@ -152,6 +86,10 @@ export function createGitProvider(options: GitProviderOptions = {}): GitProvider
   const runGit = options.runGit ?? runGitCommand;
 
   return {
+    getWorktreeDiff: async (repositoryPath, diffOptions) =>
+      extractWorktreeDiff(repositoryPath, runGit, diffOptions),
     inspectRepository: async (repositoryPath) => inspectRepository(repositoryPath, runGit),
   };
 }
+
+export { RepositoryInspectionError } from './repository-path.js';
