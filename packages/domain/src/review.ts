@@ -56,9 +56,9 @@ export interface EvidencePointer {
 export interface ReviewTarget {
   kind: ReviewTargetKind;
   display: string;
-  base?: string;
-  head?: string;
-  pullRequestNumber?: number;
+  base?: string | undefined;
+  head?: string | undefined;
+  pullRequestNumber?: number | undefined;
 }
 
 export interface Finding {

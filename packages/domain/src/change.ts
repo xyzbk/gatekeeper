@@ -18,6 +18,14 @@ export interface ChangedFile extends ChangedFileSummary {
 
 export interface ChangeSet {
   schemaVersion: 1;
-  target: { kind: 'worktree'; display: 'Current worktree' };
+  target:
+    | { kind: 'worktree'; display: 'Current worktree' }
+    | {
+        kind: 'pull_request';
+        display: string;
+        pullRequestNumber: number;
+        base?: string;
+        head?: string;
+      };
   files: ChangedFile[];
 }

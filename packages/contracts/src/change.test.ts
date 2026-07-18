@@ -100,4 +100,36 @@ describe('changeSetSchema', () => {
       }),
     ).toThrow();
   });
+
+  it('accepts a bounded pull-request target without weakening the worktree target', async () => {
+    const { changeSetSchema } = await import('./change.js');
+
+    expect(
+      changeSetSchema.parse({
+        schemaVersion: 1,
+        target: {
+          kind: 'pull_request',
+          display: 'Pull request #12',
+          pullRequestNumber: 12,
+          base: 'master',
+          head: 'redis-cache',
+        },
+        files: [],
+      }),
+    ).toMatchObject({ target: { kind: 'pull_request', pullRequestNumber: 12 } });
+
+    expect(() =>
+      changeSetSchema.parse({
+        schemaVersion: 1,
+        target: {
+          kind: 'pull_request',
+          display: 'Pull request #0',
+          pullRequestNumber: 0,
+        },
+        files: [],
+      }),
+    ).toThrow();
+
+    expect(changeSetSchema.parse(validChangeSet)).toEqual(validChangeSet);
+  });
 });

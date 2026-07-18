@@ -205,6 +205,18 @@ importers:
         specifier: 7.0.6
         version: 7.0.6
 
+  packages/github-gh:
+    dependencies:
+      '@gatekeeper/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      execa:
+        specifier: 9.6.1
+        version: 9.6.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+
   packages/project-memory:
     dependencies:
       '@gatekeeper/contracts':

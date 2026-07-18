@@ -81,12 +81,23 @@ export const changedFileSchema = z
 export const changeSetSchema = z
   .object({
     schemaVersion: z.literal(1),
-    target: z
-      .object({
-        kind: z.literal('worktree'),
-        display: z.literal('Current worktree'),
-      })
-      .strict(),
+    target: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('worktree'),
+          display: z.literal('Current worktree'),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('pull_request'),
+          display: z.string().trim().min(1).max(300),
+          pullRequestNumber: z.int().positive(),
+          base: z.string().trim().min(1).max(300).optional(),
+          head: z.string().trim().min(1).max(300).optional(),
+        })
+        .strict(),
+    ]),
     files: z.array(changedFileSchema).max(500),
   })
   .strict();
