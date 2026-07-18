@@ -59,7 +59,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 ## Phase 4 MCP and Codex controls
 
 - Trusted-project MCP configuration contains only a local Node command, relative build path, working directory, and bounded timeouts; it contains no token or model credential.
-- The stdio server registers exactly six fixed-repository tools. It exposes no arbitrary path, file-read, subprocess, GitHub, pull-request, or publication capability.
+- The stdio server registers exactly seven fixed-repository tools. The seventh reads one positive-numbered GitHub pull request through the local service and persists only machine-local state. It exposes no arbitrary path, file-read, subprocess, remote selector, synchronization, or publication capability.
 - Protocol stdout is JSON-RPC only. Startup stderr and tool failures are bounded and exclude exception text, service metadata, response bodies, source, diffs, and tokens.
 - The client validates `service.json`, accepts only its strict loopback URL and high-entropy bearer shape, applies a 30-second request timeout, and validates every API response again.
 - `gatekeeper_status` reads the current and indexed HEAD so Codex can avoid unnecessary index writes.

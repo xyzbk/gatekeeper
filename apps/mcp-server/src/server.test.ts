@@ -8,7 +8,7 @@ import { createReviewRunFixture } from '@gatekeeper/testkit';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GatekeeperClient } from './client.js';
-import { createGatekeeperMcpServer, PHASE_4_TOOL_NAMES } from './server.js';
+import { createGatekeeperMcpServer, GATEKEEPER_TOOL_NAMES } from './server.js';
 
 const review = createReviewRunFixture();
 const suspiciousEvidence = {
@@ -28,6 +28,11 @@ const draft = {
   changes: review.changes,
   evidenceCandidates: [suspiciousEvidence],
   createdAt: review.createdAt,
+};
+const pullRequestDraft = {
+  ...draft,
+  reviewId: 'review_pr_12',
+  target: { kind: 'pull_request' as const, display: 'Pull request #12', pullRequestNumber: 12 },
 };
 
 function stubClient(): GatekeeperClient {
@@ -97,6 +102,7 @@ function stubClient(): GatekeeperClient {
       }),
     ),
     reviewWorktree: vi.fn(() => Promise.resolve(draft)),
+    reviewPullRequest: vi.fn(() => Promise.resolve(pullRequestDraft)),
     searchMemory: vi.fn(() =>
       Promise.resolve({
         schemaVersion: 1,
@@ -127,15 +133,14 @@ async function connected(clientImplementation = stubClient()) {
 }
 
 describe('Gatekeeper MCP server', () => {
-  it('lists exactly six local tools with strict schemas and accurate annotations', async () => {
+  it('lists exactly seven local tools with strict schemas and accurate annotations', async () => {
     const { client, server } = await connected();
 
     const { tools } = await client.listTools();
     await client.close();
     await server.close();
 
-    expect(tools.map(({ name }) => name)).toEqual(PHASE_4_TOOL_NAMES);
-    expect(tools.map(({ name }) => name)).not.toContain('gatekeeper_review_pull_request');
+    expect(tools.map(({ name }) => name)).toEqual(GATEKEEPER_TOOL_NAMES);
     expect(tools.every(({ inputSchema, outputSchema }) => inputSchema && outputSchema)).toBe(true);
     expect(tools.find(({ name }) => name === 'gatekeeper_status')?.annotations).toEqual(
       expect.objectContaining({
@@ -159,6 +164,16 @@ describe('Gatekeeper MCP server', () => {
         idempotentHint: false,
       }),
     );
+    expect(
+      tools.find(({ name }) => name === 'gatekeeper_review_pull_request')?.annotations,
+    ).toEqual(
+      expect.objectContaining({
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      }),
+    );
   });
 
   it('returns concise text plus validated structured content through the official client', async () => {
@@ -168,6 +183,10 @@ describe('Gatekeeper MCP server', () => {
     const reviewResult = await client.callTool({
       name: 'gatekeeper_review_worktree',
       arguments: {},
+    });
+    const pullRequestResult = await client.callTool({
+      name: 'gatekeeper_review_pull_request',
+      arguments: { pullRequestNumber: 12 },
     });
     const search = await client.callTool({
       name: 'gatekeeper_search_memory',
@@ -203,8 +222,10 @@ describe('Gatekeeper MCP server', () => {
     expect(index.isError).not.toBe(true);
     expect(completed.structuredContent).toEqual(review);
     expect(loaded.structuredContent).toEqual(review);
-    expect(toolsAfterHostileContent.tools.map(({ name }) => name)).toEqual(PHASE_4_TOOL_NAMES);
+    expect(toolsAfterHostileContent.tools.map(({ name }) => name)).toEqual(GATEKEEPER_TOOL_NAMES);
     expect(clientImplementation.reviewWorktree).toHaveBeenCalledOnce();
+    expect(pullRequestResult.structuredContent).toEqual(pullRequestDraft);
+    expect(clientImplementation.reviewPullRequest).toHaveBeenCalledWith(12);
   });
 
   it('rejects invalid tool inputs before calling the local service', async () => {
@@ -215,11 +236,17 @@ describe('Gatekeeper MCP server', () => {
       name: 'gatekeeper_search_memory',
       arguments: { query: '', limit: 500, path: 'C:\\private' },
     });
+    const invalidPullRequest = await client.callTool({
+      name: 'gatekeeper_review_pull_request',
+      arguments: { pullRequestNumber: 0, remote: 'attacker/repository' },
+    });
     await client.close();
     await server.close();
 
     expect(result.isError).toBe(true);
+    expect(invalidPullRequest.isError).toBe(true);
     expect(implementation.searchMemory).not.toHaveBeenCalled();
+    expect(implementation.reviewPullRequest).not.toHaveBeenCalled();
   });
 
   it('converts local-service failures into actionable tool errors without leaking details', async () => {
@@ -260,6 +287,6 @@ describe('Gatekeeper MCP server', () => {
     const { tools } = await client.listTools();
     await client.close();
 
-    expect(tools.map(({ name }) => name)).toEqual(PHASE_4_TOOL_NAMES);
+    expect(tools.map(({ name }) => name)).toEqual(GATEKEEPER_TOOL_NAMES);
   });
 });

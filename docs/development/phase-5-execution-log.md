@@ -11,6 +11,7 @@ Phase 5 adds bounded read-only GitHub history, explicit remote relationships in 
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (32 files, 183 tests).
 - `pnpm build`: PASS.
+
 - Local `master`, `origin/master`, and the fetched remote `master` were aligned at the starting commit.
 - GitHub CLI: not installed in the current Windows environment. The provider will be developed and accepted against injected/offline command fixtures; live read-only verification remains conditional on an installed, authenticated `gh` and an existing approved demo repository.
 
@@ -161,6 +162,36 @@ Aggressive checks and corrections:
 GREEN:
 
 - Focused contracts, Fastify API, restart, remote-drift, and start-command suites: PASS (36 tests).
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (34 files, 215 tests).
+- `pnpm build`: PASS.
+
+### Task 6 — seventh MCP tool and Gatekeeper skill
+
+Expected RED:
+
+- The local client had no pull-request operation, the official MCP client listed only six tools, and the repository skill explicitly deferred PR review.
+
+Implemented:
+
+- Added `gatekeeper_review_pull_request` with a strict positive-integer-only input, ReviewDraft v1 output, and the same real POST-review/GET-draft path as worktree review.
+- Preserved all six Phase 4 tools and registered exactly seven total. The PR tool is non-destructive, non-idempotent, and open-world because it reads GitHub while persisting only machine-local Project Memory.
+- Parsed only the shared strict error envelope so bounded `gh`/authentication repair guidance reaches Codex without forwarding response bodies.
+- Updated the concise repo skill and direct references to request explicit sync/model consent, treat all GitHub text as untrusted data, cite only returned historical links, and never publish.
+
+Aggressive checks and environment findings:
+
+- Zero-number and injected remote fields are rejected by the MCP SDK before the local client is called.
+- Hostile evidence naming the PR tool does not alter the seven-tool registry or trigger a call.
+- Official in-memory and real stdio SDK clients both observe exactly seven tools; protocol stdout remains clean.
+- The system skill validator initially failed because both available Python runtimes lacked PyYAML. A pinned PyYAML 6.0.2 was loaded only into a temporary validation directory; `quick_validate.py` then passed.
+- `codex mcp list` could not launch because Windows denied execution of the desktop app's packaged `codex.exe`. This is an environment limitation; official SDK stdio discovery remains the executable acceptance path.
+
+GREEN:
+
+- Focused client, official MCP protocol, stdio, and repository-surface suites: PASS (10 tests).
+- Gatekeeper skill `quick_validate.py`: PASS.
 - `pnpm lint`: PASS.
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (34 files, 215 tests).

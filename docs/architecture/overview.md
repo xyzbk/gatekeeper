@@ -15,7 +15,7 @@ HTTP review ┘                                                 │       │
                                     CLI text/JSON <─ local API ─> React dashboard
 ```
 
-The Phase 4 Codex path is `Codex skill -> six stdio MCP tools -> fixed loopback API -> review engine / Project Memory -> persisted ReviewRun`. The MCP process never bypasses the API to reach Git, SQLite, or repository files.
+The Codex path is `Codex skill -> seven stdio MCP tools -> fixed loopback API -> review engine / Project Memory -> persisted ReviewRun`. The MCP process never bypasses the API to reach Git, GitHub, SQLite, or repository files.
 
 The current dependency direction is:
 
@@ -60,4 +60,4 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 ## Phase 5 boundary
 
-Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, and verified CLI/Fastify pull-request composition. MCP/dashboard composition and the Ghost Change fixture remain inside the active Phase 5 gate until their verified slices land. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.
+Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, and verified CLI/Fastify/MCP pull-request composition. Dashboard composition and the Ghost Change fixture remain inside the active Phase 5 gate until their verified slices land. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.

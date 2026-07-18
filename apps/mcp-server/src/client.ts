@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { resolveServicePaths } from '@gatekeeper/config';
 import {
+  errorEnvelopeSchema,
   gatekeeperMcpStatusSchema,
   indexResultSchema,
   memorySearchResponseSchema,
@@ -45,6 +46,7 @@ export interface GatekeeperClient {
   status: () => Promise<GatekeeperMcpStatus>;
   indexRepository: () => Promise<IndexResult>;
   reviewWorktree: () => Promise<ReviewDraftContract>;
+  reviewPullRequest: (pullRequestNumber: number) => Promise<ReviewDraftContract>;
   searchMemory: (input: SearchMemoryRequest) => Promise<MemorySearchResponse>;
   completeReview: (input: CompleteReviewRequest) => Promise<ReviewRunContract>;
   getReview: (reviewId: string) => Promise<ReviewRunContract>;
@@ -112,6 +114,16 @@ export function createGatekeeperClient(options: GatekeeperClientOptions = {}): G
     }
 
     if (!response.ok) {
+      try {
+        const envelope = errorEnvelopeSchema.parse(await response.json());
+        throw new GatekeeperClientError(
+          [envelope.error.message, envelope.error.repair].filter(Boolean).join(' '),
+        );
+      } catch (error) {
+        if (error instanceof GatekeeperClientError) {
+          throw error;
+        }
+      }
       throw new GatekeeperClientError(
         response.status === 404
           ? 'The requested Gatekeeper record was not found.'
@@ -155,6 +167,13 @@ export function createGatekeeperClient(options: GatekeeperClientOptions = {}): G
       const review = await request('/v1/reviews/worktree', reviewRunSchema, {
         method: 'POST',
         body: {},
+      });
+      return request(`/v1/reviews/${encodeURIComponent(review.reviewId)}/draft`, reviewDraftSchema);
+    },
+    reviewPullRequest: async (pullRequestNumber) => {
+      const review = await request('/v1/reviews/pull-request', reviewRunSchema, {
+        method: 'POST',
+        body: { schemaVersion: 1, pullRequestNumber },
       });
       return request(`/v1/reviews/${encodeURIComponent(review.reviewId)}/draft`, reviewDraftSchema);
     },

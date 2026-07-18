@@ -75,6 +75,11 @@ const memoryStatus = {
 };
 
 const review = { ...createReviewRunFixture(), repositoryId: repository.repositoryId };
+const pullRequestReview = {
+  ...review,
+  reviewId: 'review_pr_12',
+  target: { kind: 'pull_request' as const, display: 'Pull request #12', pullRequestNumber: 12 },
+};
 const draft = {
   schemaVersion: 1 as const,
   reviewId: review.reviewId,
@@ -111,14 +116,22 @@ describe('Gatekeeper local service client', () => {
                 ? indexResult
                 : url.pathname === '/v1/reviews/worktree'
                   ? review
-                  : url.pathname.endsWith('/draft')
-                    ? draft
-                    : url.pathname.endsWith('/complete') ||
-                        url.pathname === `/v1/reviews/${review.reviewId}`
-                      ? review
-                      : url.pathname === '/v1/memory/search'
-                        ? memoryResponse
-                        : undefined;
+                  : url.pathname === '/v1/reviews/pull-request'
+                    ? pullRequestReview
+                    : url.pathname.endsWith('/draft')
+                      ? url.pathname.includes(pullRequestReview.reviewId)
+                        ? {
+                            ...draft,
+                            reviewId: pullRequestReview.reviewId,
+                            target: pullRequestReview.target,
+                          }
+                        : draft
+                      : url.pathname.endsWith('/complete') ||
+                          url.pathname === `/v1/reviews/${review.reviewId}`
+                        ? review
+                        : url.pathname === '/v1/memory/search'
+                          ? memoryResponse
+                          : undefined;
       return Promise.resolve(response === undefined ? json({}, 404) : json(response));
     });
     const client = createGatekeeperClient({
@@ -133,6 +146,11 @@ describe('Gatekeeper local service client', () => {
     });
     await expect(client.indexRepository()).resolves.toEqual(indexResult);
     await expect(client.reviewWorktree()).resolves.toEqual(draft);
+    await expect(client.reviewPullRequest(12)).resolves.toEqual({
+      ...draft,
+      reviewId: pullRequestReview.reviewId,
+      target: pullRequestReview.target,
+    });
     await expect(client.searchMemory({ query: 'cache', limit: 5 })).resolves.toEqual(
       memoryResponse,
     );
@@ -149,6 +167,10 @@ describe('Gatekeeper local service client', () => {
       );
       expect(new URL((request as Request).url).origin).toBe(metadata.baseUrl);
     }
+    const pullRequestCall = fetchImplementation.mock.calls
+      .map(([request]) => request as Request)
+      .find((request) => new URL(request.url).pathname === '/v1/reviews/pull-request');
+    expect(await pullRequestCall?.json()).toEqual({ schemaVersion: 1, pullRequestNumber: 12 });
   });
 
   it('returns actionable bounded errors without leaking metadata or response content', async () => {
@@ -164,6 +186,22 @@ describe('Gatekeeper local service client', () => {
       loadMetadata: () => Promise.resolve(metadata),
       fetch: () => Promise.resolve(json({ privateSource: 'do not leak' })),
     });
+    const repairResponse = createGatekeeperClient({
+      loadMetadata: () => Promise.resolve(metadata),
+      fetch: () =>
+        Promise.resolve(
+          json(
+            {
+              error: {
+                code: 'ENVIRONMENT_ERROR',
+                message: 'GitHub authentication is required for this local operation.',
+                repair: 'Run gh auth login --hostname github.com.',
+              },
+            },
+            503,
+          ),
+        ),
+    });
 
     await expect(unavailable.status()).rejects.toThrow(
       'Gatekeeper local service is unavailable. Start it with:',
@@ -177,6 +215,9 @@ describe('Gatekeeper local service client', () => {
       'Gatekeeper local service returned an invalid response.',
     );
     await expect(invalidResponse.status()).rejects.not.toThrow('do not leak');
+    await expect(repairResponse.reviewPullRequest(12)).rejects.toThrow(
+      'GitHub authentication is required for this local operation. Run gh auth login --hostname github.com.',
+    );
   });
 
   it('uses a bounded request timeout', async () => {
