@@ -84,6 +84,8 @@ const reviewBaseShape = {
   target: reviewTargetSchema,
   findings: z.array(findingSchema),
   metrics: reviewMetricsSchema,
+  changes: z.array(changedFileSummarySchema).max(500),
+  previousReviewId: identifierSchema.optional(),
   createdAt: z.iso.datetime(),
 };
 
@@ -99,12 +101,51 @@ export const reviewRunSchema = z
     ...reviewBaseShape,
     verdict: z.enum(VERDICTS),
     summary: z.string().trim().min(1).max(4_000),
-    changes: z.array(changedFileSummarySchema).max(500),
-    previousReviewId: identifierSchema.optional(),
     reasoningProvider: z.string().nullable().optional(),
     model: z.string().nullable().optional(),
   })
   .strict();
+
+export const reviewCompletionFindingSchema = findingSchema
+  .omit({ enforcement: true, policyId: true })
+  .extend({
+    authority: z.enum(['EVIDENCE_SUPPORTED', 'INFERENCE']),
+    evidence: z.array(evidencePointerSchema).max(20),
+    affectedPaths: z.array(z.string().trim().min(1).max(4_096)).max(100).optional(),
+    affectedSymbols: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+    remediation: z.array(z.string().trim().min(1).max(1_000)).max(20),
+  })
+  .strict()
+  .superRefine((finding, context) => {
+    if (finding.authority === 'EVIDENCE_SUPPORTED' && finding.evidence.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Evidence-supported findings must cite at least one offered evidence pointer.',
+        path: ['evidence'],
+      });
+    }
+  });
+
+export const reviewCompletionInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    findings: z.array(reviewCompletionFindingSchema).max(100),
+    model: z.string().trim().min(1).max(200).nullable().optional(),
+  })
+  .strict()
+  .superRefine(({ findings }, context) => {
+    const seen = new Set<string>();
+    for (const [index, finding] of findings.entries()) {
+      if (seen.has(finding.id)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Finding IDs must be unique.',
+          path: ['findings', index, 'id'],
+        });
+      }
+      seen.add(finding.id);
+    }
+  });
 
 export const reviewRunJsonSchema = {
   $id: 'https://gatekeeper.local/schemas/verdict-v1.json',
@@ -117,4 +158,17 @@ export const reviewRunApiJsonSchema = {
   ...z.toJSONSchema(reviewRunSchema, { target: 'draft-7' }),
 };
 
+export const reviewDraftJsonSchema = {
+  $id: 'gatekeeper:review-draft-v1',
+  ...z.toJSONSchema(reviewDraftSchema, { target: 'draft-7' }),
+};
+
+export const reviewCompletionInputJsonSchema = {
+  $id: 'gatekeeper:review-completion-input-v1',
+  ...z.toJSONSchema(reviewCompletionInputSchema, { target: 'draft-7' }),
+};
+
 export type ReviewRunContract = z.infer<typeof reviewRunSchema>;
+export type ReviewDraftContract = z.infer<typeof reviewDraftSchema>;
+export type ReviewCompletionFinding = z.infer<typeof reviewCompletionFindingSchema>;
+export type ReviewCompletionInput = z.infer<typeof reviewCompletionInputSchema>;

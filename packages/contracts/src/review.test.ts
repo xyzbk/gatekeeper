@@ -63,3 +63,115 @@ describe('reviewRunSchema', () => {
     expect(committedSchema).toEqual(reviewRunJsonSchema);
   });
 });
+
+describe('review completion contracts', () => {
+  const evidence = {
+    sourceType: 'adr' as const,
+    repositoryId: 'repository_fixture',
+    sourceId: 'docs/adr/0001.md',
+    path: 'docs/adr/0001.md',
+    excerpt: 'Keep the cache optional.',
+  };
+
+  const supportedFinding = {
+    id: 'finding_supported',
+    category: 'architecture-history',
+    severity: 'medium' as const,
+    authority: 'EVIDENCE_SUPPORTED' as const,
+    confidence: 0.9,
+    title: 'The change conflicts with an active ADR',
+    explanation: 'The retrieved ADR requires the cache to remain optional.',
+    evidence: [evidence],
+    affectedPaths: ['src/cache.ts'],
+    remediation: ['Keep the cache optional.'],
+    falsePositiveRisk: 'low' as const,
+    humanApprovalRequired: false,
+  };
+
+  it('accepts only model-authored evidence-supported or inference findings', async () => {
+    const { reviewCompletionInputSchema } = await import('./review.js');
+
+    expect(
+      reviewCompletionInputSchema.parse({
+        schemaVersion: 1,
+        findings: [
+          supportedFinding,
+          {
+            ...supportedFinding,
+            id: 'finding_inference',
+            authority: 'INFERENCE',
+            evidence: [],
+          },
+        ],
+        model: 'active-codex-model',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        findings: [
+          expect.objectContaining({ authority: 'EVIDENCE_SUPPORTED' }),
+          expect.objectContaining({ authority: 'INFERENCE' }),
+        ],
+      }),
+    );
+  });
+
+  it.each([
+    ['a submitted verdict', { verdict: 'BLOCK' }],
+    [
+      'deterministic authority',
+      { findings: [{ ...supportedFinding, authority: 'DETERMINISTIC' }] },
+    ],
+    ['model-authored enforcement', { findings: [{ ...supportedFinding, enforcement: 'hard' }] }],
+    ['model-authored policy identity', { findings: [{ ...supportedFinding, policyId: 'policy' }] }],
+  ])('rejects %s', async (_label, override) => {
+    const { reviewCompletionInputSchema } = await import('./review.js');
+    const candidate = {
+      schemaVersion: 1,
+      findings: [supportedFinding],
+      ...override,
+    };
+
+    expect(() => reviewCompletionInputSchema.parse(candidate)).toThrow();
+  });
+
+  it('requires evidence-supported findings to cite evidence and rejects duplicate IDs', async () => {
+    const { reviewCompletionInputSchema } = await import('./review.js');
+
+    expect(() =>
+      reviewCompletionInputSchema.parse({
+        schemaVersion: 1,
+        findings: [{ ...supportedFinding, evidence: [] }],
+      }),
+    ).toThrow();
+    expect(() =>
+      reviewCompletionInputSchema.parse({
+        schemaVersion: 1,
+        findings: [supportedFinding, supportedFinding],
+      }),
+    ).toThrow();
+  });
+
+  it('keeps changes and previous review identity in a strict review draft', async () => {
+    const [{ reviewDraftSchema }, { createReviewRunFixture }] = await Promise.all([
+      import('./review.js'),
+      import('@gatekeeper/testkit'),
+    ]);
+    const review = createReviewRunFixture();
+
+    const draft = reviewDraftSchema.parse({
+      schemaVersion: 1,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      findings: review.findings,
+      metrics: review.metrics,
+      changes: review.changes,
+      evidenceCandidates: [],
+      createdAt: review.createdAt,
+      previousReviewId: 'review_previous',
+    });
+
+    expect(draft.changes).toEqual(review.changes);
+    expect(draft.previousReviewId).toBe('review_previous');
+  });
+});

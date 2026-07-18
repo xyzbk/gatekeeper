@@ -96,6 +96,8 @@ export interface ReviewDraft {
   target: ReviewTarget;
   findings: Finding[];
   metrics: ReviewMetrics;
+  changes: ChangedFileSummary[];
+  previousReviewId?: ReviewId;
   evidenceCandidates: EvidencePointer[];
   createdAt: string;
 }
@@ -103,8 +105,6 @@ export interface ReviewDraft {
 export interface ReviewRun extends Omit<ReviewDraft, 'evidenceCandidates'> {
   verdict: Verdict;
   summary: string;
-  changes: ChangedFileSummary[];
-  previousReviewId?: ReviewId;
   reasoningProvider?: string | null;
   model?: string | null;
 }

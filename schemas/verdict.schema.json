@@ -253,20 +253,6 @@
       "required": ["filesChanged", "linesAdded", "linesDeleted", "pathGroups"],
       "additionalProperties": false
     },
-    "createdAt": {
-      "type": "string",
-      "format": "date-time",
-      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-    },
-    "verdict": {
-      "type": "string",
-      "enum": ["FAST_PATH", "REQUIRE_CHANGES", "ESCALATE", "BLOCK"]
-    },
-    "summary": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 4000
-    },
     "changes": {
       "maxItems": 500,
       "type": "array",
@@ -312,6 +298,20 @@
       "type": "string",
       "minLength": 1
     },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["FAST_PATH", "REQUIRE_CHANGES", "ESCALATE", "BLOCK"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
     "reasoningProvider": {
       "anyOf": [
         {
@@ -340,10 +340,10 @@
     "target",
     "findings",
     "metrics",
+    "changes",
     "createdAt",
     "verdict",
-    "summary",
-    "changes"
+    "summary"
   ],
   "additionalProperties": false
 }
