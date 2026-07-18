@@ -8,6 +8,8 @@ import type {
   IndexState,
   MemorySearchResult,
   RepositoryRecord,
+  ReviewCompletionInput,
+  ReviewDraftContract,
   ReviewRunContract,
   StatusResponse,
 } from '@gatekeeper/contracts';
@@ -122,6 +124,48 @@ const memoryResult: MemorySearchResult = {
   },
 };
 
+const reviewDraft: ReviewDraftContract = {
+  schemaVersion: 1,
+  reviewId: reviewResponse.reviewId,
+  repositoryId: reviewResponse.repositoryId,
+  target: reviewResponse.target,
+  findings: reviewResponse.findings,
+  metrics: reviewResponse.metrics,
+  changes: reviewResponse.changes,
+  evidenceCandidates: [memoryResult.evidence],
+  createdAt: reviewResponse.createdAt,
+};
+
+const completionInput: ReviewCompletionInput = {
+  schemaVersion: 1,
+  findings: [
+    {
+      id: 'finding_inference',
+      category: 'maintainability',
+      severity: 'low',
+      authority: 'INFERENCE',
+      confidence: 0.65,
+      title: 'A follow-up review may be useful',
+      explanation: 'This is explicitly presented as an inference.',
+      evidence: [],
+      affectedPaths: ['src/app.ts'],
+      remediation: ['Review the changed path manually.'],
+      falsePositiveRisk: 'medium',
+      humanApprovalRequired: false,
+    },
+  ],
+  model: 'active-codex-model',
+};
+
+const completedReview: ReviewRunContract = {
+  ...reviewResponse,
+  findings: completionInput.findings,
+  summary:
+    'FAST_PATH: 1 changed file; 0 deterministic, 0 evidence-supported, 1 inference findings.',
+  reasoningProvider: 'codex',
+  model: 'active-codex-model',
+};
+
 async function createDashboardFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'gatekeeper-dashboard-'));
   await writeFile(join(root, 'index.html'), '<!doctype html><title>Gatekeeper</title>', 'utf8');
@@ -130,7 +174,12 @@ async function createDashboardFixture(): Promise<string> {
 
 async function buildTestServer(
   options: {
+    completeReview?: (
+      reviewId: string,
+      input: ReviewCompletionInput,
+    ) => Promise<ReviewRunContract | null>;
     logger?: unknown;
+    prepareReview?: (reviewId: string) => Promise<ReviewDraftContract | null>;
     projectMemory?: Partial<ProjectMemoryApi>;
     reviewWorktree?: () => Promise<ReviewRunContract>;
   } = {},
@@ -142,6 +191,10 @@ async function buildTestServer(
 
   return buildGatekeeperServer({
     bearerToken,
+    completeReview:
+      options.completeReview ??
+      ((reviewId) =>
+        Promise.resolve(reviewId === reviewResponse.reviewId ? completedReview : null)),
     dashboardRoot,
     getStatus: () => statusResponse,
     logger: options.logger ?? false,
@@ -154,6 +207,9 @@ async function buildTestServer(
       searchMemory: () => Promise.resolve([memoryResult]),
       ...options.projectMemory,
     },
+    prepareReview:
+      options.prepareReview ??
+      ((reviewId) => Promise.resolve(reviewId === reviewResponse.reviewId ? reviewDraft : null)),
     reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
     version: '0.1.0',
   });
@@ -479,6 +535,82 @@ describe('Gatekeeper local service', () => {
     });
   });
 
+  it('returns a strict deterministic review draft with bounded evidence candidates', async () => {
+    const prepareReview = vi.fn((reviewId: string) =>
+      Promise.resolve(reviewId === reviewResponse.reviewId ? reviewDraft : null),
+    );
+    const server = await buildTestServer({ prepareReview });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const found = await server.inject({
+      method: 'GET',
+      url: `/v1/reviews/${reviewResponse.reviewId}/draft`,
+      headers,
+    });
+    const missing = await server.inject({
+      method: 'GET',
+      url: '/v1/reviews/review_missing/draft',
+      headers,
+    });
+    await server.close();
+
+    expect(found.statusCode).toBe(200);
+    expect(found.json()).toEqual(reviewDraft);
+    expect(missing.statusCode).toBe(404);
+    expect(prepareReview).toHaveBeenCalledTimes(2);
+  });
+
+  it('strictly validates completion, rejects submitted authority, and returns the recomputed run', async () => {
+    const completeReview = vi.fn(() => Promise.resolve(completedReview));
+    const server = await buildTestServer({ completeReview });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const completed = await server.inject({
+      method: 'POST',
+      url: `/v1/reviews/${reviewResponse.reviewId}/complete`,
+      headers,
+      payload: completionInput,
+    });
+    const submittedVerdict = await server.inject({
+      method: 'POST',
+      url: `/v1/reviews/${reviewResponse.reviewId}/complete`,
+      headers,
+      payload: { ...completionInput, verdict: 'BLOCK' },
+    });
+    const submittedDeterministicFinding = await server.inject({
+      method: 'POST',
+      url: `/v1/reviews/${reviewResponse.reviewId}/complete`,
+      headers,
+      payload: {
+        ...completionInput,
+        findings: [{ ...completionInput.findings[0], authority: 'DETERMINISTIC' }],
+      },
+    });
+    await server.close();
+
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toEqual(completedReview);
+    expect(submittedVerdict.statusCode).toBe(400);
+    expect(submittedDeterministicFinding.statusCode).toBe(400);
+    expect(completeReview).toHaveBeenCalledOnce();
+    expect(completeReview).toHaveBeenCalledWith(reviewResponse.reviewId, completionInput);
+  });
+
+  it('returns not found when completing an unknown review', async () => {
+    const completeReview = vi.fn(() => Promise.resolve(null));
+    const server = await buildTestServer({ completeReview });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/review_missing/complete',
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: { schemaVersion: 1, findings: [] },
+    });
+    await server.close();
+
+    expect(response.statusCode).toBe(404);
+  });
+
   it('maps Project Memory failures without logging source or database details', async () => {
     const stream = new PassThrough();
     let logs = '';
@@ -550,6 +682,8 @@ describe('Gatekeeper local service', () => {
     expect(server.getSchema('gatekeeper:dashboard-bootstrap-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:error-envelope')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-run-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:review-draft-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:review-completion-input-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:repository-record-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:index-result-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:repository-status-v1')).toBeDefined();
@@ -677,6 +811,117 @@ describe('Gatekeeper local service', () => {
       expect(persisted.json()).toEqual(firstReview);
       expect(secondReview.previousReviewId).toBe(firstReview.reviewId);
       expect(reviewWorktree).toHaveBeenCalledTimes(2);
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('prepares, validates, persists, and reloads a completed Codex review', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-completion-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    const reviewWorktree = ({ repositoryId }: PersistentReviewContext) =>
+      Promise.resolve({ ...reviewResponse, repositoryId });
+
+    try {
+      const first = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewWorktree,
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(first.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const createdResponse = await first.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree',
+        headers,
+        payload: {},
+      });
+      const created = reviewRunSchema.parse(createdResponse.json());
+      const draft = await first.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${created.reviewId}/draft`,
+        headers,
+      });
+      const completedResponse = await first.server.inject({
+        method: 'POST',
+        url: `/v1/reviews/${created.reviewId}/complete`,
+        headers,
+        payload: completionInput,
+      });
+      const completed = reviewRunSchema.parse(completedResponse.json());
+      const forged = await first.server.inject({
+        method: 'POST',
+        url: `/v1/reviews/${created.reviewId}/complete`,
+        headers,
+        payload: {
+          schemaVersion: 1,
+          findings: [
+            {
+              ...completionInput.findings[0],
+              authority: 'EVIDENCE_SUPPORTED',
+              evidence: [memoryResult.evidence],
+            },
+          ],
+        },
+      });
+      await first.close();
+
+      const second = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewWorktree,
+        startedAt: '2026-07-17T01:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const persisted = await second.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${created.reviewId}`,
+        headers: {
+          host: new URL(second.baseUrl).host,
+          authorization: `Bearer ${bearerToken}`,
+        },
+      });
+      await second.close();
+
+      expect(draft.statusCode).toBe(200);
+      expect(draft.json()).toEqual(
+        expect.objectContaining({
+          reviewId: created.reviewId,
+          findings: [],
+          evidenceCandidates: [],
+          changes: created.changes,
+        }),
+      );
+      expect(completedResponse.statusCode).toBe(200);
+      expect(completed.reasoningProvider).toBe('codex');
+      expect(completed.findings).toEqual(completionInput.findings);
+      expect(forged.statusCode).toBe(400);
+      expect(forged.json()).toEqual({
+        error: {
+          code: 'USAGE_ERROR',
+          message: 'The request does not match the local API contract.',
+        },
+      });
+      expect(persisted.statusCode).toBe(200);
+      expect(persisted.json()).toEqual(completed);
     } finally {
       await rm(appData, { force: true, recursive: true });
     }

@@ -16,6 +16,7 @@
     "@gatekeeper/domain": "workspace:*",
     "@gatekeeper/git-adapter": "workspace:*",
     "@gatekeeper/project-memory": "workspace:*",
+    "@gatekeeper/review-engine": "workspace:*",
     "@gatekeeper/store-sqlite": "workspace:*",
     "fastify": "5.10.0"
   }

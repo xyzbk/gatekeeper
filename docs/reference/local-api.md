@@ -140,6 +140,49 @@ The query is 1–256 characters and the optional limit is 1–50. Results are bo
 
 Reads one persisted strict ReviewRun v1. Missing review IDs return `NOT_FOUND`. Reviews remain available after the foreground service restarts because they live in machine-local Project Memory.
 
+### `GET /v1/reviews/:reviewId/draft`
+
+Prepares the fixed stored worktree review for Codex completion. The strict ReviewDraft v1 preserves deterministic findings and bounded changed-file summaries, then adds up to twenty deduplicated Project Memory evidence candidates retrieved with at most eight derived queries. Returned repository excerpts remain bounded to 2,000 characters and labelled untrusted by the memory-search contract.
+
+Instruction-like text in retrieved evidence is never followed. Gatekeeper adds a deterministic `content-security` finding that cites the suspicious text as data and requires human review.
+
+### `POST /v1/reviews/:reviewId/complete`
+
+Accepts strict model-authored findings and persists the recomputed ReviewRun v1:
+
+```json
+{
+  "schemaVersion": 1,
+  "findings": [
+    {
+      "id": "finding_optional_cache",
+      "category": "architecture-history",
+      "severity": "medium",
+      "authority": "EVIDENCE_SUPPORTED",
+      "confidence": 0.9,
+      "title": "The change conflicts with an active ADR",
+      "explanation": "The offered ADR requires the cache to remain optional.",
+      "evidence": [
+        {
+          "sourceType": "adr",
+          "repositoryId": "repository_<opaque>",
+          "sourceId": "docs/adr/0003-cache.md",
+          "path": "docs/adr/0003-cache.md",
+          "excerpt": "Keep the cache optional."
+        }
+      ],
+      "affectedPaths": ["src/cache.ts"],
+      "remediation": ["Keep the cache optional."],
+      "falsePositiveRisk": "low",
+      "humanApprovalRequired": false
+    }
+  ],
+  "model": "<active Codex model, optional>"
+}
+```
+
+The request cannot contain a verdict, deterministic authority, policy identity, or enforcement. Evidence-supported findings require at least one exact pointer offered by the draft. Gatekeeper rejects duplicate IDs, cross-repository or forged pointers, and affected paths outside the stored change. It preserves deterministic findings, fixes the reasoning provider to `codex`, assembles the verdict locally, and atomically replaces the stored run. A missing review returns `NOT_FOUND`; invalid completion claims return the stable `USAGE_ERROR` envelope without echoing rejected content.
+
 ## Dashboard routes
 
 The built React application supports direct entry and refresh for these fixed local routes:

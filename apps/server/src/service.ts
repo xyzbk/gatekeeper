@@ -11,15 +11,17 @@ import {
 import {
   serviceMetadataSchema,
   statusResponseSchema,
+  type ReviewCompletionInput,
   type RepositorySnapshot,
   type MemorySearchInput,
   type ReviewRunContract,
   type StatusResponse,
   type ToolAvailability,
 } from '@gatekeeper/contracts';
-import type { RepositoryId, ReviewId } from '@gatekeeper/domain';
+import type { RepositoryId, ReviewId, ReviewRun } from '@gatekeeper/domain';
 import { createGitProvider } from '@gatekeeper/git-adapter';
 import { createProjectMemory } from '@gatekeeper/project-memory';
+import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
 
@@ -84,8 +86,37 @@ export async function startGatekeeperService(
       root: options.repository.root,
       remote: options.repository.remote,
     });
+    const prepareStoredReview = async (reviewId: string) => {
+      const review = await memory.getReview(reviewId);
+      if (review === null || review.repositoryId !== registeredRepository.repositoryId) {
+        return null;
+      }
+
+      return prepareReviewDraft({
+        review: review as ReviewRun,
+        searchMemory: (input) => memory.search(input),
+      });
+    };
     const serverOptions: BuildGatekeeperServerOptions = {
       bearerToken,
+      completeReview: async (reviewId: string, input: ReviewCompletionInput) => {
+        const review = await memory.getReview(reviewId);
+        if (review === null || review.repositoryId !== registeredRepository.repositoryId) {
+          return null;
+        }
+        const draft = await prepareStoredReview(reviewId);
+        if (draft === null) {
+          return null;
+        }
+        const completed = completeReview({
+          review: review as ReviewRun,
+          draft,
+          findings: input.findings,
+          ...(input.model === undefined ? {} : { model: input.model }),
+        });
+        await memory.saveReview(completed);
+        return completed;
+      },
       dashboardRoot: options.dashboardRoot,
       getStatus: () => {
         if (status === undefined) {
@@ -107,6 +138,7 @@ export async function startGatekeeperService(
         },
         searchMemory: (input: MemorySearchInput) => memory.search(input),
       },
+      prepareReview: prepareStoredReview,
       reviewWorktree: async () => {
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
         const previousReviewId = await memory.latestReviewId(

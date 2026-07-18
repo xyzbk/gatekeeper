@@ -22,6 +22,10 @@ import {
   repositoryRecordSchema,
   repositoryStatusJsonSchema,
   repositoryStatusSchema,
+  reviewCompletionInputJsonSchema,
+  reviewCompletionInputSchema,
+  reviewDraftJsonSchema,
+  reviewDraftSchema,
   reviewIdParamsJsonSchema,
   reviewRunApiJsonSchema,
   reviewRunSchema,
@@ -32,9 +36,12 @@ import {
   type MemorySearchInput,
   type MemorySearchResult,
   type RepositoryRecord,
+  type ReviewCompletionInput,
+  type ReviewDraftContract,
   type ReviewRunContract,
   type StatusResponse,
 } from '@gatekeeper/contracts';
+import { InvalidReviewCompletionError } from '@gatekeeper/review-engine';
 import fastify, { type FastifyInstance, LogController } from 'fastify';
 
 const contentSecurityPolicy = [
@@ -57,10 +64,15 @@ interface GatekeeperLoggerOptions {
 
 export interface BuildGatekeeperServerOptions {
   bearerToken: string;
+  completeReview: (
+    reviewId: string,
+    input: ReviewCompletionInput,
+  ) => Promise<ReviewRunContract | null>;
   dashboardRoot: string;
   getStatus: () => StatusResponse;
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
+  prepareReview: (reviewId: string) => Promise<ReviewDraftContract | null>;
   reviewWorktree: () => Promise<ReviewRunContract>;
   version: string;
 }
@@ -149,6 +161,8 @@ export async function buildGatekeeperServer(
   server.addSchema(dashboardBootstrapJsonSchema);
   server.addSchema(emptyRequestJsonSchema);
   server.addSchema(reviewRunApiJsonSchema);
+  server.addSchema(reviewDraftJsonSchema);
+  server.addSchema(reviewCompletionInputJsonSchema);
   server.addSchema(repositoryRecordJsonSchema);
   server.addSchema(indexStateJsonSchema);
   server.addSchema(indexResultJsonSchema);
@@ -178,7 +192,8 @@ export async function buildGatekeeperServer(
   });
 
   server.setErrorHandler((error, request, reply) => {
-    const validationFailure = isValidationError(error);
+    const validationFailure =
+      isValidationError(error) || error instanceof InvalidReviewCompletionError;
     server.log.warn(
       {
         requestId: request.id,
@@ -389,6 +404,60 @@ export async function buildGatekeeperServer(
         schemaVersion: 1,
         results: await options.projectMemory.searchMemory(input),
       });
+    },
+  );
+
+  server.get<{ Params: { reviewId: string } }>(
+    '/v1/reviews/:reviewId/draft',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:review-id-params-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-draft-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const draft = await options.prepareReview(request.params.reviewId);
+      return draft === null
+        ? reply
+            .code(404)
+            .send(createError('NOT_FOUND', 'The requested local resource was not found.'))
+        : reviewDraftSchema.parse(draft);
+    },
+  );
+
+  server.post<{ Body: ReviewCompletionInput; Params: { reviewId: string } }>(
+    '/v1/reviews/:reviewId/complete',
+    {
+      schema: {
+        params: { $ref: 'gatekeeper:review-id-params-v1#' },
+        body: { $ref: 'gatekeeper:review-completion-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-run-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = reviewCompletionInputSchema.parse(request.body);
+      const review = await options.completeReview(request.params.reviewId, input);
+      return review === null
+        ? reply
+            .code(404)
+            .send(createError('NOT_FOUND', 'The requested local resource was not found.'))
+        : reviewRunSchema.parse(review);
     },
   );
 

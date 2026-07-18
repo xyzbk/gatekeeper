@@ -30,6 +30,13 @@ export interface CompleteReviewInput {
   model?: string | null;
 }
 
+export class InvalidReviewCompletionError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'InvalidReviewCompletionError';
+  }
+}
+
 function evidenceKey(evidence: EvidencePointer): string {
   return JSON.stringify(
     Object.entries(evidence).sort(([left], [right]) => left.localeCompare(right)),
@@ -155,25 +162,31 @@ function validateAuthoredFindings(
 
   for (const finding of findings) {
     if (seen.has(finding.id)) {
-      throw new Error(`Duplicate finding ID: ${finding.id}`);
+      throw new InvalidReviewCompletionError(`Duplicate finding ID: ${finding.id}`);
     }
     seen.add(finding.id);
     if (deterministicIds.has(finding.id as FindingId)) {
-      throw new Error(`Finding ID collides with a deterministic finding: ${finding.id}`);
+      throw new InvalidReviewCompletionError(
+        `Finding ID collides with a deterministic finding: ${finding.id}`,
+      );
     }
     for (const evidence of finding.evidence) {
       if (evidence.repositoryId !== review.repositoryId) {
-        throw new Error(`Evidence repository does not match review repository: ${finding.id}`);
+        throw new InvalidReviewCompletionError(
+          `Evidence repository does not match review repository: ${finding.id}`,
+        );
       }
       if (!offeredEvidence.has(evidenceKey(evidence as EvidencePointer))) {
-        throw new Error(
+        throw new InvalidReviewCompletionError(
           `Finding cites evidence that is not an offered evidence candidate: ${finding.id}`,
         );
       }
     }
     for (const path of finding.affectedPaths ?? []) {
       if (!changedPaths.has(path)) {
-        throw new Error(`Finding cites a path that is not a changed path: ${path}`);
+        throw new InvalidReviewCompletionError(
+          `Finding cites a path that is not a changed path: ${path}`,
+        );
       }
     }
   }
@@ -198,7 +211,9 @@ export function completeReview({
   model,
 }: CompleteReviewInput): ReviewRun {
   if (draft.reviewId !== review.reviewId || draft.repositoryId !== review.repositoryId) {
-    throw new Error('Review draft identity does not match the stored review.');
+    throw new InvalidReviewCompletionError(
+      'Review draft identity does not match the stored review.',
+    );
   }
   validateAuthoredFindings(review, draft, authoredFindings);
   const findings = [...draft.findings, ...(authoredFindings as Finding[])];

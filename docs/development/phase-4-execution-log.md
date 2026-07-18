@@ -50,3 +50,25 @@ GREEN:
 - `pnpm build`: PASS.
 
 Further RED states, GREEN commands, unexpected failures, corrections, aggressive-test results, and commit hashes will be appended per verified task.
+
+### Task 3 — local completion API and persistence
+
+Expected RED:
+
+- Draft and completion routes returned `404`.
+- The generated review-draft and completion-input schemas were not registered with Fastify.
+
+Implemented:
+
+- Added authenticated `GET /v1/reviews/:reviewId/draft` and `POST /v1/reviews/:reviewId/complete` routes with strict shared schemas and no repository/path selector.
+- The foreground service composes stored review loading, bounded memory retrieval, pure completion validation, verdict assembly, and atomic Project Memory persistence.
+- Invalid evidence claims map to the stable `USAGE_ERROR` response; rejected values and internal details are not returned or logged.
+
+GREEN:
+
+- Server unit/integration suite: PASS (22 tests).
+- Live in-process restart test proves draft preparation, completion, forged-evidence rejection, persistence, and reload.
+
+Unexpected failure and correction:
+
+- The first root lint rejected two intentionally unused names in a test double. The test double now omits those parameters; production behavior was unaffected.

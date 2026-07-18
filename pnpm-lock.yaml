@@ -137,6 +137,9 @@ importers:
       '@gatekeeper/project-memory':
         specifier: workspace:*
         version: link:../../packages/project-memory
+      '@gatekeeper/review-engine':
+        specifier: workspace:*
+        version: link:../../packages/review-engine
       '@gatekeeper/store-sqlite':
         specifier: workspace:*
         version: link:../../packages/store-sqlite
