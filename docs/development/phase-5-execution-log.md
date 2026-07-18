@@ -68,3 +68,33 @@ GREEN:
 - `pnpm build`: PASS.
 
 Further RED states, GREEN commands, unexpected failures, corrections, aggressive-test findings, and commit hashes will be appended per verified task.
+
+### Task 3 — incremental remote Project Memory
+
+Expected RED:
+
+- The accepted migration did not contain `sync_cursors` or remote URL/link ordering columns.
+- `SqliteProjectStore` had no remote-sync or cursor operation.
+- `ProjectMemory` had no remote normalization/indexing operation.
+
+Implemented:
+
+- Added the append-only `0001_github_history.sql` migration; the accepted Phase 3 migration remains unchanged.
+- Added repository/provider-scoped cursors, bounded GitHub evidence URLs, and stable ordered document links.
+- Added atomic remote upserts that coexist with local ADR/document/commit indexing. A subsequent local re-index cannot delete GitHub history.
+- Added deterministic remote normalization for issues, pull requests, comments, and reviews plus explicit parent links, linked numbers, revert/resolution phrases, and bounded `Gatekeeper-Relation` markers.
+- Search now returns exact identities first, their ordered explicit links second, and FTS matches last.
+
+Aggressive finding and correction:
+
+- A complete but stale replay initially rewound the cursor and overwrote newer evidence. A new RED test reproduced both failures. Remote writes now retain the newer timestamped document, and cursor upserts keep the greatest completed cursor.
+- A partial batch persists its valid documents atomically but never advances the cursor, so malformed records remain eligible for retry.
+- Repeat sync writes zero unchanged documents/links, cross-source local/remote indexing remains isolated, and an exact PR identity excludes a coincidental Redis lexical match from the bounded result.
+
+GREEN:
+
+- Focused migration, persistence, normalization, relationship, ranking, partial, replay, and local/remote coexistence tests: PASS (24 tests).
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (34 files, 207 tests).
+- `pnpm build`: PASS.

@@ -83,6 +83,7 @@ export const documents = sqliteTable(
     contentHash: text('content_hash').notNull(),
     status: text('status').notNull(),
     occurredAt: text('occurred_at'),
+    remoteUrl: text('remote_url'),
     chunkIndex: integer('chunk_index').notNull(),
     indexedAt: text('indexed_at').notNull(),
   },
@@ -110,12 +111,26 @@ export const documentLinks = sqliteTable(
       .notNull()
       .references(() => documents.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
+    position: integer('position').notNull().default(0),
   },
   (table) => [
     primaryKey({
       columns: [table.repositoryId, table.fromDocumentId, table.toDocumentId, table.type],
     }),
   ],
+);
+
+export const syncCursors = sqliteTable(
+  'sync_cursors',
+  {
+    repositoryId: text('repository_id')
+      .notNull()
+      .references(() => repositories.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    cursor: text('cursor').notNull(),
+    syncedAt: text('synced_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.repositoryId, table.provider] })],
 );
 
 export const reviewRuns = sqliteTable(

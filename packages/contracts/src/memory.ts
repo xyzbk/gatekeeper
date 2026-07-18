@@ -83,7 +83,7 @@ export const memorySearchInputSchema = z
 export const memorySearchResultSchema = z
   .object({
     documentId: identifierSchema,
-    match: z.enum(['exact', 'fts']),
+    match: z.enum(['exact', 'linked', 'fts']),
     trust: z.literal('untrusted_repository_content'),
     status: z.enum(['active', 'historical', 'superseded', 'unknown']),
     occurredAt: z.iso.datetime().nullable(),

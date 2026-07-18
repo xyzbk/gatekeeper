@@ -94,6 +94,28 @@ export const githubHistoryBatchSchema = z
   })
   .strict();
 
+const remoteSyncCountsSchema = z
+  .object({
+    received: z.int().nonnegative(),
+    written: z.int().nonnegative(),
+    unchanged: z.int().nonnegative(),
+  })
+  .strict();
+
+export const githubSyncResultSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    repositoryId: z.string().trim().min(1).max(300),
+    provider: z.literal('github'),
+    syncedAt: timestampSchema,
+    cursor: timestampSchema.nullable(),
+    partial: z.boolean(),
+    documents: remoteSyncCountsSchema,
+    links: remoteSyncCountsSchema,
+    failures: z.array(githubHistoryFailureSchema).max(500),
+  })
+  .strict();
+
 export type GitHubRemote = z.infer<typeof githubRemoteSchema>;
 export type GitHubPreflight = z.infer<typeof githubPreflightSchema>;
 export type GitHubSyncLimits = z.infer<typeof githubSyncLimitsSchema>;
@@ -101,3 +123,4 @@ export type PullRequestRecord = z.infer<typeof pullRequestRecordSchema>;
 export type GitHubRemoteRecord = z.infer<typeof githubRemoteRecordSchema>;
 export type GitHubHistoryFailure = z.infer<typeof githubHistoryFailureSchema>;
 export type GitHubHistoryBatch = z.infer<typeof githubHistoryBatchSchema>;
+export type GitHubSyncResult = z.infer<typeof githubSyncResultSchema>;

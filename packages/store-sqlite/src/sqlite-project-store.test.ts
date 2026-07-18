@@ -11,6 +11,7 @@ import {
   type SqliteProjectStore,
   SqliteProjectStoreError,
   type SqliteIndexBatch,
+  type SqliteRemoteSyncBatch,
 } from './sqlite-project-store.js';
 
 const temporaryRoots: string[] = [];
@@ -103,8 +104,246 @@ describe('SQLite Project Memory store', () => {
         'index_state',
         'repositories',
         'review_runs',
+        'sync_cursors',
       ]),
     );
+  });
+
+  it('upserts remote documents and ordered links without deleting local memory', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root,
+      normalizedRoot: root,
+      remote: 'https://github.com/acme/demo.git',
+      normalizedRemote: 'github.com/acme/demo',
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    store.applyIndex(createBatch());
+
+    const batch: SqliteRemoteSyncBatch = {
+      repositoryId: 'repository_fixture',
+      provider: 'github',
+      syncedAt: '2026-07-18T19:00:00.000Z',
+      cursor: '2026-07-18T18:59:00.000Z',
+      partial: false,
+      failures: [],
+      documents: [
+        {
+          documentId: 'document_pr_12',
+          sourceType: 'pull_request',
+          sourceId: 'pull_request:#12',
+          title: 'Require Redis cache',
+          path: null,
+          commitSha: null,
+          remoteUrl: 'https://github.com/acme/demo/pull/12',
+          excerpt: 'Reintroduce required Redis.',
+          contentHash: '1'.repeat(64),
+          status: 'active',
+          occurredAt: '2026-07-18T18:30:00.000Z',
+          chunkIndex: 0,
+        },
+        {
+          documentId: 'document_issue_4',
+          sourceType: 'issue',
+          sourceId: 'issue:#4',
+          title: 'Proposal: Redis cache',
+          path: null,
+          commitSha: null,
+          remoteUrl: 'https://github.com/acme/demo/issues/4',
+          excerpt: 'Propose Redis.',
+          contentHash: '2'.repeat(64),
+          status: 'historical',
+          occurredAt: '2026-07-01T00:00:00.000Z',
+          chunkIndex: 0,
+        },
+        {
+          documentId: 'document_pr_8',
+          sourceType: 'pull_request',
+          sourceId: 'pull_request:#8',
+          title: 'Revert Redis',
+          path: null,
+          commitSha: null,
+          remoteUrl: 'https://github.com/acme/demo/pull/8',
+          excerpt: 'Revert required Redis after regressions.',
+          contentHash: '3'.repeat(64),
+          status: 'historical',
+          occurredAt: '2026-07-08T00:00:00.000Z',
+          chunkIndex: 0,
+        },
+      ],
+      links: [
+        {
+          fromSourceType: 'pull_request',
+          fromSourceId: 'pull_request:#12',
+          toSourceType: 'issue',
+          toSourceId: 'issue:#4',
+          type: 'implements',
+          position: 0,
+        },
+        {
+          fromSourceType: 'pull_request',
+          fromSourceId: 'pull_request:#12',
+          toSourceType: 'pull_request',
+          toSourceId: 'pull_request:#8',
+          type: 'reverts',
+          position: 1,
+        },
+        {
+          fromSourceType: 'pull_request',
+          fromSourceId: 'pull_request:#12',
+          toSourceType: 'adr',
+          toSourceId: 'docs/adr/0003-no-required-redis.md',
+          type: 'supersedes',
+          position: 2,
+        },
+      ],
+    };
+
+    const first = store.applyRemoteSync(batch);
+    const second = store.applyRemoteSync({
+      ...batch,
+      syncedAt: '2026-07-18T19:01:00.000Z',
+    });
+
+    expect(first.documents).toEqual({ received: 3, written: 3, unchanged: 0 });
+    expect(first.links).toEqual({ received: 3, written: 3, unchanged: 0 });
+    expect(second.documents).toEqual({ received: 3, written: 0, unchanged: 3 });
+    expect(second.links).toEqual({ received: 3, written: 0, unchanged: 3 });
+    expect(store.getSyncCursor('repository_fixture', 'github')).toBe('2026-07-18T18:59:00.000Z');
+
+    store.applyIndex(
+      createBatch({
+        indexedAt: '2026-07-18T19:02:00.000Z',
+      }),
+    );
+
+    const evidence = store.search({
+      repositoryId: 'repository_fixture',
+      query: 'pull_request:#12',
+      limit: 10,
+    });
+    expect(evidence.map(({ evidence: pointer }) => pointer.sourceId)).toEqual([
+      'pull_request:#12',
+      'issue:#4',
+      'pull_request:#8',
+      'docs/adr/0003-no-required-redis.md',
+    ]);
+    expect(evidence.map(({ match }) => match)).toEqual(['exact', 'linked', 'linked', 'linked']);
+    expect(evidence[0]?.evidence.remoteUrl).toBe('https://github.com/acme/demo/pull/12');
+  });
+
+  it('writes valid partial records atomically but does not advance the sync cursor', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root,
+      normalizedRoot: root,
+      remote: 'https://github.com/acme/demo.git',
+      normalizedRemote: 'github.com/acme/demo',
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const batch: SqliteRemoteSyncBatch = {
+      repositoryId: 'repository_fixture',
+      provider: 'github',
+      syncedAt: '2026-07-18T19:00:00.000Z',
+      cursor: '2026-07-18T18:59:00.000Z',
+      partial: true,
+      failures: [{ source: 'issues[1]', code: 'malformed_record' }],
+      documents: [
+        {
+          documentId: 'document_issue_4',
+          sourceType: 'issue',
+          sourceId: 'issue:#4',
+          title: 'Valid issue',
+          path: null,
+          commitSha: null,
+          remoteUrl: 'https://github.com/acme/demo/issues/4',
+          excerpt: 'Valid bounded content.',
+          contentHash: '4'.repeat(64),
+          status: 'active',
+          occurredAt: '2026-07-18T18:00:00.000Z',
+          chunkIndex: 0,
+        },
+      ],
+      links: [],
+    };
+
+    const result = store.applyRemoteSync(batch);
+
+    expect(result.partial).toBe(true);
+    expect(result.documents.written).toBe(1);
+    expect(store.getSyncCursor('repository_fixture', 'github')).toBeNull();
+    expect(store.search({ repositoryId: 'repository_fixture', query: 'issue:#4' })).toHaveLength(1);
+  });
+
+  it('does not let a stale replay regress the cursor or overwrite newer remote evidence', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root,
+      normalizedRoot: root,
+      remote: 'https://github.com/acme/demo.git',
+      normalizedRemote: 'github.com/acme/demo',
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const current: SqliteRemoteSyncBatch = {
+      repositoryId: 'repository_fixture',
+      provider: 'github',
+      syncedAt: '2026-07-18T19:00:00.000Z',
+      cursor: '2026-07-18T19:00:00.000Z',
+      partial: false,
+      failures: [],
+      documents: [
+        {
+          documentId: 'document_issue_4',
+          sourceType: 'issue',
+          sourceId: 'issue:#4',
+          title: 'Current issue',
+          path: null,
+          commitSha: null,
+          remoteUrl: 'https://github.com/acme/demo/issues/4',
+          excerpt: 'Current evidence.',
+          contentHash: '9'.repeat(64),
+          status: 'active',
+          occurredAt: '2026-07-18T19:00:00.000Z',
+          chunkIndex: 0,
+        },
+      ],
+      links: [],
+    };
+    store.applyRemoteSync(current);
+    store.applyRemoteSync({
+      ...current,
+      syncedAt: '2026-07-18T19:01:00.000Z',
+      cursor: '2026-07-18T18:00:00.000Z',
+      documents: [
+        {
+          ...current.documents[0]!,
+          title: 'Stale issue',
+          excerpt: 'Stale evidence.',
+          contentHash: '8'.repeat(64),
+          occurredAt: '2026-07-18T18:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(store.getSyncCursor('repository_fixture', 'github')).toBe('2026-07-18T19:00:00.000Z');
+    expect(
+      store.search({ repositoryId: 'repository_fixture', query: 'issue:#4' })[0]?.evidence,
+    ).toMatchObject({ title: 'Current issue', excerpt: 'Current evidence.' });
   });
 
   it('reopens and migrates an already migrated database idempotently', async () => {

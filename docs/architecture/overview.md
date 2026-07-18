@@ -2,7 +2,7 @@
 
 Gatekeeper is a local-first, evidence-first repository governance agent. Codex remains the reasoning surface; Gatekeeper owns bounded evidence retrieval and deterministic enforcement.
 
-## Current Phase 4 runtime
+## Current Phase 5 runtime
 
 ```text
 bounded Git metadata/docs ─> Project Memory index ─> SQLite + FTS5 ─> memory search
@@ -28,6 +28,7 @@ packages/project-memory -> packages/contracts + inward-facing Git/persistence in
 packages/store-sqlite -> packages/contracts + better-sqlite3 + Drizzle
 packages/review-engine -> packages/domain + packages/contracts + policy types
 packages/git-adapter -> packages/contracts
+packages/github-gh -> packages/contracts + execa
 packages/contracts -> packages/domain
 packages/testkit -> packages/domain
 ```
@@ -38,7 +39,9 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 `review-engine` is pure after its inputs are supplied. It sorts files, calculates metrics, evaluates change-size, source/test, risk-zone, added-relative-import, and protected-path rules, then delegates final verdict assembly to `domain`. It returns ReviewRun v1 with bounded change summaries; inspected added lines never enter that contract. See [review-pipeline.md](review-pipeline.md).
 
-`project-memory` normalizes repository identity, reads bounded tracked metadata, selected Markdown/ADR/policy content, and recent commit metadata through an inward-facing Git interface, then writes one complete incremental batch. `store-sqlite` owns WAL mode, foreign keys, migrations, FTS5 synchronization, exact-first search, and atomic review persistence. The database lives under machine-local Gatekeeper app data, outside the target repository by default.
+`project-memory` normalizes repository identity, reads bounded tracked metadata, selected Markdown/ADR/policy content, and recent commit metadata through an inward-facing Git interface, then writes one complete incremental batch. Phase 5 also normalizes bounded GitHub issues, pull requests, comments, and reviews into the same document model. Explicit metadata and curated relationship markers become ordered document links; exact identities and their linked neighbors rank before FTS matches.
+
+`store-sqlite` owns WAL mode, foreign keys, migrations, FTS5 synchronization, exact/linked/lexical search, remote sync cursors, and atomic review persistence. Local re-indexing manages only local source types and cannot delete remote documents. Remote sync upserts only remote documents, preserves valid records from partial batches, advances its cursor only after a complete batch, and ignores stale cursor/document replays. The database lives under machine-local Gatekeeper app data, outside the target repository by default.
 
 `apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, migrates/registers the fixed repository before listening, and exposes authenticated fixed-repository index, memory-search, worktree-review, and review-read endpoints. HTTP input cannot select a path or another repository.
 
@@ -55,6 +58,6 @@ The `domain` package owns public entities and the rule that only a hard determin
 - Tests are deterministic and offline.
 - Packages are created only in the phase that needs working behavior.
 
-## Phase 4 boundary
+## Phase 5 boundary
 
-Phase 4 adds native Codex discovery, six local MCP tools, bounded Project Memory evidence, and strict model-authored review completion. There is no GitHub synchronization, pull-request review, publication, embedding, second model provider, background worker, or generic plugin system. Those remain behind later phase gates.
+Phase 5 adds the read-only `gh` provider and the remote Project Memory foundation. Pull-request CLI/API/MCP/dashboard composition remains inside the active Phase 5 gate until its verified slices land. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.

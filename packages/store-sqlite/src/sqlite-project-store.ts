@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
+  githubSyncResultSchema,
   indexResultSchema,
   indexStateSchema,
   memorySearchInputSchema,
@@ -11,6 +12,8 @@ import {
   reviewRunSchema,
   type IndexResult,
   type IndexState,
+  type GitHubHistoryFailure,
+  type GitHubSyncResult,
   type MemorySearchResult,
   type RepositoryRecord,
   type ReviewRunContract,
@@ -27,9 +30,11 @@ export type SqliteProjectStoreErrorCode =
   | 'DATABASE_OPEN_FAILED'
   | 'FTS5_UNAVAILABLE'
   | 'INVALID_INDEX_BATCH'
+  | 'INVALID_REMOTE_BATCH'
   | 'INDEX_WRITE_FAILED'
   | 'MIGRATION_FAILED'
   | 'REVIEW_WRITE_FAILED'
+  | 'REMOTE_SYNC_WRITE_FAILED'
   | 'REPOSITORY_CONFLICT';
 
 export class SqliteProjectStoreError extends Error {
@@ -73,7 +78,28 @@ export interface SqliteMemoryDocument {
   contentHash: string;
   status: MemorySearchResult['status'];
   occurredAt: string | null;
+  remoteUrl?: string | null;
   chunkIndex: number;
+}
+
+export interface SqliteDocumentLink {
+  fromSourceType: SqliteMemoryDocument['sourceType'];
+  fromSourceId: string;
+  toSourceType: SqliteMemoryDocument['sourceType'];
+  toSourceId: string;
+  type: 'mentions' | 'implements' | 'reverts' | 'supersedes' | 'caused_by' | 'resolves';
+  position: number;
+}
+
+export interface SqliteRemoteSyncBatch {
+  repositoryId: string;
+  provider: 'github';
+  syncedAt: string;
+  cursor: string | null;
+  partial: boolean;
+  failures: GitHubHistoryFailure[];
+  documents: SqliteMemoryDocument[];
+  links: SqliteDocumentLink[];
 }
 
 export interface SqliteIndexBatch {
@@ -91,6 +117,7 @@ type CommitRow = SqliteIndexedCommit;
 
 interface DocumentRow extends SqliteMemoryDocument {
   rowid: number;
+  remoteUrl: string | null;
 }
 
 interface SearchRow {
@@ -104,6 +131,11 @@ interface SearchRow {
   contentHash: string;
   status: string;
   occurredAt: string | null;
+  remoteUrl: string | null;
+}
+
+interface LinkedSearchRow extends SearchRow {
+  position: number;
 }
 
 interface RepositoryRow {
@@ -118,13 +150,14 @@ function uniqueBy<T>(
   values: readonly T[],
   key: (value: T) => string,
   label: string,
+  code: 'INVALID_INDEX_BATCH' | 'INVALID_REMOTE_BATCH' = 'INVALID_INDEX_BATCH',
 ): Map<string, T> {
   const result = new Map<string, T>();
   for (const value of values) {
     const id = key(value);
     if (result.has(id)) {
       throw new SqliteProjectStoreError(
-        'INVALID_INDEX_BATCH',
+        code,
         `Project Memory received duplicate ${label} records.`,
       );
     }
@@ -160,6 +193,7 @@ function sameDocument(left: DocumentRow, right: SqliteMemoryDocument): boolean {
     left.contentHash === right.contentHash &&
     left.status === right.status &&
     left.occurredAt === right.occurredAt &&
+    left.remoteUrl === (right.remoteUrl ?? null) &&
     left.chunkIndex === right.chunkIndex
   );
 }
@@ -182,7 +216,7 @@ function repositoryRecord(row: RepositoryRow): RepositoryRecord {
   });
 }
 
-function searchResult(repositoryId: string, row: SearchRow, match: 'exact' | 'fts') {
+function searchResult(repositoryId: string, row: SearchRow, match: MemorySearchResult['match']) {
   return memorySearchResultSchema.parse({
     documentId: row.documentId,
     match,
@@ -196,6 +230,7 @@ function searchResult(repositoryId: string, row: SearchRow, match: 'exact' | 'ft
       title: row.title,
       ...(row.path === null ? {} : { path: row.path }),
       ...(row.commitSha === null ? {} : { commitSha: row.commitSha }),
+      ...(row.remoteUrl === null ? {} : { remoteUrl: row.remoteUrl }),
       excerpt: row.excerpt,
       contentHash: row.contentHash,
     },
@@ -386,8 +421,11 @@ export class SqliteProjectStore {
           .prepare<unknown[], DocumentRow>(
             `SELECT rowid, id AS documentId, source_type AS sourceType, source_id AS sourceId,
                     title, path, commit_sha AS commitSha, excerpt, content_hash AS contentHash,
-                    status, occurred_at AS occurredAt, chunk_index AS chunkIndex
-             FROM documents WHERE repository_id = ?`,
+                    status, occurred_at AS occurredAt, remote_url AS remoteUrl,
+                    chunk_index AS chunkIndex
+             FROM documents
+             WHERE repository_id = ?
+               AND source_type IN ('adr', 'documentation', 'policy', 'commit')`,
           )
           .all(batch.repositoryId)
           .map((row) => [row.documentId, row]),
@@ -402,8 +440,8 @@ export class SqliteProjectStore {
           .prepare(
             `INSERT INTO documents (
                id, repository_id, source_type, source_id, title, path, commit_sha, excerpt,
-               content_hash, status, occurred_at, chunk_index, indexed_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               content_hash, status, occurred_at, remote_url, chunk_index, indexed_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                source_type = excluded.source_type,
                source_id = excluded.source_id,
@@ -414,6 +452,7 @@ export class SqliteProjectStore {
                content_hash = excluded.content_hash,
                status = excluded.status,
                occurred_at = excluded.occurred_at,
+               remote_url = excluded.remote_url,
                chunk_index = excluded.chunk_index,
                indexed_at = excluded.indexed_at
              WHERE documents.repository_id = excluded.repository_id`,
@@ -430,6 +469,7 @@ export class SqliteProjectStore {
             document.contentHash,
             document.status,
             document.occurredAt,
+            document.remoteUrl ?? null,
             document.chunkIndex,
             batch.indexedAt,
           );
@@ -557,6 +597,197 @@ export class SqliteProjectStore {
     }
   }
 
+  public getSyncCursor(repositoryId: string, provider: 'github'): string | null {
+    const row = this.#database
+      .prepare<unknown[], { cursor: string }>(
+        'SELECT cursor FROM sync_cursors WHERE repository_id = ? AND provider = ?',
+      )
+      .get(repositoryId, provider);
+    return row?.cursor ?? null;
+  }
+
+  public applyRemoteSync(batch: SqliteRemoteSyncBatch): GitHubSyncResult {
+    const incomingDocuments = uniqueBy(
+      batch.documents,
+      ({ documentId }) => documentId,
+      'remote document',
+      'INVALID_REMOTE_BATCH',
+    );
+    const incomingLinks = uniqueBy(
+      batch.links,
+      (link) =>
+        [
+          link.fromSourceType,
+          link.fromSourceId,
+          link.toSourceType,
+          link.toSourceId,
+          link.type,
+        ].join('\0'),
+      'remote relationship',
+      'INVALID_REMOTE_BATCH',
+    );
+
+    const apply = this.#database.transaction(() => {
+      let documentsWritten = 0;
+      let documentsUnchanged = 0;
+      for (const document of incomingDocuments.values()) {
+        const current = this.#database
+          .prepare<unknown[], DocumentRow>(
+            `SELECT rowid, id AS documentId, source_type AS sourceType,
+                    source_id AS sourceId, title, path, commit_sha AS commitSha,
+                    excerpt, content_hash AS contentHash, status,
+                    occurred_at AS occurredAt, remote_url AS remoteUrl,
+                    chunk_index AS chunkIndex
+             FROM documents WHERE repository_id = ? AND id = ?`,
+          )
+          .get(batch.repositoryId, document.documentId);
+        if (
+          current?.occurredAt !== null &&
+          current?.occurredAt !== undefined &&
+          document.occurredAt !== null &&
+          document.occurredAt < current.occurredAt
+        ) {
+          documentsUnchanged += 1;
+          continue;
+        }
+        if (current !== undefined && sameDocument(current, document)) {
+          documentsUnchanged += 1;
+          continue;
+        }
+        const write = this.#database
+          .prepare(
+            `INSERT INTO documents (
+               id, repository_id, source_type, source_id, title, path, commit_sha, excerpt,
+               content_hash, status, occurred_at, remote_url, chunk_index, indexed_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               source_type = excluded.source_type,
+               source_id = excluded.source_id,
+               title = excluded.title,
+               path = excluded.path,
+               commit_sha = excluded.commit_sha,
+               excerpt = excluded.excerpt,
+               content_hash = excluded.content_hash,
+               status = excluded.status,
+               occurred_at = excluded.occurred_at,
+               remote_url = excluded.remote_url,
+               chunk_index = excluded.chunk_index,
+               indexed_at = excluded.indexed_at
+             WHERE documents.repository_id = excluded.repository_id`,
+          )
+          .run(
+            document.documentId,
+            batch.repositoryId,
+            document.sourceType,
+            document.sourceId,
+            document.title,
+            document.path,
+            document.commitSha,
+            document.excerpt,
+            document.contentHash,
+            document.status,
+            document.occurredAt,
+            document.remoteUrl ?? null,
+            document.chunkIndex,
+            batch.syncedAt,
+          );
+        if (write.changes !== 1) {
+          throw new SqliteProjectStoreError(
+            'INVALID_REMOTE_BATCH',
+            'Project Memory received a remote document identity owned by another repository.',
+          );
+        }
+        documentsWritten += 1;
+      }
+
+      const findDocument = this.#database.prepare<unknown[], { id: string }>(
+        `SELECT id FROM documents
+         WHERE repository_id = ? AND source_type = ? AND source_id = ?
+         ORDER BY chunk_index, id LIMIT 1`,
+      );
+      let linksWritten = 0;
+      let linksUnchanged = 0;
+      for (const link of incomingLinks.values()) {
+        const from = findDocument.get(batch.repositoryId, link.fromSourceType, link.fromSourceId);
+        const to = findDocument.get(batch.repositoryId, link.toSourceType, link.toSourceId);
+        if (from === undefined || to === undefined || from.id === to.id) {
+          continue;
+        }
+        const current = this.#database
+          .prepare<unknown[], { position: number }>(
+            `SELECT position FROM document_links
+             WHERE repository_id = ? AND from_document_id = ? AND to_document_id = ? AND type = ?`,
+          )
+          .get(batch.repositoryId, from.id, to.id, link.type);
+        if (current?.position === link.position) {
+          linksUnchanged += 1;
+          continue;
+        }
+        this.#database
+          .prepare(
+            `INSERT INTO document_links (
+               repository_id, from_document_id, to_document_id, type, position
+             ) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(repository_id, from_document_id, to_document_id, type)
+             DO UPDATE SET position = excluded.position`,
+          )
+          .run(batch.repositoryId, from.id, to.id, link.type, link.position);
+        linksWritten += 1;
+      }
+
+      if (!batch.partial && batch.cursor !== null) {
+        this.#database
+          .prepare(
+            `INSERT INTO sync_cursors (repository_id, provider, cursor, synced_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(repository_id, provider) DO UPDATE SET
+               cursor = CASE
+                 WHEN excluded.cursor > sync_cursors.cursor THEN excluded.cursor
+                 ELSE sync_cursors.cursor
+               END,
+               synced_at = CASE
+                 WHEN excluded.cursor > sync_cursors.cursor THEN excluded.synced_at
+                 ELSE sync_cursors.synced_at
+               END`,
+          )
+          .run(batch.repositoryId, batch.provider, batch.cursor, batch.syncedAt);
+      }
+
+      return githubSyncResultSchema.parse({
+        schemaVersion: 1,
+        repositoryId: batch.repositoryId,
+        provider: batch.provider,
+        syncedAt: batch.syncedAt,
+        cursor: this.getSyncCursor(batch.repositoryId, batch.provider),
+        partial: batch.partial,
+        documents: {
+          received: incomingDocuments.size,
+          written: documentsWritten,
+          unchanged: documentsUnchanged,
+        },
+        links: {
+          received: incomingLinks.size,
+          written: linksWritten,
+          unchanged: linksUnchanged,
+        },
+        failures: batch.failures,
+      });
+    });
+
+    try {
+      return apply.immediate();
+    } catch (error) {
+      if (error instanceof SqliteProjectStoreError) {
+        throw error;
+      }
+      throw new SqliteProjectStoreError(
+        'REMOTE_SYNC_WRITE_FAILED',
+        'Project Memory could not write the remote synchronization transaction.',
+        { cause: error },
+      );
+    }
+  }
+
   public search(input: {
     repositoryId: string;
     query: string;
@@ -568,7 +799,7 @@ export class SqliteProjectStore {
       .prepare<unknown[], SearchRow>(
         `SELECT id AS documentId, source_type AS sourceType, source_id AS sourceId,
                 title, path, commit_sha AS commitSha, excerpt, content_hash AS contentHash,
-                status, occurred_at AS occurredAt
+                status, occurred_at AS occurredAt, remote_url AS remoteUrl
          FROM documents
          WHERE repository_id = ?
            AND (source_id = ? COLLATE NOCASE OR path = ? COLLATE NOCASE OR title = ? COLLATE NOCASE)
@@ -590,13 +821,42 @@ export class SqliteProjectStore {
       );
     const results = exactRows.map((row) => searchResult(parsed.repositoryId, row, 'exact'));
     const seen = new Set(results.map(({ documentId }) => documentId));
+
+    for (const exact of exactRows) {
+      if (results.length >= limit) {
+        break;
+      }
+      const linkedRows = this.#database
+        .prepare<unknown[], LinkedSearchRow>(
+          `SELECT d.id AS documentId, d.source_type AS sourceType, d.source_id AS sourceId,
+                  d.title, d.path, d.commit_sha AS commitSha, d.excerpt,
+                  d.content_hash AS contentHash, d.status, d.occurred_at AS occurredAt,
+                  d.remote_url AS remoteUrl, l.position
+           FROM document_links AS l
+           JOIN documents AS d ON d.id = l.to_document_id
+           WHERE l.repository_id = ? AND l.from_document_id = ?
+           ORDER BY l.position, d.id`,
+        )
+        .all(parsed.repositoryId, exact.documentId);
+      for (const row of linkedRows) {
+        if (!seen.has(row.documentId)) {
+          results.push(searchResult(parsed.repositoryId, row, 'linked'));
+          seen.add(row.documentId);
+          if (results.length === limit) {
+            break;
+          }
+        }
+      }
+    }
+
     const matchExpression = ftsQuery(parsed.query);
     if (results.length < limit && matchExpression !== undefined) {
       const lexicalRows = this.#database
         .prepare<unknown[], SearchRow>(
           `SELECT d.id AS documentId, d.source_type AS sourceType, d.source_id AS sourceId,
                   d.title, d.path, d.commit_sha AS commitSha, d.excerpt,
-                  d.content_hash AS contentHash, d.status, d.occurred_at AS occurredAt
+                  d.content_hash AS contentHash, d.status, d.occurred_at AS occurredAt,
+                  d.remote_url AS remoteUrl
            FROM document_fts
            JOIN documents AS d ON d.rowid = document_fts.rowid
            WHERE document_fts MATCH ? AND d.repository_id = ?

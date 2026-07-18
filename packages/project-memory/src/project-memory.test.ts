@@ -2,7 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { GitCommitRecord, RepositorySnapshot, TrackedFileRecord } from '@gatekeeper/contracts';
+import type {
+  GitCommitRecord,
+  GitHubHistoryBatch,
+  RepositorySnapshot,
+  TrackedFileRecord,
+} from '@gatekeeper/contracts';
 import {
   openSqliteProjectStore,
   type SqliteIndexBatch,
@@ -40,6 +45,8 @@ function recordingPersistence(
       batches.push(batch);
       return store.applyIndex(batch);
     },
+    applyRemoteSync: (batch) => store.applyRemoteSync(batch),
+    getSyncCursor: (repositoryId, provider) => store.getSyncCursor(repositoryId, provider),
     search: (input) => store.search(input),
     saveReview: (review) => store.saveReview(review),
     getReview: (reviewId) => store.getReview(reviewId),
@@ -174,6 +181,105 @@ describe('Project Memory', () => {
       memory.findRepository({ root: `${root}-missing`, remote: null }),
     ).resolves.toBeNull();
     store.close();
+  });
+
+  it('normalizes explicit GitHub relationships and ranks them before lexical matches', async () => {
+    const root = await temporaryRoot();
+    const store = openStore(join(root, 'gatekeeper.db'));
+    const batches: SqliteIndexBatch[] = [];
+    const state = fakeGit(root);
+    const memory = memoryWith(state, recordingPersistence(store, batches));
+    await memory.migrate();
+    const repository = await memory.registerRepository({ root, remote: state.snapshot.remote });
+    await memory.indexLocalRepository({ repositoryId: repository.repositoryId });
+    const batch: GitHubHistoryBatch = {
+      schemaVersion: 1,
+      cursor: '2026-07-18T18:00:00.000Z',
+      partial: false,
+      failures: [],
+      records: [
+        {
+          kind: 'issue',
+          sourceId: 'issue:#4',
+          number: 4,
+          parentSourceId: null,
+          title: 'Proposal: Redis cache',
+          body: 'Propose required Redis.',
+          url: 'https://github.com/example/fixture/issues/4',
+          state: 'closed',
+          createdAt: '2026-07-01T00:00:00.000Z',
+          updatedAt: '2026-07-02T00:00:00.000Z',
+        },
+        {
+          kind: 'pull_request',
+          sourceId: 'pull_request:#8',
+          number: 8,
+          parentSourceId: null,
+          title: 'Revert required Redis',
+          body: 'Reverts #5 after deployment regressions.',
+          url: 'https://github.com/example/fixture/pull/8',
+          state: 'closed',
+          createdAt: '2026-07-08T00:00:00.000Z',
+          updatedAt: '2026-07-08T01:00:00.000Z',
+        },
+        {
+          kind: 'pull_request',
+          sourceId: 'pull_request:#12',
+          number: 12,
+          parentSourceId: null,
+          title: 'Require Redis again',
+          body: [
+            'Gatekeeper-Relation: implements issue #4',
+            'Gatekeeper-Relation: reverts pull_request #8',
+            'Gatekeeper-Relation: supersedes adr docs/adr/0003-no-required-redis.md',
+          ].join('\n'),
+          url: 'https://github.com/example/fixture/pull/12',
+          state: 'open',
+          createdAt: '2026-07-18T17:00:00.000Z',
+          updatedAt: '2026-07-18T18:00:00.000Z',
+        },
+        {
+          kind: 'issue',
+          sourceId: 'issue:#99',
+          number: 99,
+          parentSourceId: null,
+          title: 'Redis typo in documentation',
+          body: 'Coincidental lexical match.',
+          url: 'https://github.com/example/fixture/issues/99',
+          state: 'open',
+          createdAt: '2026-07-17T00:00:00.000Z',
+          updatedAt: '2026-07-17T01:00:00.000Z',
+        },
+      ],
+    };
+
+    const first = await memory.indexRemoteDocuments({
+      repositoryId: repository.repositoryId,
+      provider: 'github',
+      batch,
+    });
+    const second = await memory.indexRemoteDocuments({
+      repositoryId: repository.repositoryId,
+      provider: 'github',
+      batch,
+    });
+    const results = await memory.search({
+      schemaVersion: 1,
+      repositoryId: repository.repositoryId,
+      query: 'pull_request:#12',
+      limit: 10,
+    });
+
+    expect(first.documents.written).toBe(4);
+    expect(second.documents).toMatchObject({ written: 0, unchanged: 4 });
+    expect(await memory.getRemoteSyncCursor(repository.repositoryId, 'github')).toBe(batch.cursor);
+    expect(results.map(({ evidence }) => evidence.sourceId)).toEqual([
+      'pull_request:#12',
+      'issue:#4',
+      'pull_request:#8',
+      'docs/adr/0003-no-required-redis.md',
+    ]);
+    expect(results.some(({ evidence }) => evidence.sourceId === 'issue:#99')).toBe(false);
   });
 
   it('indexes once, performs zero unchanged rewrites, invalidates one changed ADR, and deletes it', async () => {

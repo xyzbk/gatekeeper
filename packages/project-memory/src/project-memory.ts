@@ -4,6 +4,9 @@ import { basename, resolve } from 'node:path';
 import {
   memorySearchInputSchema,
   type GitCommitRecord,
+  type GitHubHistoryBatch,
+  type GitHubRemoteRecord,
+  type GitHubSyncResult,
   type IndexResult,
   type IndexState,
   type MemorySearchInput,
@@ -64,7 +67,28 @@ export interface ProjectMemoryDocument {
   contentHash: string;
   status: MemorySearchResult['status'];
   occurredAt: string | null;
+  remoteUrl?: string | null;
   chunkIndex: number;
+}
+
+export interface ProjectMemoryDocumentLink {
+  fromSourceType: ProjectMemoryDocument['sourceType'];
+  fromSourceId: string;
+  toSourceType: ProjectMemoryDocument['sourceType'];
+  toSourceId: string;
+  type: 'mentions' | 'implements' | 'reverts' | 'supersedes' | 'caused_by' | 'resolves';
+  position: number;
+}
+
+export interface ProjectMemoryRemoteSyncBatch {
+  repositoryId: string;
+  provider: 'github';
+  syncedAt: string;
+  cursor: string | null;
+  partial: boolean;
+  failures: GitHubHistoryBatch['failures'];
+  documents: ProjectMemoryDocument[];
+  links: ProjectMemoryDocumentLink[];
 }
 
 export interface ProjectMemoryIndexBatch {
@@ -86,6 +110,8 @@ export interface ProjectMemoryPersistence {
   ): RepositoryRecord | null;
   getIndexState(repositoryId: string): IndexState | null;
   applyIndex(batch: ProjectMemoryIndexBatch): IndexResult;
+  applyRemoteSync(batch: ProjectMemoryRemoteSyncBatch): GitHubSyncResult;
+  getSyncCursor(repositoryId: string, provider: 'github'): string | null;
   search(input: { repositoryId: string; query: string; limit?: number }): MemorySearchResult[];
   saveReview(review: ReviewRunContract): void;
   getReview(reviewId: string): ReviewRunContract | null;
@@ -109,6 +135,12 @@ export interface LocalIndexInput {
   ignorePatterns?: readonly string[];
 }
 
+export interface RemoteIndexInput {
+  repositoryId: string;
+  provider: 'github';
+  batch: GitHubHistoryBatch;
+}
+
 export interface ProjectMemory {
   migrate(): Promise<void>;
   registerRepository(input: RegisterRepositoryInput): Promise<RepositoryRecord>;
@@ -116,6 +148,8 @@ export interface ProjectMemory {
   getRepository(repositoryId: string): Promise<RepositoryRecord | null>;
   getIndexState(repositoryId: string): Promise<IndexState | null>;
   indexLocalRepository(input: LocalIndexInput): Promise<IndexResult>;
+  indexRemoteDocuments(input: RemoteIndexInput): Promise<GitHubSyncResult>;
+  getRemoteSyncCursor(repositoryId: string, provider: 'github'): Promise<string | null>;
   search(input: MemorySearchInput): Promise<MemorySearchResult[]>;
   saveReview(review: ReviewRunContract): Promise<void>;
   getReview(reviewId: string): Promise<ReviewRunContract | null>;
@@ -180,6 +214,162 @@ function documentId(
     .digest('hex')
     .slice(0, 24);
   return `document_${digest}`;
+}
+
+function remoteSourceType(kind: GitHubRemoteRecord['kind']): ProjectMemoryDocument['sourceType'] {
+  if (kind === 'issue') {
+    return 'issue';
+  }
+  if (kind === 'pull_request') {
+    return 'pull_request';
+  }
+  return 'comment';
+}
+
+function remoteStatus(record: GitHubRemoteRecord): MemorySearchResult['status'] {
+  if (record.kind === 'issue' || record.kind === 'pull_request') {
+    return record.state.toLowerCase() === 'open' ? 'active' : 'historical';
+  }
+  return 'historical';
+}
+
+function sourceTypeFromId(sourceId: string): ProjectMemoryDocument['sourceType'] | undefined {
+  if (sourceId.startsWith('issue:')) {
+    return 'issue';
+  }
+  if (sourceId.startsWith('pull_request:')) {
+    return 'pull_request';
+  }
+  if (sourceId.startsWith('comment:')) {
+    return 'comment';
+  }
+  return undefined;
+}
+
+function linkKey(link: ProjectMemoryDocumentLink): string {
+  return [
+    link.fromSourceType,
+    link.fromSourceId,
+    link.toSourceType,
+    link.toSourceId,
+    link.type,
+  ].join('\0');
+}
+
+function extractRemoteLinks(records: readonly GitHubRemoteRecord[]): ProjectMemoryDocumentLink[] {
+  const links = new Map<string, ProjectMemoryDocumentLink>();
+  const numberKinds = new Map<number, 'issue' | 'pull_request'>();
+  for (const record of records) {
+    if (
+      record.number !== undefined &&
+      record.number !== null &&
+      (record.kind === 'issue' || record.kind === 'pull_request')
+    ) {
+      numberKinds.set(record.number, record.kind);
+    }
+  }
+
+  for (const record of records) {
+    const fromSourceType = remoteSourceType(record.kind);
+    let position = 0;
+    const add = (
+      type: ProjectMemoryDocumentLink['type'],
+      toSourceType: ProjectMemoryDocument['sourceType'],
+      toSourceId: string,
+    ) => {
+      const link = {
+        fromSourceType,
+        fromSourceId: record.sourceId,
+        toSourceType,
+        toSourceId,
+        type,
+        position,
+      } satisfies ProjectMemoryDocumentLink;
+      position += 1;
+      if (toSourceId !== record.sourceId && !links.has(linkKey(link))) {
+        links.set(linkKey(link), link);
+      }
+    };
+
+    if (record.parentSourceId !== null) {
+      const parentType = sourceTypeFromId(record.parentSourceId);
+      if (parentType !== undefined) {
+        add('mentions', parentType, record.parentSourceId);
+      }
+    }
+
+    const markerPattern =
+      /^Gatekeeper-Relation:\s*(mentions|implements|reverts|supersedes|caused_by|resolves)\s+(issue|pull_request|adr)\s+([^\s]+)\s*$/gimu;
+    for (const match of record.body.matchAll(markerPattern)) {
+      const type = match[1] as ProjectMemoryDocumentLink['type'];
+      const targetKind = match[2];
+      const target = match[3];
+      if (targetKind === undefined || target === undefined) {
+        continue;
+      }
+      if ((targetKind === 'issue' || targetKind === 'pull_request') && /^#\d+$/.test(target)) {
+        add(type, targetKind, `${targetKind}:${target}`);
+      } else if (targetKind === 'adr' && target.length <= 300 && !target.includes('..')) {
+        add(type, 'adr', target.replaceAll('\\', '/'));
+      }
+    }
+
+    for (const match of record.body.matchAll(/#(\d{1,10})\b/gu)) {
+      const number = Number(match[1]);
+      if (!Number.isSafeInteger(number) || number <= 0) {
+        continue;
+      }
+      const context = record.body.slice(Math.max(0, (match.index ?? 0) - 50), match.index);
+      const lowerContext = context.toLowerCase();
+      if (/revert(?:s|ed|ing)?\s*$/u.test(lowerContext)) {
+        add('reverts', 'pull_request', `pull_request:#${number}`);
+      } else if (/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*$/u.test(lowerContext)) {
+        add('resolves', 'issue', `issue:#${number}`);
+      } else {
+        const targetKind = numberKinds.get(number) ?? 'issue';
+        add('mentions', targetKind, `${targetKind}:#${number}`);
+      }
+    }
+  }
+  return [...links.values()];
+}
+
+export function normalizeGitHubHistory(
+  repository: string,
+  batch: GitHubHistoryBatch,
+): { documents: ProjectMemoryDocument[]; links: ProjectMemoryDocumentLink[] } {
+  const documents = batch.records.map((record) => {
+    const type = remoteSourceType(record.kind);
+    const contentHash = createHash('sha256')
+      .update(
+        JSON.stringify([
+          record.kind,
+          record.sourceId,
+          record.title,
+          record.body,
+          record.url,
+          record.state,
+          record.createdAt,
+          record.updatedAt,
+        ]),
+      )
+      .digest('hex');
+    return {
+      documentId: documentId(repository, type, record.sourceId, 0),
+      sourceType: type,
+      sourceId: record.sourceId,
+      title: record.title,
+      path: null,
+      commitSha: null,
+      excerpt: record.body.slice(0, MAX_EXCERPT_CHARACTERS),
+      contentHash,
+      status: remoteStatus(record),
+      occurredAt: record.updatedAt,
+      remoteUrl: record.url,
+      chunkIndex: 0,
+    } satisfies ProjectMemoryDocument;
+  });
+  return { documents, links: extractRemoteLinks(batch.records) };
 }
 
 function isRegularFile(file: TrackedFileRecord): boolean {
@@ -386,6 +576,8 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
       ),
     getRepository: (id) => Promise.resolve(options.persistence.getRepository(id)),
     getIndexState: (id) => Promise.resolve(options.persistence.getIndexState(id)),
+    getRemoteSyncCursor: (id, provider) =>
+      Promise.resolve(options.persistence.getSyncCursor(id, provider)),
     indexLocalRepository: async (input) => {
       const repository = options.persistence.getRepository(input.repositoryId);
       if (repository === null) {
@@ -428,6 +620,28 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
         documents,
         commits,
       });
+    },
+    indexRemoteDocuments: (input) => {
+      const repository = options.persistence.getRepository(input.repositoryId);
+      if (repository === null) {
+        throw new ProjectMemoryError(
+          'REPOSITORY_NOT_FOUND',
+          'Initialize this repository before synchronizing GitHub history.',
+        );
+      }
+      const normalized = normalizeGitHubHistory(repository.repositoryId, input.batch);
+      return Promise.resolve(
+        options.persistence.applyRemoteSync({
+          repositoryId: repository.repositoryId,
+          provider: input.provider,
+          syncedAt: now(),
+          cursor: input.batch.cursor,
+          partial: input.batch.partial,
+          failures: input.batch.failures,
+          documents: normalized.documents,
+          links: normalized.links,
+        }),
+      );
     },
     search: (input) => {
       const parsed = memorySearchInputSchema.parse(input);
