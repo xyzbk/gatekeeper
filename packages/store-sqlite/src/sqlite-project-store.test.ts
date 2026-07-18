@@ -1,0 +1,387 @@
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { createReviewRunFixture } from '@gatekeeper/testkit';
+import Database from 'better-sqlite3';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  openSqliteProjectStore,
+  type SqliteProjectStore,
+  SqliteProjectStoreError,
+  type SqliteIndexBatch,
+} from './sqlite-project-store.js';
+
+const temporaryRoots: string[] = [];
+const openStores: SqliteProjectStore[] = [];
+
+function openStore(options: Parameters<typeof openSqliteProjectStore>[0]): SqliteProjectStore {
+  const store = openSqliteProjectStore(options);
+  openStores.push(store);
+  return store;
+}
+
+async function temporaryRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'gatekeeper-store-'));
+  temporaryRoots.push(root);
+  return root;
+}
+
+function createBatch(overrides: Partial<SqliteIndexBatch> = {}): SqliteIndexBatch {
+  return {
+    repositoryId: 'repository_fixture',
+    head: 'a'.repeat(40),
+    indexedAt: '2026-07-18T18:01:00.000Z',
+    files: [
+      {
+        path: 'docs/adr/0003-no-required-redis.md',
+        objectId: 'b'.repeat(40),
+        mode: '100644',
+        sizeBytes: 42,
+      },
+    ],
+    documents: [
+      {
+        documentId: 'document_redis',
+        sourceType: 'adr',
+        sourceId: 'docs/adr/0003-no-required-redis.md',
+        title: 'No required Redis',
+        path: 'docs/adr/0003-no-required-redis.md',
+        commitSha: null,
+        excerpt: 'Required Redis caused deployment regressions. Keep cache optional.',
+        contentHash: 'c'.repeat(64),
+        status: 'active',
+        occurredAt: null,
+        chunkIndex: 0,
+      },
+    ],
+    commits: [],
+    ...overrides,
+  };
+}
+
+afterEach(async () => {
+  for (const store of openStores.splice(0)) {
+    store.close();
+  }
+  await Promise.all(
+    temporaryRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
+  );
+});
+
+describe('SQLite Project Memory store', () => {
+  it('migrates a new WAL database with foreign keys, ordinary tables, FTS5, and a journal', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+
+    store.migrate();
+    expect(store.capabilities()).toEqual({ foreignKeys: true, fts5: true, journalMode: 'wal' });
+    store.close();
+
+    const database = new Database(databasePath, { readonly: true });
+    const names = database
+      .prepare("select name from sqlite_master where type in ('table', 'trigger') order by name")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    database.close();
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        '__drizzle_migrations',
+        'commits',
+        'document_fts',
+        'document_fts_ai',
+        'document_fts_au',
+        'document_fts_ad',
+        'document_links',
+        'documents',
+        'files',
+        'finding_evidence',
+        'findings',
+        'index_state',
+        'repositories',
+        'review_runs',
+      ]),
+    );
+  });
+
+  it('reopens and migrates an already migrated database idempotently', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const first = openStore({ databasePath });
+    first.migrate();
+    first.close();
+
+    const second = openStore({ databasePath });
+    expect(() => second.migrate()).not.toThrow();
+    expect(second.capabilities().fts5).toBe(true);
+    second.close();
+  });
+
+  it('reports an actionable stable error when migrations cannot load', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const missingMigrations = join(root, 'missing-migrations');
+    const store = openStore({ databasePath, migrationsFolder: missingMigrations });
+
+    expect(() => store.migrate()).toThrowError(SqliteProjectStoreError);
+    try {
+      store.migrate();
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'MIGRATION_FAILED',
+        message:
+          'Project Memory migrations failed. Reinstall Gatekeeper or repair the local database.',
+      });
+    }
+    store.close();
+  });
+
+  it('rolls back statements from an interrupted migration', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const migrationsFolder = join(root, 'broken-migrations');
+    await mkdir(join(migrationsFolder, 'meta'), { recursive: true });
+    await writeFile(
+      join(migrationsFolder, 'meta', '_journal.json'),
+      JSON.stringify({
+        version: '7',
+        dialect: 'sqlite',
+        entries: [{ idx: 0, version: '6', when: 1, tag: '0000_broken', breakpoints: true }],
+      }),
+    );
+    await writeFile(
+      join(migrationsFolder, '0000_broken.sql'),
+      'CREATE TABLE partial_write (id integer);\n--> statement-breakpoint\nNOT VALID SQL;',
+    );
+    const store = openStore({ databasePath, migrationsFolder });
+
+    expect(() => store.migrate()).toThrowError(SqliteProjectStoreError);
+    store.close();
+
+    const database = new Database(databasePath, { readonly: true });
+    expect(
+      database
+        .prepare("select name from sqlite_master where type = 'table' and name = 'partial_write'")
+        .get(),
+    ).toBeUndefined();
+    database.close();
+  });
+
+  it('rejects duplicate batch identities and missing repository foreign keys safely', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    const batch = createBatch();
+
+    expect(() =>
+      store.applyIndex({ ...batch, documents: [batch.documents[0]!, batch.documents[0]!] }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_INDEX_BATCH',
+        message: 'Project Memory received duplicate document records.',
+      }),
+    );
+    expect(() => store.applyIndex(batch)).toThrowError(
+      expect.objectContaining({
+        code: 'INDEX_WRITE_FAILED',
+        message: 'Project Memory could not write the index transaction.',
+      }),
+    );
+    store.close();
+  });
+
+  it('keeps FTS5 synchronized across insert, update, and delete', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+
+    expect(store.applyIndex(createBatch()).documents.written).toBe(1);
+    expect(
+      store.search({ repositoryId: 'repository_fixture', query: 'redis', limit: 20 })[0],
+    ).toMatchObject({ documentId: 'document_redis', match: 'fts' });
+
+    const updated = createBatch({
+      documents: [
+        {
+          ...createBatch().documents[0]!,
+          sourceId: 'docs/adr/in-process-cache.md',
+          title: 'In-process cache',
+          path: 'docs/adr/in-process-cache.md',
+          excerpt: 'The deployment now uses an in-process memory cache.',
+          contentHash: 'd'.repeat(64),
+        },
+      ],
+    });
+    expect(store.applyIndex(updated).documents.written).toBe(1);
+    expect(store.search({ repositoryId: 'repository_fixture', query: 'redis', limit: 20 })).toEqual(
+      [],
+    );
+    expect(
+      store.search({ repositoryId: 'repository_fixture', query: 'memory', limit: 20 }),
+    ).toHaveLength(1);
+
+    expect(store.applyIndex(createBatch({ files: [], documents: [] })).documents.deleted).toBe(1);
+    expect(
+      store.search({ repositoryId: 'repository_fixture', query: 'memory', limit: 20 }),
+    ).toEqual([]);
+    store.close();
+  });
+
+  it('returns exact source matches before lexical matches and safely escapes FTS syntax', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const base = createBatch();
+    store.applyIndex({
+      ...base,
+      documents: [
+        { ...base.documents[0]!, documentId: 'document_exact', sourceId: 'redis' },
+        {
+          ...base.documents[0]!,
+          documentId: 'document_lexical',
+          sourceId: 'docs/cache.md',
+          path: 'docs/cache.md',
+          title: 'Redis cache history',
+        },
+      ],
+    });
+
+    expect(
+      store
+        .search({ repositoryId: 'repository_fixture', query: 'redis', limit: 20 })
+        .map(({ documentId }) => documentId),
+    ).toEqual(['document_exact', 'document_lexical']);
+    expect(() =>
+      store.search({ repositoryId: 'repository_fixture', query: '" OR * NOT (', limit: 20 }),
+    ).not.toThrow();
+    store.close();
+  });
+
+  it('persists review runs, findings, and evidence atomically', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const review = {
+      ...createReviewRunFixture(),
+      repositoryId: 'repository_fixture',
+      findings: [
+        {
+          id: 'finding_fixture',
+          category: 'history',
+          severity: 'medium',
+          authority: 'EVIDENCE_SUPPORTED',
+          confidence: 0.9,
+          title: 'Redis was reverted',
+          explanation: 'A prior change was reverted after deployment regressions.',
+          evidence: [
+            {
+              sourceType: 'adr',
+              repositoryId: 'repository_fixture',
+              sourceId: 'docs/adr/0003-no-required-redis.md',
+              excerpt: 'Keep cache optional.',
+            },
+          ],
+          remediation: ['Use the in-process cache boundary.'],
+          humanApprovalRequired: true,
+        },
+      ],
+    } as const;
+
+    store.saveReview(review);
+    expect(store.getReview(review.reviewId)).toEqual(review);
+    expect(store.latestReviewId(review.repositoryId, review.target)).toBe(review.reviewId);
+    store.close();
+
+    const database = new Database(join(root, 'gatekeeper.db'), { readonly: true });
+    expect(database.prepare('select count(*) from findings').pluck().get()).toBe(1);
+    expect(database.prepare('select count(*) from finding_evidence').pluck().get()).toBe(1);
+    database.close();
+
+    const reopened = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    reopened.migrate();
+    expect(reopened.getReview(review.reviewId)).toEqual(review);
+    reopened.close();
+  });
+
+  it('rolls back and sanitizes a failed review transaction', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    const review = createReviewRunFixture();
+
+    expect(() => store.saveReview(review)).toThrowError(
+      expect.objectContaining({
+        code: 'REVIEW_WRITE_FAILED',
+        message: 'Project Memory could not persist the review transaction.',
+      }),
+    );
+    expect(store.getReview(review.reviewId)).toBeNull();
+    store.close();
+  });
+
+  it('fails closed with a stable error when persisted review JSON is corrupt', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    store.saveReview(review);
+    store.close();
+
+    const database = new Database(databasePath);
+    database
+      .prepare('update review_runs set review_json = ? where review_id = ?')
+      .run('{', review.reviewId);
+    database.close();
+
+    const reopened = openStore({ databasePath });
+    reopened.migrate();
+    expect(() => reopened.getReview(review.reviewId)).toThrowError(
+      'The stored review is corrupt and cannot be read safely.',
+    );
+    reopened.close();
+  });
+});

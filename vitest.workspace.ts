@@ -12,6 +12,7 @@ export default defineConfig({
       '@gatekeeper/domain': fromRoot('./packages/domain/src/index.ts'),
       '@gatekeeper/git-adapter': fromRoot('./packages/git-adapter/src/index.ts'),
       '@gatekeeper/review-engine': fromRoot('./packages/review-engine/src/index.ts'),
+      '@gatekeeper/store-sqlite': fromRoot('./packages/store-sqlite/src/index.ts'),
       '@gatekeeper/server': fromRoot('./apps/server/src/index.ts'),
       '@gatekeeper/testkit': fromRoot('./packages/testkit/src/index.ts'),
     },

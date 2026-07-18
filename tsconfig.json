@@ -8,6 +8,7 @@
     { "path": "packages/config" },
     { "path": "packages/git-adapter" },
     { "path": "packages/review-engine" },
+    { "path": "packages/store-sqlite" },
     { "path": "apps/cli" },
     { "path": "apps/server" }
   ]

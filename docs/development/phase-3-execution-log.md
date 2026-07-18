@@ -40,15 +40,57 @@ The requested feature branch is `codex/phase-3-project-memory`.
 
 ## Task ledger
 
-| Task                                  | State   | Commit | Verification | Failures and corrections |
-| ------------------------------------- | ------- | ------ | ------------ | ------------------------ |
-| 1. Storage contracts and migrations   | pending | —      | —            | —                        |
-| 2. Bounded Git indexing sources       | pending | —      | —            | —                        |
-| 3. Incremental indexing and retrieval | pending | —      | —            | —                        |
-| 4. Doctor, CLI, and fixture           | pending | —      | —            | —                        |
-| 5. Persistent local API               | pending | —      | —            | —                        |
-| 6. Dashboard memory and review routes | pending | —      | —            | —                        |
-| 7. Aggressive acceptance and docs     | pending | —      | —            | —                        |
+| Task                                  | State    | Commit    | Verification                         | Failures and corrections  |
+| ------------------------------------- | -------- | --------- | ------------------------------------ | ------------------------- |
+| 1. Storage contracts and migrations   | complete | this step | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
+| 2. Bounded Git indexing sources       | pending  | —         | —                                    | —                         |
+| 3. Incremental indexing and retrieval | pending  | —         | —                                    | —                         |
+| 4. Doctor, CLI, and fixture           | pending  | —         | —                                    | —                         |
+| 5. Persistent local API               | pending  | —         | —                                    | —                         |
+| 6. Dashboard memory and review routes | pending  | —         | —                                    | —                         |
+| 7. Aggressive acceptance and docs     | pending  | —         | —                                    | —                         |
+
+## Task 1 evidence
+
+Expected RED:
+
+- The contract suite failed because `memory.ts` did not exist.
+- The store suite failed because better-sqlite3 and `sqlite-project-store.ts` did not exist.
+- A missing-repository index batch exposed a raw SQLite foreign-key error instead of a stable adapter error.
+- A missing-repository review write exposed the same raw database error path.
+
+Corrections and learning:
+
+- A source-inspection command used a wildcard inside a Windows path passed to `rg`; Windows did not expand it. Locating the pnpm package directory first and reading through the workspace symlink exposed the installed Drizzle types without changing code.
+- The Drizzle-generated migration used a whimsical generated tag. It was renamed to the stable `0000_project_memory` tag before review, then the FTS5 table and three synchronization triggers were added explicitly.
+- The first repository registration passed adapter-only normalized identity fields into the strict public repository schema. The adapter now validates only the public projection and stores normalized fields separately.
+- That early assertion failure left database handles open and produced secondary Windows `EBUSY` cleanup errors. The tests now register every opened store for unconditional `afterEach` closure, so future failures retain the primary signal.
+- The first FTS update assertion expected a Redis query to disappear after only the excerpt changed, but Redis remained intentionally present in the title, source ID, and path. The corrected test changes every indexed column and proves the update trigger removes all old terms.
+- Index and review transactions now translate driver failures into stable `INDEX_WRITE_FAILED` and `REVIEW_WRITE_FAILED` errors; transaction rollback tests prove no partial record remains.
+- better-sqlite3 installed its Node 24 prebuild successfully. Its installer emitted Node's `fs.R_OK` deprecation warning through the upstream `prebuild-install` path; product code does not use that API.
+- The first root lint found two empty row interfaces; direct type aliases express the same database-row shape without lint suppression.
+- The first audit found one moderate development-only esbuild advisory through Drizzle Kit's legacy `@esbuild-kit/esm-loader` dependency. The reviewed migration had already been generated, while runtime migration uses `drizzle-orm`; keeping the generator installed added vulnerability without product capability. Drizzle Kit and its config/script were removed after generation, pruning the unused toolchain and advisory. Future schema changes must deliberately install the then-current pinned generator, regenerate, review the SQL, and remove it again.
+- The first format check found only the generated Drizzle snapshot and updated lockfile. Both are formatted normally and no generated-file exception is added.
+
+Focused result:
+
+```text
+Project Memory contracts                         PASS — 4 tests
+SQLite migrations/capabilities/index/reviews     PASS — 10 tests
+Total                                            PASS — 14 tests
+```
+
+Task gate:
+
+```text
+pnpm install --frozen-lockfile   PASS — already up to date
+pnpm lint                        PASS
+pnpm typecheck                   PASS
+pnpm test                        PASS — 22 files, 115 tests
+pnpm build                       PASS
+pnpm format:check                PASS
+pnpm audit --audit-level high    PASS — no known vulnerabilities
+```
 
 ## Scope boundary
 
