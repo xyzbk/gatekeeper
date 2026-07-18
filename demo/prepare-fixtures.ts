@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 
 const execFileAsync = promisify(execFile);
 const fixturesRoot = fileURLToPath(new URL('./fixtures', import.meta.url));
-const fixtureNames = ['clean', 'missing-test', 'protected-path'] as const;
+const fixtureNames = ['clean', 'missing-test', 'protected-path', 'history'] as const;
 const policy = `version: 1
 tests:
   relationships:
@@ -71,7 +71,50 @@ async function prepareFixture(name: (typeof fixtureNames)[number]): Promise<void
   await rm(root, { force: true, recursive: true });
   await createBaseline(root);
 
-  if (name === 'clean') {
+  if (name === 'history') {
+    await writeFixtureFile(root, '.gatekeeperignore', 'docs/ignored.md\n');
+    await writeFixtureFile(root, '.env', 'REDIS_PASSWORD=fixture-only-secret\n');
+    await writeFixtureFile(
+      root,
+      'docs/cache.md',
+      '# Cache design\n\nThe first proposal used a required Redis cache for every local review.\n',
+    );
+    await writeFixtureFile(
+      root,
+      'docs/ignored.md',
+      '# Ignored design\n\nThis selected document must not enter Project Memory.\n',
+    );
+    await runGit(root, ['add', '--force', '.env']);
+    await runGit(root, ['add', '--all']);
+    await runGit(root, ['commit', '--message', 'propose required redis cache']);
+
+    await writeFixtureFile(
+      root,
+      'docs/adr/0003-no-required-redis.md',
+      [
+        '# No required Redis cache',
+        '',
+        'Status: active',
+        '',
+        'Gatekeeper stays local-first. Redis is not required for cache or queue behavior.',
+        '',
+      ].join('\n'),
+    );
+    await writeFixtureFile(
+      root,
+      'docs/cache.md',
+      '# Cache design\n\nThe required Redis cache was reverted; SQLite remains the durable local store.\n',
+    );
+    await runGit(root, ['add', '--all']);
+    await runGit(root, ['commit', '--message', 'revert required redis cache']);
+
+    await writeFixtureFile(
+      root,
+      'src/app.ts',
+      'export const total = (value: number) => value + 1;\n',
+    );
+    await writeFixtureFile(root, 'tests/app.test.ts', 'export const updatedTest = true;\n');
+  } else if (name === 'clean') {
     await writeFixtureFile(
       root,
       'src/app.ts',

@@ -44,8 +44,8 @@ The requested feature branch is `codex/phase-3-project-memory`.
 | ------------------------------------- | -------- | --------- | ------------------------------------ | ------------------------- |
 | 1. Storage contracts and migrations   | complete | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
 | 2. Bounded Git indexing sources       | complete | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
-| 3. Incremental indexing and retrieval | complete | this step | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
-| 4. Doctor, CLI, and fixture           | pending  | —         | —                                    | —                         |
+| 3. Incremental indexing and retrieval | complete | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
+| 4. Doctor, CLI, and fixture           | complete | this step | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
 | 5. Persistent local API               | pending  | —         | —                                    | —                         |
 | 6. Dashboard memory and review routes | pending  | —         | —                                    | —                         |
 | 7. Aggressive acceptance and docs     | pending  | —         | —                                    | —                         |
@@ -167,6 +167,43 @@ pnpm test                        PASS — 25 files, 130 tests
 pnpm build                       PASS
 pnpm format:check                PASS
 pnpm audit --audit-level high    PASS — no known vulnerabilities
+```
+
+## Task 4 evidence
+
+Expected RED:
+
+- Database-path, SQLite/FTS5 Doctor, repository-status, previous-review, CLI lifecycle, and Project Memory command suites failed before their behavior existed.
+- The first CLI test command omitted the repository Vitest configuration, so package imports resolved stale build output and produced a false missing-export failure. Re-running through `vitest.workspace.ts` exposed only the intended RED failures.
+
+Corrections and learning:
+
+- The CLI TypeScript project initially lacked references to its new Project Memory and SQLite dependencies. Explicit project references restored build boundaries without widening source roots.
+- The first lint pass rejected a dynamic-import type annotation and an unbound mocked method assertion. Inferred module typing and a directly named spy fixed both without suppressions.
+- The first complete format gate found only the updated lockfile. Formatting it and rerunning every root gate produced a fully green state.
+- Doctor reports the optional missing `gh` client as degraded, while native SQLite, database WAL, and FTS5 remain required. The acceptance machine therefore returned a healthy Project Memory probe with an expected overall degraded status.
+
+Behavior proven:
+
+- The database resolves under Gatekeeper machine app-data storage, outside the target repository by default.
+- `repo init`, `repo status`, `index`, `memory search`, persisted `review worktree`, and `review show` use short-lived sessions that close in `finally`.
+- Not-initialized, not-found, invalid-input, Git/environment, migration, index, and internal failures map to stable exit categories without echoing private details.
+- The disposable history fixture recreates idempotently with a reverted required-Redis proposal, active ADR, selected documentation, tracked denied secret, ignored document, and source-plus-test worktree change.
+- Source and compiled CLI runs both wrote six evidence documents on the first index and zero on the unchanged second index. Redis search returned ADR, commit, and documentation evidence; the saved `FAST_PATH` review reopened in a new process, and a second review linked to the first by `previousReviewId`.
+
+Task gate:
+
+```text
+pnpm fixtures:prepare (twice)   PASS — 4 deterministic repositories
+source CLI acceptance           PASS — second document writes 0; review round trip true
+compiled CLI acceptance         PASS — second document writes 0; ADR + commit evidence
+pnpm install --frozen-lockfile  PASS
+pnpm lint                       PASS
+pnpm typecheck                  PASS
+pnpm test                       PASS — 26 files, 137 tests
+pnpm build                      PASS
+pnpm format:check               PASS
+pnpm audit --audit-level high   PASS — no known vulnerabilities
 ```
 
 ## Scope boundary

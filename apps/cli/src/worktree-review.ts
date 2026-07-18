@@ -32,6 +32,11 @@ export interface WorktreeReviewDependencies {
   now: () => string;
 }
 
+export interface WorktreeReviewContext {
+  repositoryId: RepositoryId;
+  previousReviewId?: ReviewId;
+}
+
 export interface PolicyValidationDependencies {
   inspectRepository: (path: string) => Promise<RepositorySnapshot>;
   loadRequiredPolicy: (root: string) => Promise<LoadedRepositoryPolicy>;
@@ -61,6 +66,7 @@ const defaultPolicyValidationDependencies: PolicyValidationDependencies = {
 export async function runWorktreeReview(
   repositoryPath: string,
   dependencies: WorktreeReviewDependencies = defaultReviewDependencies,
+  context?: WorktreeReviewContext,
 ): Promise<ReviewRunContract> {
   const repository = await dependencies.inspectRepository(repositoryPath);
   const loadedPolicy = await dependencies.loadPolicy(repository.root);
@@ -71,8 +77,11 @@ export async function runWorktreeReview(
     changeSet,
     createdAt: dependencies.now(),
     policy: loadedPolicy.policy,
-    repositoryId: dependencies.createRepositoryId(repository.root),
+    repositoryId: context?.repositoryId ?? dependencies.createRepositoryId(repository.root),
     reviewId: dependencies.createReviewId(),
+    ...(context?.previousReviewId === undefined
+      ? {}
+      : { previousReviewId: context.previousReviewId }),
   });
 
   return reviewRunSchema.parse(review);

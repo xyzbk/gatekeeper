@@ -11,7 +11,7 @@ The compiled equivalent is `node apps/cli/dist/index.js <command>`.
 
 ## `doctor`
 
-Checks Node, pnpm, Git, optional `gh`, and the writable app-data path without authenticating or making a network request.
+Checks Node, pnpm, Git, optional `gh`, the writable app-data path, the native SQLite driver, the Project Memory database in WAL mode, and FTS5 without authenticating or making a network request.
 
 ```bash
 gatekeeper doctor
@@ -37,7 +37,7 @@ gatekeeper review worktree .
 gatekeeper review worktree . --format json
 ```
 
-`human` is the default format. It prints the verdict, summary, counts, finding authority/severity, affected paths, and remediation. `json` emits the strict ReviewRun v1 contract documented in [verdicts.md](verdicts.md).
+`human` is the default format. It prints the verdict, summary, counts, finding authority/severity, affected paths, and remediation. `json` emits the strict ReviewRun v1 contract documented in [verdicts.md](verdicts.md). Completed worktree reviews are stored in Project Memory; a later review of the same target records the prior review ID.
 
 The review loads `.gatekeeper/policies.yaml` when present and otherwise uses an empty version-1 policy. It never accepts a base branch, remote, URL, pull request, arbitrary file, or policy text through the command line.
 
@@ -52,6 +52,30 @@ For `policy validate` and `review worktree`:
 
 A verdict is product output, not a process failure. Phase 2 intentionally has no enforcement flag and never mutates the target repository.
 
+## Project Memory
+
+Project Memory is a local SQLite database stored under Gatekeeper's machine app-data directory, never inside the target repository by default. Register and incrementally index one repository:
+
+```bash
+gatekeeper repo init .
+gatekeeper repo status . --format json
+gatekeeper index .
+gatekeeper memory search "redis cache" . --format json
+gatekeeper review show review_<id> --format json
+```
+
+The index stores tracked file metadata and hashes, bounded Markdown/ADR/policy excerpts, and up to 200 recent commit records. It does not store full private source files. Gatekeeper excludes ignore-matched paths, known secret/config names, non-regular files, oversized documents, and invalid UTF-8. Every returned repository excerpt is labelled `untrusted_repository_content`; exact path/source/title matches precede FTS5 matches.
+
+`repo status` is read-only with respect to repository registration. `index` and `memory search` require prior initialization. A repeated unchanged index reports zero writes. `review show` reads a strict persisted ReviewRun v1 by ID.
+
+Project Memory command exit codes are:
+
+- `0`: command completed, including an empty search or non-fast-path verdict;
+- `2`: usage, policy/configuration, invalid query, not-initialized, or not-found error;
+- `3`: Git, native SQLite, database, or migration environment error;
+- `4`: bounded indexing source or transaction error;
+- `6`: unexpected internal failure.
+
 ## `start [path]`
 
 Starts the loopback service and built dashboard for one fixed repository:
@@ -64,7 +88,7 @@ The command prints the canonical repository root and random `127.0.0.1` URL, rem
 
 ## Deterministic demo fixtures
 
-Generate the three disposable Git repositories, then run the acceptance matrix:
+Generate the four disposable Git repositories, then run the acceptance matrix:
 
 ```bash
 pnpm fixtures:prepare
@@ -72,6 +96,11 @@ gatekeeper policy validate demo/fixtures/clean
 gatekeeper review worktree demo/fixtures/clean
 gatekeeper review worktree demo/fixtures/missing-test
 gatekeeper review worktree demo/fixtures/protected-path --format json
+gatekeeper repo init demo/fixtures/history
+gatekeeper index demo/fixtures/history
+gatekeeper index demo/fixtures/history
+gatekeeper memory search "redis cache" demo/fixtures/history --format json
+gatekeeper review worktree demo/fixtures/history --format json
 ```
 
-Expected verdicts are `FAST_PATH`, `REQUIRE_CHANGES`, and `BLOCK` respectively. Re-running `pnpm fixtures:prepare` replaces only the generated fixture directories and produces the same states.
+The first three review verdicts are `FAST_PATH`, `REQUIRE_CHANGES`, and `BLOCK`. The history fixture contains a reverted required-Redis proposal, its active ADR, ignored and denied content, and a source change with its required test. Its second index writes zero records, Redis search returns ADR and commit evidence, and its worktree review is `FAST_PATH`. Re-running `pnpm fixtures:prepare` replaces only the generated fixture directories and produces the same states.

@@ -49,12 +49,18 @@ importers:
       '@gatekeeper/git-adapter':
         specifier: workspace:*
         version: link:../../packages/git-adapter
+      '@gatekeeper/project-memory':
+        specifier: workspace:*
+        version: link:../../packages/project-memory
       '@gatekeeper/review-engine':
         specifier: workspace:*
         version: link:../../packages/review-engine
       '@gatekeeper/server':
         specifier: workspace:*
         version: link:../server
+      '@gatekeeper/store-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/store-sqlite
       commander:
         specifier: 15.0.0
         version: 15.0.0

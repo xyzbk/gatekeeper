@@ -7,6 +7,7 @@ import {
   memorySearchResponseJsonSchema,
   memorySearchResponseSchema,
   repositoryRecordSchema,
+  repositoryStatusSchema,
 } from './memory.js';
 
 const repository = {
@@ -23,6 +24,42 @@ describe('Project Memory contracts', () => {
     expect(repositoryRecordSchema.parse(repository)).toEqual(repository);
     expect(() =>
       repositoryRecordSchema.parse({ ...repository, databasePath: 'private.db' }),
+    ).toThrow();
+  });
+
+  it('distinguishes uninitialized and indexed repository status', () => {
+    const indexState = {
+      schemaVersion: 1 as const,
+      repositoryId: repository.repositoryId,
+      head: 'a'.repeat(40),
+      indexedAt: '2026-07-18T18:01:00.000Z',
+      files: 4,
+      documents: 3,
+      commits: 2,
+    };
+    expect(
+      repositoryStatusSchema.parse({
+        schemaVersion: 1,
+        state: 'not_initialized',
+        repository: null,
+        indexState: null,
+      }).state,
+    ).toBe('not_initialized');
+    expect(
+      repositoryStatusSchema.parse({
+        schemaVersion: 1,
+        state: 'ready',
+        repository,
+        indexState,
+      }).state,
+    ).toBe('ready');
+    expect(() =>
+      repositoryStatusSchema.parse({
+        schemaVersion: 1,
+        state: 'not_initialized',
+        repository,
+        indexState: null,
+      }),
     ).toThrow();
   });
 

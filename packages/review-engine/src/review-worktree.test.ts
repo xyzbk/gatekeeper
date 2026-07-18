@@ -39,6 +39,20 @@ function review(files: ChangedFile[], policy: GatekeeperPolicy) {
   });
 }
 
+it('links a review to its previous persisted run when supplied', () => {
+  const result = reviewWorktree({
+    changeSet: changeSet([]),
+    createdAt: '2026-07-18T12:00:00.000Z',
+    policy: { version: 1 },
+    repositoryId,
+    reviewId,
+    previousReviewId: 'review_previous' as ReviewId,
+  });
+
+  expect(result.previousReviewId).toBe('review_previous');
+  expect(reviewRunSchema.parse(result)).toEqual(result);
+});
+
 describe('reviewWorktree', () => {
   it('fast-paths a source change accompanied by its required test', () => {
     const result = review([changedFile('src/app.ts'), changedFile('tests/app.test.ts')], {

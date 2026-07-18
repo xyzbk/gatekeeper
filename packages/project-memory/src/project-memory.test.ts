@@ -167,6 +167,12 @@ describe('Project Memory', () => {
     expect(second.repositoryId).toBe(first.repositoryId);
     expect(second.createdAt).toBe(first.createdAt);
     expect(second.updatedAt).toBe('2026-07-18T19:00:00.000Z');
+    await expect(
+      memory.findRepository({ root, remote: 'https://github.com/EXAMPLE/FIXTURE.git' }),
+    ).resolves.toEqual(second);
+    await expect(
+      memory.findRepository({ root: `${root}-missing`, remote: null }),
+    ).resolves.toBeNull();
     store.close();
   });
 

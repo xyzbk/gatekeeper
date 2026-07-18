@@ -112,6 +112,7 @@ export interface LocalIndexInput {
 export interface ProjectMemory {
   migrate(): Promise<void>;
   registerRepository(input: RegisterRepositoryInput): Promise<RepositoryRecord>;
+  findRepository(input: RegisterRepositoryInput): Promise<RepositoryRecord | null>;
   getRepository(repositoryId: string): Promise<RepositoryRecord | null>;
   getIndexState(repositoryId: string): Promise<IndexState | null>;
   indexLocalRepository(input: LocalIndexInput): Promise<IndexResult>;
@@ -376,6 +377,13 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
         }),
       );
     },
+    findRepository: (input) =>
+      Promise.resolve(
+        options.persistence.getRepositoryByIdentity(
+          normalizeRootIdentity(input.root),
+          normalizeRemoteIdentity(input.remote),
+        ),
+      ),
     getRepository: (id) => Promise.resolve(options.persistence.getRepository(id)),
     getIndexState: (id) => Promise.resolve(options.persistence.getIndexState(id)),
     indexLocalRepository: async (input) => {

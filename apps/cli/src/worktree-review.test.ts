@@ -70,6 +70,28 @@ describe('runWorktreeReview', () => {
     });
     expect(reviewRunSchema.parse(result)).toEqual(result);
   });
+
+  it('uses the persistent repository identity and previous review context when provided', async () => {
+    const result = await runWorktreeReview(
+      '.',
+      {
+        createRepositoryId: () => 'repository_fallback' as RepositoryId,
+        createReviewId: () => 'review_next' as ReviewId,
+        getWorktreeDiff: () => Promise.resolve({ ...changes, files: [] }),
+        inspectRepository: () => Promise.resolve(repository),
+        loadPolicy: () =>
+          Promise.resolve({ path: null, policy: { version: 1 }, source: 'default' }),
+        now: () => '2026-07-18T12:00:00.000Z',
+      },
+      {
+        repositoryId: 'repository_persisted' as RepositoryId,
+        previousReviewId: 'review_previous' as ReviewId,
+      },
+    );
+
+    expect(result.repositoryId).toBe('repository_persisted');
+    expect(result.previousReviewId).toBe('review_previous');
+  });
 });
 
 describe('worktree review presentation', () => {

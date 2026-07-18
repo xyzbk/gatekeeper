@@ -14,8 +14,10 @@
     "@gatekeeper/contracts": "workspace:*",
     "@gatekeeper/domain": "workspace:*",
     "@gatekeeper/git-adapter": "workspace:*",
+    "@gatekeeper/project-memory": "workspace:*",
     "@gatekeeper/review-engine": "workspace:*",
     "@gatekeeper/server": "workspace:*",
+    "@gatekeeper/store-sqlite": "workspace:*",
     "commander": "15.0.0",
     "execa": "9.6.1"
   }

@@ -45,3 +45,9 @@ export function resolveServicePaths(appData = resolveAppDataPath()): ServicePath
     storage: path.join(appData, 'storage'),
   };
 }
+
+export function resolveProjectMemoryDatabasePath(appData = resolveAppDataPath()): string {
+  const { storage } = resolveServicePaths(appData);
+  const path = /^[A-Za-z]:[\\/]|^\\\\/.test(storage) ? win32 : posix;
+  return path.join(storage, 'project-memory.sqlite3');
+}

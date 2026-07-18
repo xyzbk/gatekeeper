@@ -1,0 +1,222 @@
+import type {
+  IndexResult,
+  MemorySearchResult,
+  RepositoryRecord,
+  RepositorySnapshot,
+  ReviewRunContract,
+} from '@gatekeeper/contracts';
+import type { ProjectMemory } from '@gatekeeper/project-memory';
+import { ProjectMemoryError } from '@gatekeeper/project-memory';
+import { SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  classifyProjectMemoryCommandError,
+  createProjectMemoryCommands,
+  formatMemorySearch,
+  ProjectMemoryCommandError,
+} from './project-memory.js';
+
+const snapshot: RepositorySnapshot = {
+  root: '/target/repository',
+  branch: 'master',
+  head: 'a'.repeat(40),
+  dirty: true,
+  remote: 'git@github.com:example/repository.git',
+};
+
+const repository: RepositoryRecord = {
+  schemaVersion: 1,
+  repositoryId: 'repository_test',
+  root: snapshot.root,
+  remote: snapshot.remote,
+  createdAt: '2026-07-18T12:00:00.000Z',
+  updatedAt: '2026-07-18T12:00:00.000Z',
+};
+
+const indexResult: IndexResult = {
+  schemaVersion: 1,
+  repositoryId: repository.repositoryId,
+  head: snapshot.head,
+  indexedAt: '2026-07-18T12:01:00.000Z',
+  files: { scanned: 3, written: 3, unchanged: 0, deleted: 0 },
+  documents: { scanned: 2, written: 2, unchanged: 0, deleted: 0 },
+  commits: { scanned: 1, written: 1, unchanged: 0, deleted: 0 },
+};
+
+const searchResult: MemorySearchResult = {
+  documentId: 'document_test',
+  match: 'exact',
+  trust: 'untrusted_repository_content',
+  status: 'active',
+  occurredAt: null,
+  evidence: {
+    sourceType: 'adr',
+    repositoryId: repository.repositoryId,
+    sourceId: 'docs/adr/0003-no-redis.md',
+    path: 'docs/adr/0003-no-redis.md',
+    excerpt: 'Do not require Redis for the local cache.',
+  },
+};
+
+const review: ReviewRunContract = {
+  schemaVersion: 1,
+  reviewId: 'review_next',
+  previousReviewId: 'review_previous',
+  repositoryId: repository.repositoryId,
+  target: { kind: 'worktree', display: 'Current worktree' },
+  verdict: 'FAST_PATH',
+  summary: 'FAST_PATH: 0 changed files, 0 deterministic findings.',
+  findings: [],
+  metrics: {
+    filesChanged: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    productionFilesChanged: 0,
+    testFilesChanged: 0,
+    documentationFilesChanged: 0,
+    pathGroups: [],
+  },
+  changes: [],
+  createdAt: '2026-07-18T12:02:00.000Z',
+};
+
+function fakeMemory(overrides: Partial<ProjectMemory> = {}): ProjectMemory {
+  return {
+    migrate: () => Promise.resolve(),
+    registerRepository: () => Promise.resolve(repository),
+    findRepository: () => Promise.resolve(repository),
+    getRepository: () => Promise.resolve(repository),
+    getIndexState: () => Promise.resolve(null),
+    indexLocalRepository: () => Promise.resolve(indexResult),
+    search: () => Promise.resolve([searchResult]),
+    saveReview: () => Promise.resolve(),
+    getReview: () => Promise.resolve(review),
+    latestReviewId: () => Promise.resolve('review_previous'),
+    ...overrides,
+  };
+}
+
+describe('Project Memory CLI composition', () => {
+  it('initializes, reports status, indexes policy ignores, and closes every session', async () => {
+    const close = vi.fn();
+    const indexLocalRepository = vi.fn(() => Promise.resolve(indexResult));
+    const memory = fakeMemory({
+      registerRepository: vi.fn(() => Promise.resolve(repository)),
+      findRepository: vi.fn(() => Promise.resolve(repository)),
+      getIndexState: vi.fn(() => Promise.resolve(null)),
+      indexLocalRepository,
+    });
+    const commands = createProjectMemoryCommands({
+      inspectRepository: () => Promise.resolve(snapshot),
+      loadPolicy: () =>
+        Promise.resolve({
+          path: '/target/repository/.gatekeeper/policies.yaml',
+          source: 'file',
+          policy: { version: 1, paths: { ignore: ['generated/**'] } },
+        }),
+      openSession: () => Promise.resolve({ memory, close }),
+      reviewWorktree: () => Promise.resolve(review),
+    });
+
+    await expect(commands.initialize('.')).resolves.toEqual(repository);
+    await expect(commands.status('.')).resolves.toEqual({
+      schemaVersion: 1,
+      state: 'ready',
+      repository,
+      indexState: null,
+    });
+    await expect(commands.index('.')).resolves.toEqual(indexResult);
+
+    expect(indexLocalRepository).toHaveBeenCalledWith({
+      repositoryId: repository.repositoryId,
+      ignorePatterns: ['generated/**'],
+    });
+    expect(close).toHaveBeenCalledTimes(3);
+  });
+
+  it('searches one initialized repository and persists a chained worktree review', async () => {
+    const close = vi.fn();
+    const saveReview = vi.fn(() => Promise.resolve());
+    const reviewWorktree = vi.fn(() => Promise.resolve(review));
+    const commands = createProjectMemoryCommands({
+      inspectRepository: () => Promise.resolve(snapshot),
+      loadPolicy: () => Promise.resolve({ path: null, source: 'default', policy: { version: 1 } }),
+      openSession: () => Promise.resolve({ memory: fakeMemory({ saveReview }), close }),
+      reviewWorktree,
+    });
+
+    await expect(commands.search('.', 'redis cache', 7)).resolves.toEqual([searchResult]);
+    await expect(commands.reviewWorktree('.')).resolves.toEqual(review);
+    await expect(commands.showReview(review.reviewId)).resolves.toEqual(review);
+
+    expect(reviewWorktree).toHaveBeenCalledWith(snapshot.root, {
+      repositoryId: repository.repositoryId,
+      previousReviewId: 'review_previous',
+    });
+    expect(saveReview).toHaveBeenCalledWith(review);
+    expect(close).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns stable errors, closes failed sessions, and formats trust labels', async () => {
+    const close = vi.fn();
+    const commands = createProjectMemoryCommands({
+      inspectRepository: () => Promise.resolve(snapshot),
+      loadPolicy: () => Promise.resolve({ path: null, source: 'default', policy: { version: 1 } }),
+      openSession: () =>
+        Promise.resolve({
+          memory: fakeMemory({
+            findRepository: () => Promise.resolve(null),
+            getReview: () => Promise.resolve(null),
+          }),
+          close,
+        }),
+      reviewWorktree: () => Promise.resolve(review),
+    });
+
+    await expect(commands.index('.')).rejects.toMatchObject({ code: 'NOT_INITIALIZED' });
+    await expect(commands.showReview('review_missing')).rejects.toMatchObject({
+      code: 'REVIEW_NOT_FOUND',
+    });
+    expect(close).toHaveBeenCalledTimes(2);
+    expect(formatMemorySearch([searchResult], 'human')).toContain(
+      '[untrusted_repository_content/exact] adr docs/adr/0003-no-redis.md',
+    );
+    expect(JSON.parse(formatMemorySearch([searchResult], 'json'))).toEqual({
+      schemaVersion: 1,
+      results: [searchResult],
+    });
+
+    const classified = classifyProjectMemoryCommandError(new Error('private source and token'));
+    expect(classified).toEqual({
+      exitCode: 6,
+      message: 'Gatekeeper could not complete the Project Memory command.',
+    });
+    expect(classified.message).not.toContain('private');
+    expect(
+      classifyProjectMemoryCommandError(
+        new ProjectMemoryCommandError('NOT_INITIALIZED', 'Initialize this repository first.'),
+      ),
+    ).toEqual({ exitCode: 2, message: 'Initialize this repository first.' });
+    expect(
+      classifyProjectMemoryCommandError(
+        new ProjectMemoryError('INDEX_SOURCE_FAILED', 'The bounded Git index failed.'),
+      ),
+    ).toEqual({ exitCode: 4, message: 'The bounded Git index failed.' });
+    expect(
+      classifyProjectMemoryCommandError(
+        new SqliteProjectStoreError('MIGRATION_FAILED', 'The local migration failed.'),
+      ),
+    ).toEqual({ exitCode: 3, message: 'The local migration failed.' });
+    expect(
+      classifyProjectMemoryCommandError(
+        new SqliteProjectStoreError('INDEX_WRITE_FAILED', 'The index transaction failed.'),
+      ),
+    ).toEqual({ exitCode: 4, message: 'The index transaction failed.' });
+    expect(
+      classifyProjectMemoryCommandError(
+        Object.assign(new Error('private invalid query detail'), { name: 'ZodError' }),
+      ),
+    ).toEqual({ exitCode: 2, message: 'The Project Memory command input is invalid.' });
+  });
+});

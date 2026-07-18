@@ -27,6 +27,7 @@ export interface ReviewWorktreeInput {
   policy: GatekeeperPolicy;
   repositoryId: RepositoryId;
   reviewId: ReviewId;
+  previousReviewId?: ReviewId;
 }
 
 function createMatcher(patterns: readonly string[]): Ignore {
@@ -400,6 +401,7 @@ export function reviewWorktree(input: ReviewWorktreeInput): ReviewRun {
   return {
     schemaVersion: 1,
     reviewId: input.reviewId,
+    ...(input.previousReviewId === undefined ? {} : { previousReviewId: input.previousReviewId }),
     repositoryId: input.repositoryId,
     target: input.changeSet.target,
     verdict,

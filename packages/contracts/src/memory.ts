@@ -48,6 +48,25 @@ export const indexResultSchema = z
   })
   .strict();
 
+export const repositoryStatusSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      schemaVersion: z.literal(1),
+      state: z.literal('not_initialized'),
+      repository: z.null(),
+      indexState: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      schemaVersion: z.literal(1),
+      state: z.literal('ready'),
+      repository: repositoryRecordSchema,
+      indexState: indexStateSchema.nullable(),
+    })
+    .strict(),
+]);
+
 export const memorySearchInputSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -100,9 +119,15 @@ export const memorySearchResponseJsonSchema = {
   ...z.toJSONSchema(memorySearchResponseSchema, { target: 'draft-7' }),
 };
 
+export const repositoryStatusJsonSchema = {
+  $id: 'gatekeeper:repository-status-v1',
+  ...z.toJSONSchema(repositoryStatusSchema, { target: 'draft-7' }),
+};
+
 export type RepositoryRecord = z.infer<typeof repositoryRecordSchema>;
 export type IndexState = z.infer<typeof indexStateSchema>;
 export type IndexResult = z.infer<typeof indexResultSchema>;
+export type RepositoryStatus = z.infer<typeof repositoryStatusSchema>;
 export type MemorySearchInput = z.infer<typeof memorySearchInputSchema>;
 export type MemorySearchResult = z.infer<typeof memorySearchResultSchema>;
 export type MemorySearchResponse = z.infer<typeof memorySearchResponseSchema>;
