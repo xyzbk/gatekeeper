@@ -59,6 +59,20 @@ const indexResult = {
   documents: { scanned: 0, written: 0, unchanged: 0, deleted: 0 },
   commits: { scanned: 1, written: 1, unchanged: 0, deleted: 0 },
 };
+const memoryStatus = {
+  schemaVersion: 1 as const,
+  state: 'ready' as const,
+  repository,
+  indexState: {
+    schemaVersion: 1 as const,
+    repositoryId: repository.repositoryId,
+    head: status.repository.head,
+    indexedAt: metadata.startedAt,
+    files: 1,
+    documents: 0,
+    commits: 1,
+  },
+};
 
 const review = { ...createReviewRunFixture(), repositoryId: repository.repositoryId };
 const draft = {
@@ -91,18 +105,20 @@ describe('Gatekeeper local service client', () => {
           ? status
           : url.pathname === '/v1/repositories'
             ? repository
-            : url.pathname.endsWith('/index')
-              ? indexResult
-              : url.pathname === '/v1/reviews/worktree'
-                ? review
-                : url.pathname.endsWith('/draft')
-                  ? draft
-                  : url.pathname.endsWith('/complete') ||
-                      url.pathname === `/v1/reviews/${review.reviewId}`
-                    ? review
-                    : url.pathname === '/v1/memory/search'
-                      ? memoryResponse
-                      : undefined;
+            : url.pathname.endsWith('/memory/status')
+              ? memoryStatus
+              : url.pathname.endsWith('/index')
+                ? indexResult
+                : url.pathname === '/v1/reviews/worktree'
+                  ? review
+                  : url.pathname.endsWith('/draft')
+                    ? draft
+                    : url.pathname.endsWith('/complete') ||
+                        url.pathname === `/v1/reviews/${review.reviewId}`
+                      ? review
+                      : url.pathname === '/v1/memory/search'
+                        ? memoryResponse
+                        : undefined;
       return Promise.resolve(response === undefined ? json({}, 404) : json(response));
     });
     const client = createGatekeeperClient({
@@ -110,7 +126,11 @@ describe('Gatekeeper local service client', () => {
       loadMetadata: () => Promise.resolve(metadata),
     });
 
-    await expect(client.status()).resolves.toEqual(status);
+    await expect(client.status()).resolves.toEqual({
+      schemaVersion: 1,
+      status,
+      memory: memoryStatus,
+    });
     await expect(client.indexRepository()).resolves.toEqual(indexResult);
     await expect(client.reviewWorktree()).resolves.toEqual(draft);
     await expect(client.searchMemory({ query: 'cache', limit: 5 })).resolves.toEqual(

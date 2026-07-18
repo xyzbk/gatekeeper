@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { memorySearchResponseSchema, statusResponseSchema } from '@gatekeeper/contracts';
+import { gatekeeperMcpStatusSchema, memorySearchResponseSchema } from '@gatekeeper/contracts';
 import { createReviewRunFixture } from '@gatekeeper/testkit';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -32,34 +32,59 @@ const draft = {
 
 function stubClient(): GatekeeperClient {
   return {
-    status: vi.fn(() =>
-      Promise.resolve({
+    status: vi.fn(() => {
+      const repository = {
+        schemaVersion: 1 as const,
+        repositoryId: review.repositoryId,
+        root: 'D:\\work\\gatekeeper',
+        remote: null,
+        createdAt: '2026-07-18T11:00:00.000Z',
+        updatedAt: '2026-07-18T12:00:00.000Z',
+      };
+      return Promise.resolve({
         schemaVersion: 1,
-        service: {
+        status: {
+          schemaVersion: 1,
+          service: {
+            state: 'ready',
+            version: '0.1.0',
+            startedAt: '2026-07-18T12:00:00.000Z',
+            baseUrl: 'http://127.0.0.1:43127',
+          },
+          repository: {
+            root: repository.root,
+            branch: 'master',
+            head: 'b'.repeat(40),
+            dirty: true,
+            remote: null,
+          },
+          tools: {
+            git: { available: true, version: 'git version 2.50.1' },
+            gh: { available: false, version: null },
+          },
+          features: { modelReasoning: 'disabled', projectMemory: 'ready' },
+          paths: {
+            appData: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper',
+            serviceMetadata: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper\\service.json',
+            storage: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper\\storage',
+          },
+        },
+        memory: {
+          schemaVersion: 1,
           state: 'ready',
-          version: '0.1.0',
-          startedAt: '2026-07-18T12:00:00.000Z',
-          baseUrl: 'http://127.0.0.1:43127',
+          repository,
+          indexState: {
+            schemaVersion: 1,
+            repositoryId: repository.repositoryId,
+            head: 'b'.repeat(40),
+            indexedAt: '2026-07-18T12:00:00.000Z',
+            files: 1,
+            documents: 1,
+            commits: 1,
+          },
         },
-        repository: {
-          root: 'D:\\work\\gatekeeper',
-          branch: 'master',
-          head: 'b'.repeat(40),
-          dirty: true,
-          remote: null,
-        },
-        tools: {
-          git: { available: true, version: 'git version 2.50.1' },
-          gh: { available: false, version: null },
-        },
-        features: { modelReasoning: 'disabled', projectMemory: 'ready' },
-        paths: {
-          appData: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper',
-          serviceMetadata: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper\\service.json',
-          storage: 'C:\\Users\\developer\\AppData\\Local\\Gatekeeper\\storage',
-        },
-      }),
-    ),
+      });
+    }),
     indexRepository: vi.fn(() =>
       Promise.resolve({
         schemaVersion: 1,
@@ -165,9 +190,11 @@ describe('Gatekeeper MCP server', () => {
     await server.close();
 
     expect(status.isError).not.toBe(true);
-    expect(statusResponseSchema.parse(status.structuredContent).service.state).toBe('ready');
+    expect(gatekeeperMcpStatusSchema.parse(status.structuredContent).memory.indexState?.head).toBe(
+      'b'.repeat(40),
+    );
     expect(status.content).toEqual([
-      { type: 'text', text: 'Gatekeeper ready on master; Project Memory ready.' },
+      { type: 'text', text: 'Gatekeeper ready on master; Project Memory current.' },
     ]);
     expect(reviewResult.structuredContent).toEqual(draft);
     expect(memorySearchResponseSchema.parse(search.structuredContent).results[0]?.trust).toBe(
@@ -220,6 +247,8 @@ describe('Gatekeeper MCP server', () => {
       command: process.execPath,
       args: [
         fileURLToPath(new URL('../../../node_modules/tsx/dist/cli.mjs', import.meta.url)),
+        '--tsconfig',
+        fileURLToPath(new URL('../../../tsconfig.base.json', import.meta.url)),
         fileURLToPath(new URL('./index.ts', import.meta.url)),
       ],
       cwd: process.cwd(),

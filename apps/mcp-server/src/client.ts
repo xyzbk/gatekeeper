@@ -2,19 +2,21 @@ import { readFile } from 'node:fs/promises';
 
 import { resolveServicePaths } from '@gatekeeper/config';
 import {
+  gatekeeperMcpStatusSchema,
   indexResultSchema,
   memorySearchResponseSchema,
   repositoryRecordSchema,
+  repositoryStatusSchema,
   reviewDraftSchema,
   reviewRunSchema,
   serviceMetadataSchema,
   statusResponseSchema,
+  type GatekeeperMcpStatus,
   type IndexResult,
   type MemorySearchResponse,
   type ReviewCompletionFinding,
   type ReviewDraftContract,
   type ReviewRunContract,
-  type StatusResponse,
 } from '@gatekeeper/contracts';
 import type { z } from 'zod';
 
@@ -40,7 +42,7 @@ export interface SearchMemoryRequest {
 }
 
 export interface GatekeeperClient {
-  status: () => Promise<StatusResponse>;
+  status: () => Promise<GatekeeperMcpStatus>;
   indexRepository: () => Promise<IndexResult>;
   reviewWorktree: () => Promise<ReviewDraftContract>;
   searchMemory: (input: SearchMemoryRequest) => Promise<MemorySearchResponse>;
@@ -129,7 +131,15 @@ export function createGatekeeperClient(options: GatekeeperClientOptions = {}): G
   }
 
   return {
-    status: () => request('/v1/status', statusResponseSchema),
+    status: async () => {
+      const status = await request('/v1/status', statusResponseSchema);
+      const selected = await repository();
+      const memory = await request(
+        `/v1/repositories/${encodeURIComponent(selected.repositoryId)}/memory/status`,
+        repositoryStatusSchema,
+      );
+      return gatekeeperMcpStatusSchema.parse({ schemaVersion: 1, status, memory });
+    },
     indexRepository: async () => {
       const selected = await repository();
       return request(

@@ -56,9 +56,21 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Search is repository-scoped, exact-first, FTS-tokenized, parameterized, capped, and labelled `untrusted_repository_content`.
 - Corrupt persisted review JSON fails closed. Restart tests prove durable reads without widening repository selection.
 
+## Phase 4 MCP and Codex controls
+
+- Trusted-project MCP configuration contains only a local Node command, relative build path, working directory, and bounded timeouts; it contains no token or model credential.
+- The stdio server registers exactly six fixed-repository tools. It exposes no arbitrary path, file-read, subprocess, GitHub, pull-request, or publication capability.
+- Protocol stdout is JSON-RPC only. Startup stderr and tool failures are bounded and exclude exception text, service metadata, response bodies, source, diffs, and tokens.
+- The client validates `service.json`, accepts only its strict loopback URL and high-entropy bearer shape, applies a 30-second request timeout, and validates every API response again.
+- `gatekeeper_status` reads the current and indexed HEAD so Codex can avoid unnecessary index writes.
+- ReviewDraft evidence is repository-owned, deduplicated, capped, and untrusted. Instruction-like repository text creates a deterministic content-security finding but never changes the workflow or tool set.
+- Completion accepts only `EVIDENCE_SUPPORTED` and `INFERENCE`; unknown fields, duplicate IDs, deterministic authority, enforcement, policy identity, submitted verdicts, forged/cross-repository pointers, and unchanged affected paths are rejected.
+- Deterministic findings remain immutable and Gatekeeper recomputes the verdict. Model inference cannot create `BLOCK`.
+- The Gatekeeper skill requires consent before first setup/indexing and model reasoning when the current request has not already authorized the action. It never remediates or changes files without a separate explicit request.
+
 ## Deferred boundaries
 
-MCP protocol isolation, the Codex skill, and the read-only `gh` adapter are required in their scheduled phases. They are not placeholder implementations.
+The read-only `gh` adapter, remote synchronization, and pull-request review are required in Phase 5. They are not placeholder implementations.
 
 ## Logging
 

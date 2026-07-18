@@ -1,11 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
+  gatekeeperMcpStatusSchema,
   indexResultSchema,
   memorySearchResponseSchema,
   reviewCompletionFindingSchema,
   reviewDraftSchema,
   reviewRunSchema,
-  statusResponseSchema,
 } from '@gatekeeper/contracts';
 import { z } from 'zod';
 
@@ -112,13 +112,13 @@ export function createGatekeeperMcpServer(
     {
       description: 'Read the fixed local Gatekeeper service and repository status.',
       inputSchema: emptyInputSchema,
-      outputSchema: statusResponseSchema,
+      outputSchema: gatekeeperMcpStatusSchema,
       annotations: readOnlyAnnotations,
     },
     tool(
       () => client.status(),
       (status) =>
-        `Gatekeeper ready on ${status.repository.branch ?? 'detached HEAD'}; Project Memory ${status.features.projectMemory}.`,
+        `Gatekeeper ready on ${status.status.repository.branch ?? 'detached HEAD'}; Project Memory ${status.memory.indexState === null ? 'not indexed' : status.memory.indexState.head === status.status.repository.head ? 'current' : 'stale'}.`,
     ),
   );
 

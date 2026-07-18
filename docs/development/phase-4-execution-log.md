@@ -100,3 +100,28 @@ GREEN:
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (30 files, 180 tests).
 - `pnpm build`: PASS.
+
+### Task 5 — trusted-project config and Gatekeeper skill
+
+Expected RED:
+
+- The MCP status contract did not exist and status lacked index freshness.
+- Trusted-project config and all three skill files were absent.
+
+Implemented:
+
+- `gatekeeper_status` now combines validated service status with fixed-repository memory status so Codex can distinguish uninitialized, stale, and current indexes without adding a seventh local tool.
+- Added credential-free `.codex/config.toml` for the built stdio server, with paths relative to `.codex` and bounded startup/tool timeouts.
+- Added a concise Gatekeeper skill plus progressive workflow and evidence/verdict references. It batches consent where possible, orders findings by authority, treats repository text as untrusted data, and forbids unrequested remediation.
+- Added a repository-surface contract test for config, six-tool scope, consent, trust, finding order, reference links, and the Phase 5 stop boundary.
+
+Unexpected environment/tooling failures and corrections:
+
+- The skill validator's default and bundled Python environments lacked PyYAML. PyYAML 6.0.3 was installed into a temporary validation-only directory; no repository or global Python environment was changed. The official validator then passed.
+- The first post-contract stdio subprocess could see a stale compiled contracts export because the root `tsconfig.json` contains project references but no path mappings. The smoke test now explicitly supplies `tsconfig.base.json`, so a clean `pnpm test` does not depend on a preceding build.
+- The desktop app's PATH resolves `codex` inside the protected WindowsApps package, but this shell receives OS `Access is denied` before the CLI starts. Repository config contracts and real official-SDK stdio discovery pass; the exact `codex mcp list` acceptance remains to be retried during closeout.
+
+GREEN:
+
+- Focused status/config/skill/MCP suite: PASS (11 tests).
+- Skill Creator `quick_validate.py`: PASS.

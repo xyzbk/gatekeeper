@@ -2,7 +2,7 @@
 
 Gatekeeper is a local-first, evidence-first repository governance agent. Codex remains the reasoning surface; Gatekeeper owns bounded evidence retrieval and deterministic enforcement.
 
-## Current Phase 3 runtime
+## Current Phase 4 runtime
 
 ```text
 bounded Git metadata/docs ─> Project Memory index ─> SQLite + FTS5 ─> memory search
@@ -15,11 +15,14 @@ HTTP review ┘                                                 │       │
                                     CLI text/JSON <─ local API ─> React dashboard
 ```
 
+The Phase 4 Codex path is `Codex skill -> six stdio MCP tools -> fixed loopback API -> review engine / Project Memory -> persisted ReviewRun`. The MCP process never bypasses the API to reach Git, SQLite, or repository files.
+
 The current dependency direction is:
 
 ```text
 apps/cli -> packages/config + packages/git-adapter + packages/project-memory + packages/review-engine + packages/store-sqlite + apps/server
-apps/server -> packages/config + packages/contracts + packages/project-memory + packages/store-sqlite
+apps/server -> packages/config + packages/contracts + packages/project-memory + packages/review-engine + packages/store-sqlite
+apps/mcp-server -> packages/config + packages/contracts + official MCP SDK
 apps/dashboard -> packages/contracts
 packages/project-memory -> packages/contracts + inward-facing Git/persistence interfaces
 packages/store-sqlite -> packages/contracts + better-sqlite3 + Drizzle
@@ -41,6 +44,8 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 `apps/dashboard` remains a small browser adapter. React Router provides Overview, `/reviews/worktree`, `/reviews/:reviewId`, and `/memory`; TanStack Query owns request state. A shared closure reads bootstrap once and holds the bearer token only in memory. Repository excerpts render only as bounded plain text with explicit source, match, date, and trust metadata.
 
+`apps/mcp-server` is a stdio-only presentation adapter. It reads validated ephemeral service metadata, calls only the recorded loopback origin with native fetch, and exposes six strict local tools. The repository skill owns the Codex workflow; the MCP adapter owns no review, evidence, persistence, or verdict behavior. Review preparation and completion remain in `review-engine`, and the foreground service remains the composition/persistence owner.
+
 `gatekeeper start [path]` composes the same review and Project Memory services used by direct CLI commands. It does not open a browser, daemonize, mutate the repository, make a network request, or call a model.
 
 ## Runtime constraints
@@ -50,6 +55,6 @@ The `domain` package owns public entities and the rule that only a hard determin
 - Tests are deterministic and offline.
 - Packages are created only in the phase that needs working behavior.
 
-## Phase 3 boundary
+## Phase 4 boundary
 
-Phase 3 is complete with durable SQLite Project Memory and local evidence retrieval. There is no MCP server, Codex skill, GitHub synchronization, pull-request review, embedding, background worker, or model reasoning. Those packages and adapters are not created early.
+Phase 4 adds native Codex discovery, six local MCP tools, bounded Project Memory evidence, and strict model-authored review completion. There is no GitHub synchronization, pull-request review, publication, embedding, second model provider, background worker, or generic plugin system. Those remain behind later phase gates.
