@@ -36,14 +36,19 @@ export function AppShell({ children }: AppShellProps) {
             >
               Reviews
             </NavLink>
-            <span aria-disabled="true" className={styles.navUnavailable}>
+            <NavLink
+              aria-label="Project Memory"
+              className={({ isActive }) =>
+                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+              }
+              to="/memory"
+            >
               Memory
-              <span>Unavailable</span>
-            </span>
+            </NavLink>
           </nav>
           <div className={styles.sidebarFooter}>
             <span>Local workspace</span>
-            <span>Deterministic review</span>
+            <span>Durable project memory</span>
           </div>
         </aside>
         <div className={styles.workspace}>

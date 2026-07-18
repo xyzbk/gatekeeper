@@ -520,6 +520,12 @@ describe('Gatekeeper local service', () => {
       url: '/reviews/worktree',
       headers: { host },
     });
+    const memory = await server.inject({ method: 'GET', url: '/memory', headers: { host } });
+    const storedReview = await server.inject({
+      method: 'GET',
+      url: '/reviews/review_api_test',
+      headers: { host },
+    });
     await server.close();
 
     expect(bootstrap.statusCode).toBe(200);
@@ -529,6 +535,10 @@ describe('Gatekeeper local service', () => {
     expect(dashboard.body).toContain('<title>Gatekeeper</title>');
     expect(reviewInspector.statusCode).toBe(200);
     expect(reviewInspector.body).toContain('<title>Gatekeeper</title>');
+    expect(memory.statusCode).toBe(200);
+    expect(memory.body).toContain('<title>Gatekeeper</title>');
+    expect(storedReview.statusCode).toBe(200);
+    expect(storedReview.body).toContain('<title>Gatekeeper</title>');
   });
 
   it('registers JSON Schemas generated from shared contracts', async () => {

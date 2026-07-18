@@ -89,4 +89,24 @@ describe('review client', () => {
       'Gatekeeper review returned invalid JSON.',
     );
   });
+
+  it('reads a persisted review and distinguishes not found from unavailable', async () => {
+    const { createReviewClient, ReviewClientError } = await import('./review-client.js');
+    const foundFetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(review));
+    const missingFetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({}, 404));
+    const loadBootstrap = () => Promise.resolve(bootstrap);
+
+    await expect(
+      createReviewClient(foundFetcher, loadBootstrap).getReview(review.reviewId),
+    ).resolves.toEqual(review);
+    expect(foundFetcher).toHaveBeenCalledWith(`/v1/reviews/${review.reviewId}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Authorization: `Bearer ${bearerToken}` },
+      method: 'GET',
+    });
+    await expect(
+      createReviewClient(missingFetcher, loadBootstrap).getReview('review_missing'),
+    ).rejects.toEqual(new ReviewClientError('NOT_FOUND', 'Stored review not found.'));
+  });
 });

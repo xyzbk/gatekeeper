@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import type { ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
+import type { MemorySearchResult, ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -85,10 +85,28 @@ const review: ReviewRunContract = {
   createdAt: '2026-07-18T12:00:00.000Z',
 };
 
+const memoryResult: MemorySearchResult = {
+  documentId: 'document_dashboard_test',
+  match: 'fts',
+  trust: 'untrusted_repository_content',
+  status: 'active',
+  occurredAt: '2026-07-17T09:00:00.000Z',
+  evidence: {
+    sourceType: 'adr',
+    repositoryId: review.repositoryId,
+    sourceId: 'docs/adr/0003-no-required-redis.md',
+    path: 'docs/adr/0003-no-required-redis.md',
+    excerpt: 'Redis is not required for the local cache.',
+  },
+};
+
 async function renderDashboard(
   loadStatus: () => Promise<StatusResponse>,
   initialEntry = '/',
   reviewWorktree: () => Promise<ReviewRunContract> = () => Promise.resolve(review),
+  searchMemory: (query: string) => Promise<MemorySearchResult[]> = () =>
+    Promise.resolve([memoryResult]),
+  getReview: (reviewId: string) => Promise<ReviewRunContract> = () => Promise.resolve(review),
 ) {
   const { DashboardApp } = await import('./dashboard-app.js');
   const queryClient = new QueryClient({
@@ -98,7 +116,12 @@ async function renderDashboard(
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <DashboardApp loadStatus={loadStatus} reviewWorktree={reviewWorktree} />
+        <DashboardApp
+          getReview={getReview}
+          loadStatus={loadStatus}
+          reviewWorktree={reviewWorktree}
+          searchMemory={searchMemory}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -175,6 +198,140 @@ describe('dashboard application shell', () => {
   });
 });
 
+describe('Project Memory search', () => {
+  it('starts with a native search form and does not query on navigation', async () => {
+    const searchMemory = vi.fn(() => Promise.resolve([memoryResult]));
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/memory',
+      () => Promise.resolve(review),
+      searchMemory,
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Search project memory' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: 'Evidence query' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Search memory' })).toBeEnabled();
+    expect(searchMemory).not.toHaveBeenCalled();
+  });
+
+  it('renders bounded evidence metadata and trust as text', async () => {
+    const user = userEvent.setup();
+    const searchMemory = vi.fn(() => Promise.resolve([memoryResult]));
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/memory',
+      () => Promise.resolve(review),
+      searchMemory,
+    );
+
+    await user.type(screen.getByRole('searchbox', { name: 'Evidence query' }), 'redis cache');
+    await user.click(screen.getByRole('button', { name: 'Search memory' }));
+
+    expect(await screen.findByText(memoryResult.evidence.excerpt ?? '')).toBeVisible();
+    expect(screen.getByText('Source: adr')).toBeVisible();
+    expect(screen.getByText('Match: fts')).toBeVisible();
+    expect(screen.getByText('Trust: untrusted repository content')).toBeVisible();
+    expect(screen.getByText(memoryResult.evidence.path ?? '')).toBeVisible();
+    expect(screen.getByText('Occurred: Jul 17, 2026, 9:00 AM UTC')).toBeVisible();
+    expect(searchMemory).toHaveBeenCalledWith('redis cache');
+  });
+
+  it('renders a useful empty state', async () => {
+    const user = userEvent.setup();
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/memory',
+      () => Promise.resolve(review),
+      () => Promise.resolve([]),
+    );
+
+    await user.type(screen.getByRole('searchbox', { name: 'Evidence query' }), 'missing decision');
+    await user.click(screen.getByRole('button', { name: 'Search memory' }));
+
+    expect(
+      await screen.findByText('No indexed evidence matched “missing decision”.'),
+    ).toBeVisible();
+    expect(screen.getByText('Try a path, decision phrase, or commit topic.')).toBeVisible();
+  });
+
+  it('shows pending and safe retryable error states', async () => {
+    const searchMemory = vi
+      .fn<(query: string) => Promise<MemorySearchResult[]>>()
+      .mockRejectedValueOnce(new Error('private indexed content'))
+      .mockResolvedValue([memoryResult]);
+    const user = userEvent.setup();
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/memory',
+      () => Promise.resolve(review),
+      searchMemory,
+    );
+
+    await user.type(screen.getByRole('searchbox', { name: 'Evidence query' }), 'redis cache');
+    await user.click(screen.getByRole('button', { name: 'Search memory' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Project Memory search did not complete.',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private indexed content');
+    await user.click(screen.getByRole('button', { name: 'Retry search' }));
+    expect(await screen.findByText(memoryResult.evidence.excerpt ?? '')).toBeVisible();
+    expect(searchMemory).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('persisted review detail', () => {
+  it('loads and renders a stored review by route ID', async () => {
+    const getReview = vi.fn(() => Promise.resolve(review));
+    await renderDashboard(
+      () => Promise.resolve(status),
+      `/reviews/${review.reviewId}`,
+      () => Promise.resolve(review),
+      () => Promise.resolve([]),
+      getReview,
+    );
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'REQUIRE_CHANGES' })).toBeVisible();
+    expect(screen.getByText(`Review ID: ${review.reviewId}`)).toBeVisible();
+    expect(screen.getByText('Stored review')).toBeVisible();
+    expect(getReview).toHaveBeenCalledWith(review.reviewId, expect.any(AbortSignal));
+  });
+
+  it('renders not-found and retryable failure states without leaking details', async () => {
+    const { ReviewClientError } = await import('../api/review-client.js');
+    const missing = vi.fn(() =>
+      Promise.reject(new ReviewClientError('NOT_FOUND', 'Stored review not found.')),
+    );
+    await renderDashboard(
+      () => Promise.resolve(status),
+      '/reviews/review_missing',
+      () => Promise.resolve(review),
+      () => Promise.resolve([]),
+      missing,
+    );
+    expect(await screen.findByRole('heading', { name: 'Review not found' })).toBeVisible();
+
+    cleanup();
+    const unavailable = vi
+      .fn<(reviewId: string) => Promise<ReviewRunContract>>()
+      .mockRejectedValueOnce(new Error('private database detail'))
+      .mockResolvedValue(review);
+    const user = userEvent.setup();
+    await renderDashboard(
+      () => Promise.resolve(status),
+      `/reviews/${review.reviewId}`,
+      () => Promise.resolve(review),
+      () => Promise.resolve([]),
+      unavailable,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Stored review could not be loaded.',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private database detail');
+    await user.click(screen.getByRole('button', { name: 'Retry stored review' }));
+    expect(await screen.findByRole('heading', { name: 'REQUIRE_CHANGES' })).toBeVisible();
+  });
+});
+
 describe('worktree Review Inspector', () => {
   it('starts in a ready-to-run state without reviewing on navigation', async () => {
     const reviewWorktree = vi.fn(() => Promise.resolve(review));
@@ -229,6 +386,10 @@ describe('worktree Review Inspector', () => {
     await user.click(screen.getByRole('button', { name: 'Run worktree review' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'REQUIRE_CHANGES' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open stored review' })).toHaveAttribute(
+      'href',
+      `/reviews/${review.reviewId}`,
+    );
     expect(screen.getByText('Authority: DETERMINISTIC')).toBeVisible();
     expect(screen.getByText('Severity: medium')).toBeVisible();
     expect(screen.getByText('Add a matching test change.')).toBeVisible();

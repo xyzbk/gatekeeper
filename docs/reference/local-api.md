@@ -142,7 +142,14 @@ Reads one persisted strict ReviewRun v1. Missing review IDs return `NOT_FOUND`. 
 
 ## Dashboard routes
 
-`GET /` serves the repository overview. `GET /reviews/worktree` serves the same built React application so the Review Inspector can be opened or refreshed directly. Phase 3 adds dedicated memory and persisted-review routes in the dashboard step; the APIs above are already durable.
+The built React application supports direct entry and refresh for these fixed local routes:
+
+- `GET /` — repository overview;
+- `GET /reviews/worktree` — interactive worktree review;
+- `GET /reviews/:reviewId` — one persisted review selected by its validated ID;
+- `GET /memory` — Project Memory search for the repository fixed at service startup.
+
+The browser sends the in-memory bootstrap bearer token to the matching fixed-repository APIs. It never accepts a repository path, renders repository content as HTML, or stores the token in persistent browser storage.
 
 ## Errors
 

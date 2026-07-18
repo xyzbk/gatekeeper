@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import type { ReviewRunContract } from '@gatekeeper/contracts';
 import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router';
 
 import type { ReviewClient } from '../api/review-client.js';
 import styles from '../styles/dashboard.module.css';
@@ -35,7 +37,7 @@ function ReadyState({ run }: { run: () => void }) {
         <h1>Review current worktree</h1>
         <p>
           Evaluate staged, unstaged, and untracked changes against repository policy. The review is
-          local, deterministic, and ephemeral.
+          local, deterministic, and persisted in Project Memory.
         </p>
       </header>
       <div className={styles.reviewScope}>
@@ -224,18 +226,25 @@ function verdictClassName(verdict: ReviewRunContract['verdict']) {
   }
 }
 
-function CompletedState({ review, runAgain }: { review: ReviewRunContract; runAgain: () => void }) {
+export function ReviewResult({
+  action,
+  context = 'Review complete',
+  review,
+}: {
+  action?: ReactNode;
+  context?: string;
+  review: ReviewRunContract;
+}) {
   return (
     <div aria-live="polite" className={styles.reviewResult}>
       <header className={styles.reviewResultHeader}>
         <div>
-          <p className={styles.contextLabel}>Review complete</p>
+          <p className={styles.contextLabel}>{context}</p>
           <h1 className={verdictClassName(review.verdict)}>{review.verdict}</h1>
-          <p>{review.summary}</p>
+          <p className={styles.reviewSummary}>{review.summary}</p>
+          <p className={styles.reviewIdentity}>Review ID: {review.reviewId}</p>
         </div>
-        <ReviewButton onClick={runAgain} secondary>
-          Run again
-        </ReviewButton>
+        {action}
       </header>
       <ReviewMetrics review={review} />
       <FindingList review={review} />
@@ -258,7 +267,24 @@ export function ReviewRoute({
     return <ReviewErrorState retry={() => reviewMutation.mutate()} />;
   }
   if (reviewMutation.isSuccess) {
-    return <CompletedState review={reviewMutation.data} runAgain={() => reviewMutation.mutate()} />;
+    return (
+      <ReviewResult
+        action={
+          <div className={styles.reviewActions}>
+            <Link
+              className={styles.secondaryButton}
+              to={`/reviews/${reviewMutation.data.reviewId}`}
+            >
+              Open stored review
+            </Link>
+            <ReviewButton onClick={() => reviewMutation.mutate()} secondary>
+              Run again
+            </ReviewButton>
+          </div>
+        }
+        review={reviewMutation.data}
+      />
+    );
   }
   return <ReadyState run={() => reviewMutation.mutate()} />;
 }

@@ -46,8 +46,8 @@ The requested feature branch is `codex/phase-3-project-memory`.
 | 2. Bounded Git indexing sources       | complete | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
 | 3. Incremental indexing and retrieval | complete | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
 | 4. Doctor, CLI, and fixture           | complete | f07210a   | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
-| 5. Persistent local API               | complete | this step | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
-| 6. Dashboard memory and review routes | pending  | —         | —                                    | —                         |
+| 5. Persistent local API               | complete | 762a514   | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
+| 6. Dashboard memory and review routes | complete | this step | Root gates: 27 files, 153 tests PASS | See Task 6 evidence below |
 | 7. Aggressive acceptance and docs     | pending  | —         | —                                    | —                         |
 
 ## Task 1 evidence
@@ -242,6 +242,47 @@ pnpm test                                  PASS — 26 files, 144 tests
 pnpm build                                 PASS
 pnpm format:check                          PASS
 pnpm audit --audit-level high              PASS — no known vulnerabilities
+```
+
+## Task 6 evidence
+
+Expected RED:
+
+- Project Memory had no dashboard API client or route, persisted reviews had no read client or route, and the static service returned 404 for both direct-entry paths.
+- The first route-state tests failed across initial, pending, error, empty, result, not-found, and persisted-review rendering states before those components existed.
+
+Corrections and learning:
+
+- The first date formatter combined `dateStyle` and `timeStyle` with `timeZoneName`, which the test runtime correctly rejects. Explicit year, month, day, hour, minute, and time-zone options produce the same readable UTC timestamp without relying on an invalid option combination.
+- The first live visual pass exposed stale Phase 2 copy describing completed reviews as ephemeral and made reopening a saved run unnecessarily indirect. The completed state now says that the review is persisted in Project Memory, shows its stable ID, and links directly to the stored-review route.
+- Rebuilding dashboard assets while the already-running Fastify process retained its explicit static asset registrations produced a blank reload. Restarting the local service loaded the new immutable asset filenames; this is expected for the foreground build/start workflow and required no runtime watcher or speculative asset fallback.
+- Impeccable's product register had no saved product context, so the existing Phase 1/2 Gatekeeper visual system remained authoritative. The implementation preserves its IBM Plex Sans typography, graphite palette, restrained separators, explicit state hierarchy, and no-gradient/no-chat/no-motion rules.
+
+Behavior proven:
+
+- Project Memory search uses one bounded mutation, validates every response, renders repository excerpts as plain text, and exposes source, exact-or-FTS match, trust label, occurrence time, and optional path without interpreting content.
+- The memory view has distinct initial, pending, retryable-error, empty, and result states; the persisted-review view has pending, retryable-error, not-found, and strict ReviewRun states.
+- Review completion exposes the persisted review ID and a direct reopen action. Refreshing `/reviews/:reviewId` is served by Fastify and reads the same run through the authenticated durable API.
+- Live compiled-service inspection at 1440×900 and 375-pixel widths exercised index-backed Redis search and the complete review-to-reopen flow with no page-wide horizontal overflow.
+
+Focused result:
+
+```text
+Dashboard route/client suites             PASS — 4 files, 33 tests
+Server static-entry/API suites            PASS
+Dashboard production build                PASS
+```
+
+Task gate:
+
+```text
+pnpm install --frozen-lockfile  PASS
+pnpm lint                       PASS
+pnpm typecheck                  PASS
+pnpm test                       PASS — 27 files, 153 tests
+pnpm build                      PASS
+pnpm format:check               PASS
+pnpm audit --audit-level high   PASS — no known vulnerabilities
 ```
 
 ## Scope boundary
