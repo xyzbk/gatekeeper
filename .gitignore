@@ -6,6 +6,9 @@ coverage/
 !.env.example
 .gatekeeper/
 .worktrees/
-demo/fixtures/
+demo/fixtures/*
+!demo/fixtures/github/
+demo/fixtures/github/*
+!demo/fixtures/github/ghost-change.json
 *.log
 *.tsbuildinfo

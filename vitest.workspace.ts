@@ -11,6 +11,7 @@ export default defineConfig({
       '@gatekeeper/contracts': fromRoot('./packages/contracts/src/index.ts'),
       '@gatekeeper/domain': fromRoot('./packages/domain/src/index.ts'),
       '@gatekeeper/git-adapter': fromRoot('./packages/git-adapter/src/index.ts'),
+      '@gatekeeper/github-gh': fromRoot('./packages/github-gh/src/index.ts'),
       '@gatekeeper/project-memory': fromRoot('./packages/project-memory/src/index.ts'),
       '@gatekeeper/review-engine': fromRoot('./packages/review-engine/src/index.ts'),
       '@gatekeeper/store-sqlite': fromRoot('./packages/store-sqlite/src/index.ts'),
@@ -21,6 +22,11 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.{ts,tsx}'],
+    include: [
+      'packages/*/src/**/*.test.ts',
+      'apps/*/src/**/*.test.{ts,tsx}',
+      'demo/*.test.ts',
+      'demo/scripts/**/*.test.ts',
+    ],
   },
 });

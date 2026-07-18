@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "ghost-change",
+      "description": "A passing pull request revives a required Redis dependency after the original rollout regressed and was reverted.",
+      "fixture": "fixtures/github/ghost-change.json",
+      "markerPrefix": "gatekeeper-demo:ghost-change:",
+      "pullRequestNumber": 12,
+      "expectedVerdict": "ESCALATE",
+      "evidenceOrder": [
+        "pull_request:#12",
+        "issue:#4",
+        "pull_request:#8",
+        "issue:#9",
+        "pull_request:#10",
+        "docs/adr/0003-no-required-redis.md"
+      ]
+    }
+  ]
+}

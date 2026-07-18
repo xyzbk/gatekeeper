@@ -22,6 +22,7 @@
       "@gatekeeper/contracts": ["./packages/contracts/src/index.ts"],
       "@gatekeeper/domain": ["./packages/domain/src/index.ts"],
       "@gatekeeper/git-adapter": ["./packages/git-adapter/src/index.ts"],
+      "@gatekeeper/github-gh": ["./packages/github-gh/src/index.ts"],
       "@gatekeeper/project-memory": ["./packages/project-memory/src/index.ts"],
       "@gatekeeper/review-engine": ["./packages/review-engine/src/index.ts"],
       "@gatekeeper/store-sqlite": ["./packages/store-sqlite/src/index.ts"],
