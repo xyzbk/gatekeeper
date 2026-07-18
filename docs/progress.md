@@ -326,3 +326,59 @@ Phase 4 may begin only after an explicit user request. It may create the stdio M
 ## Phase 3 scope boundary audit at completion
 
 No MCP server, Codex skill, GitHub network call, pull-request review, embedding, model-generated finding, background worker, publication path, or generic plugin system exists. Phase 3 stops at durable local Project Memory and evidence retrieval.
+
+## Phase 4 — Native Codex workflow through skill and MCP
+
+Status: complete on 2026-07-18.
+
+### Implemented
+
+- Corrected the phase contract so Phase 4 owns six fully local tools and Phase 5 adds `gatekeeper_review_pull_request` only after a real GitHub-backed review path exists.
+- Added strict ReviewDraft and completion contracts. Codex can author only `EVIDENCE_SUPPORTED` or `INFERENCE` findings and cannot submit a verdict, deterministic authority, enforcement, or policy identity.
+- Added bounded review preparation, Project Memory evidence retrieval, deterministic prompt-injection detection, exact evidence/path validation, immutable deterministic findings, Gatekeeper-owned verdict assembly, and accurate mixed-authority summaries.
+- Added authenticated draft and completion endpoints to the existing foreground service. Completed runs replace the same local review atomically and survive restart through the existing dashboard/read path.
+- Added `apps/mcp-server` with pinned official MCP SDK v1.29.0, stdio only, protocol-clean stdout, validated machine-local service metadata, native fetch, bounded timeouts, and strict response validation.
+- Exposed exactly six tools: `gatekeeper_status`, `gatekeeper_index_repository`, `gatekeeper_review_worktree`, `gatekeeper_search_memory`, `gatekeeper_complete_review`, and `gatekeeper_get_review`.
+- Added trusted-project `.codex/config.toml` and the `.agents/skills/gatekeeper` skill with consent, trust, evidence, verdict, and no-unrequested-remediation rules.
+- `gatekeeper_status` now returns current and indexed HEAD state so the skill can distinguish uninitialized, stale, and current memory without a speculative seventh tool.
+
+### Aggressive findings and corrections
+
+- The original Phase 4 wording contradicted its stop gate by requiring a pull-request tool before Phase 5. The plan now prevents a placeholder implementation.
+- Model-authored verdicts, deterministic authority, enforcement, policy identity, duplicate IDs, forged/cross-repository pointers, and unchanged affected paths are rejected.
+- Instruction-like evidence split across lines is still detected, remains inert data, and creates a deterministic content-security escalation.
+- MCP status rejects a response assembled across two different fixed repositories during a service-restart race.
+- Malformed service metadata never reaches fetch; missing service, invalid response, and timeout errors are bounded and contain an exact repair command.
+- Identical review completion replay is stable. Restart tests prove the completed ReviewRun remains durable.
+- A real built service and built stdio MCP process completed all six tool calls, persisted a `FAST_PATH` review, and loaded the identical record.
+- Ponytail's phase-diff review found no removable dependency, provider abstraction, transport layer, tool registry, worker, retry framework, or Phase 5 placeholder. The one new external runtime dependency is the required official MCP SDK.
+
+### Verification
+
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm audit --audit-level high`: PASS; no known vulnerabilities.
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (32 files, 183 tests), including shuffled order.
+- `pnpm build`: PASS.
+- Official MCP SDK in-memory discovery and real stdio discovery: PASS; exact six-tool set.
+- Skill Creator `quick_validate.py`: PASS.
+- Official Codex CLI 0.144.6 `mcp list`: PASS; `gatekeeper` is enabled with the configured command, argument, and working directory.
+
+The desktop application's protected WindowsApps `codex.exe` cannot be launched from this PowerShell host (`Access is denied`), so CLI acceptance used the same official package through temporary `npx` execution. No project dependency or global install was added.
+
+### Traceability
+
+- `b2b931e` — align Phase 4 and Phase 5 MCP scope;
+- `9ff5bf8` — enforce Codex completion boundaries;
+- `c74094c` — persist strict Codex review completion;
+- `dacaf2f` — expose six local Gatekeeper tools;
+- `e7b9141` — add trusted Gatekeeper workflow.
+
+Expected RED states, unexpected failures, corrections, live acceptance, and environment limitations are retained in `docs/development/phase-4-execution-log.md`.
+
+### Deliberate limitations and exact next-phase entry condition
+
+- The MCP surface is local worktree only; there is no GitHub synchronization, pull-request target, remote publication, second provider, embedding, background job, arbitrary file/process access, or generic plugin system.
+- Prompt-injection detection is a bounded deterministic warning layer, not a claim to recognize every possible adversarial encoding. The primary control remains treating all repository content as untrusted data.
+- Phase 5 may begin only after an explicit user request. It may add the read-only `gh` adapter, bounded incremental GitHub history, the Ghost Change fixture, pull-request CLI/API/dashboard review, and `gatekeeper_review_pull_request` as the seventh tool. It must not publish to GitHub or start Phase 6 dashboard work early.

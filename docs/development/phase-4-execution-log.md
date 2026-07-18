@@ -125,3 +125,51 @@ GREEN:
 
 - Focused status/config/skill/MCP suite: PASS (11 tests).
 - Skill Creator `quick_validate.py`: PASS.
+
+### Task 6 — aggressive integrated closeout
+
+New RED and hardening:
+
+- A cross-service MCP status fixture initially parsed even though HTTP status and memory identified different repository roots. The shared MCP status contract now fails closed unless both represent the same fixed repository.
+- A prompt-injection phrase split between “previous” and “instructions” by a newline initially escaped the bounded detector. The same bounded expression now uses dot-all matching; the multiline regression produces the deterministic content-security escalation.
+
+Aggressive probes:
+
+- Malformed loopback metadata is rejected before fetch.
+- Missing service returns the exact foreground start command through the built stdio tool.
+- Invalid response schemas, bounded timeouts, hostile tool-name instructions, duplicate/colliding findings, cross-repository and forged evidence, unchanged paths, oversized excerpts, corrupt persistence, and interrupted calls are covered by focused and inherited regression suites.
+- Identical valid completion replay returns the same ReviewRun and persistence survives a complete foreground-service restart.
+- Three shuffled focused runs and one shuffled full run passed.
+- `pnpm audit --audit-level high` reported no known vulnerabilities.
+
+Live built workflow:
+
+1. Started `gatekeeper start .` on loopback.
+2. Connected the official MCP client to `node apps/mcp-server/dist/index.js` over stdio.
+3. Listed exactly six Phase 4 tools.
+4. Called status, incremental index, worktree review, memory search, completion, and stored-review read successfully.
+5. Persisted review `review_faac582c5f314012b6aafe2a2a5773ba` with `FAST_PATH`; immediate read was byte-for-byte equivalent at the structured-content boundary.
+6. Closed the MCP client and foreground service; ephemeral service metadata was removed.
+
+Acceptance/tooling corrections:
+
+- The first inline Node acceptance command lost JavaScript quotes at the PowerShell native-command boundary. Streaming the script through stdin preserved it without creating a file.
+- The root package intentionally does not depend on the MCP SDK, so the inline acceptance client imported the MCP app's declared package path rather than weakening pnpm dependency boundaries.
+- Direct `codex mcp list` remained blocked by WindowsApps ACLs. Temporary execution of official `@openai/codex` 0.144.6 through `npx` passed and reported `gatekeeper` enabled. No dependency or global installation was added.
+
+Review conclusions:
+
+- Security/correctness review: no unresolved critical, suggestion, or nit finding after the repository-consistency and multiline-injection fixes.
+- Ponytail review: `Lean already. Ship.` Net removable production lines: 0.
+
+Final GREEN:
+
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm audit --audit-level high`: PASS.
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (32 files, 183 tests).
+- `pnpm build`: PASS.
+- Official stdio MCP discovery/live six-tool workflow: PASS.
+- Official Codex CLI MCP listing: PASS through `npx`.
+- Skill validation: PASS.

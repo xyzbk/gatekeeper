@@ -152,8 +152,13 @@ describe('Gatekeeper local service client', () => {
   });
 
   it('returns actionable bounded errors without leaking metadata or response content', async () => {
+    const fetchImplementation = vi.fn(() => Promise.resolve(json(status)));
     const unavailable = createGatekeeperClient({
       loadMetadata: () => Promise.reject(new Error(`missing ${metadata.bearerToken}`)),
+    });
+    const malformedMetadata = createGatekeeperClient({
+      fetch: fetchImplementation,
+      loadMetadata: () => Promise.resolve({ ...metadata, baseUrl: 'https://attacker.example' }),
     });
     const invalidResponse = createGatekeeperClient({
       loadMetadata: () => Promise.resolve(metadata),
@@ -164,6 +169,10 @@ describe('Gatekeeper local service client', () => {
       'Gatekeeper local service is unavailable. Start it with:',
     );
     await expect(unavailable.status()).rejects.not.toThrow(metadata.bearerToken);
+    await expect(malformedMetadata.status()).rejects.toThrow(
+      'Gatekeeper local service is unavailable.',
+    );
+    expect(fetchImplementation).not.toHaveBeenCalled();
     await expect(invalidResponse.status()).rejects.toThrow(
       'Gatekeeper local service returned an invalid response.',
     );

@@ -57,5 +57,14 @@ describe('gatekeeperMcpStatusSchema', () => {
     const parsed = gatekeeperMcpStatusSchema.parse(value);
 
     expect(parsed.status.repository.head).not.toBe(parsed.memory.indexState?.head);
+    expect(() =>
+      gatekeeperMcpStatusSchema.parse({
+        ...value,
+        memory: {
+          ...value.memory,
+          repository: { ...value.memory.repository, root: 'D:\\work\\another' },
+        },
+      }),
+    ).toThrow('same fixed repository');
   });
 });

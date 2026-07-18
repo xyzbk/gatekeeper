@@ -16,7 +16,7 @@ const MAX_QUERIES = 8;
 const RESULTS_PER_QUERY = 5;
 const MAX_EVIDENCE_CANDIDATES = 20;
 const PROMPT_INJECTION_PATTERN =
-  /\b(?:ignore|disregard|override)\b.{0,80}\b(?:instruction|prompt|rule)s?\b|\b(?:system|developer)\s+(?:message|prompt)\b|\b(?:reveal|publish|expose)\b.{0,80}\b(?:secret|token|credential)s?\b|\byou are\s+(?:chatgpt|codex)\b/iu;
+  /\b(?:ignore|disregard|override)\b.{0,80}\b(?:instruction|prompt|rule)s?\b|\b(?:system|developer)\s+(?:message|prompt)\b|\b(?:reveal|publish|expose)\b.{0,80}\b(?:secret|token|credential)s?\b|\byou are\s+(?:chatgpt|codex)\b/isu;
 
 export interface PrepareReviewDraftInput {
   review: ReviewRun;

@@ -9,6 +9,15 @@ export const gatekeeperMcpStatusSchema = z
     status: statusResponseSchema,
     memory: repositoryStatusSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(({ status, memory }, context) => {
+    if (memory.state === 'ready' && memory.repository.root !== status.repository.root) {
+      context.addIssue({
+        code: 'custom',
+        message: 'MCP status and memory must describe the same fixed repository.',
+        path: ['memory', 'repository', 'root'],
+      });
+    }
+  });
 
 export type GatekeeperMcpStatus = z.infer<typeof gatekeeperMcpStatusSchema>;

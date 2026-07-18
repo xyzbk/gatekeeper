@@ -863,6 +863,12 @@ describe('Gatekeeper local service', () => {
         payload: completionInput,
       });
       const completed = reviewRunSchema.parse(completedResponse.json());
+      const replayed = await first.server.inject({
+        method: 'POST',
+        url: `/v1/reviews/${created.reviewId}/complete`,
+        headers,
+        payload: completionInput,
+      });
       const forged = await first.server.inject({
         method: 'POST',
         url: `/v1/reviews/${created.reviewId}/complete`,
@@ -913,6 +919,8 @@ describe('Gatekeeper local service', () => {
       expect(completedResponse.statusCode).toBe(200);
       expect(completed.reasoningProvider).toBe('codex');
       expect(completed.findings).toEqual(completionInput.findings);
+      expect(replayed.statusCode).toBe(200);
+      expect(replayed.json()).toEqual(completed);
       expect(forged.statusCode).toBe(400);
       expect(forged.json()).toEqual({
         error: {
