@@ -72,7 +72,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 - The production GitHub provider uses `execa` with `shell: false`, stdin disabled, argument arrays, a 30-second timeout, and a 2 MiB output cap.
 - Supported provider commands are read-only: authentication status, pull-request view, and explicit GET API endpoints. No token is requested, returned, persisted, or logged.
-- Remote identity accepts one credential-free HTTPS/SSH owner/repository target. Extra path segments, credentials, ports, queries, fragments, shell metacharacters, and non-GitHub-style remotes are rejected before execution.
+- Remote identity accepts one credential-free GitHub.com HTTPS/SSH owner/repository target. Other hosts, extra path segments, credentials, ports, queries, fragments, and shell metacharacters are rejected before execution. GitHub Enterprise routing remains deferred rather than risking a host/repository mismatch.
 - Pull-request bodies, issue text, comments, reviews, paths, and patches are bounded and schema-validated as untrusted data. A malformed record yields a partial result without discarding valid records.
 - Remote documents retain bounded GitHub URLs for evidence navigation but are stored only in the repository-scoped machine-local database.
 - Partial batches do not advance their cursor, so a malformed record is retried. Stale complete batches cannot rewind the cursor or overwrite newer remote evidence.

@@ -382,3 +382,51 @@ Expected RED states, unexpected failures, corrections, live acceptance, and envi
 - The MCP surface is local worktree only; there is no GitHub synchronization, pull-request target, remote publication, second provider, embedding, background job, arbitrary file/process access, or generic plugin system.
 - Prompt-injection detection is a bounded deterministic warning layer, not a claim to recognize every possible adversarial encoding. The primary control remains treating all repository content as untrusted data.
 - Phase 5 may begin only after an explicit user request. It may add the read-only `gh` adapter, bounded incremental GitHub history, the Ghost Change fixture, pull-request CLI/API/dashboard review, and `gatekeeper_review_pull_request` as the seventh tool. It must not publish to GitHub or start Phase 6 dashboard work early.
+
+## Phase 5 — Read-only GitHub history and the Ghost Change
+
+Status: complete on 2026-07-18.
+
+### Implemented
+
+- Added a strict GitHub.com provider using only authenticated status, pull-request view, and explicit GET API calls with argument arrays, disabled shell/stdin, bounded time/output, typed schemas, safe errors, partial malformed-record survival, and no token storage.
+- Added incremental remote Project Memory for issues, pull requests, comments, reviews, ordered explicit relationships, remote evidence URLs, partial-sync cursor retention, stale-replay protection, atomic duplicate rejection, and exact/linked/FTS ranking.
+- Added deterministic pull-request review, GitHub checks and inert prompt-injection findings, persisted previous-review linkage, `sync github` and `review pr` CLI commands, fixed-repository Fastify operations, and bounded environment repair responses.
+- Added `gatekeeper_review_pull_request` as the seventh strict MCP tool and updated the repository Gatekeeper skill for explicit sync/model consent, untrusted GitHub evidence, local completion, and no publication.
+- Added one focused OpenAI-inspired dark dashboard PR route with explicit sync/review, partial/error/pending states, persisted target display, and safe exact-GitHub evidence links.
+- Added the reproducible network-free Ghost Change: raw provider responses, passing checks, proposal/implementation/regression/revert/ADR links, lexical noise, hostile PR prose, completion, SQLite restart, dashboard/API/MCP integration, and `ESCALATE`-never-`BLOCK` assertions.
+- Added a separate dry-run-first, marker-idempotent metadata seeder. Its apply executor requires exact target approval plus prepared branches and can create/close only its marked demo objects; it cannot merge, delete, reset, or touch unrelated content.
+
+### Aggressive findings and corrections
+
+- Fixed malformed issue query construction, stale cursor/document replay, partial cursor advancement, remote drift before persistence, duplicate prompt-injection finding IDs during completion, a five-result cap that truncated the six-node evidence chain, broad demo test discovery, workspace-only `tsx` resolution, seeder partial-write hazards, lookalike object URLs, and arbitrary-host remote normalization.
+- Missing `gh`, failed authentication, invalid JSON, oversized output, shell metacharacters, credential/path/query remote attacks, excessive PR files, malformed history, duplicate batch identities, forged/cross-repository evidence, completion replay, hostile Markdown/URLs, submitted verdicts, and inference attempting `BLOCK` fail safely in focused tests.
+- The production adapter has no GitHub write command. The optional seeder is isolated, makes zero requests by default, and was never applied.
+- Gatekeeper completed and persisted its own local review without changing files or publishing. Ponytail found the phase diff lean and within the hackathon boundary.
+
+### Verification
+
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm audit --audit-level high`: PASS; no known vulnerabilities.
+- `pnpm fixtures:prepare`: PASS twice; four deterministic repositories each run.
+- `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, formatting, diff checks, shuffled tests, fixture/CLI smoke, official MCP SDK discovery, real stdio discovery, and Gatekeeper skill validation: PASS.
+- Default verification remained network-, GitHub-auth-, and model-key-free.
+
+### Traceability
+
+- `9ee72ab` — define the corrected Phase 5 contract;
+- `689426c` — add the read-only GitHub provider;
+- `e39e1a7` — persist linked GitHub history;
+- `e6be0d4` — review GitHub pull requests locally;
+- `1b40a45` — expose the fixed GitHub review API;
+- `d3ae9a7` — add pull-request MCP review;
+- `32f5fd5` — add the dashboard pull-request route;
+- `9e18e08` — add the offline Ghost Change scenario;
+- `821cbff` — complete the Ghost Change workflow and isolated seeder.
+
+Detailed RED/GREEN evidence, failures, corrections, and environment limits are retained in `docs/development/phase-5-execution-log.md`.
+
+### Deliberate limitations and exact next-phase entry condition
+
+- Live GitHub reads require an installed, authenticated `gh` and an existing approved repository. GitHub Enterprise routing, publication, Actions, comments, checks, labels, merges, hosted services, and permanent maintainer decisions remain absent.
+- Phase 6 may begin only after an explicit user request. It may build the dashboard hero experience, real review-progress polling, ordered EvidenceTimeline, remediation prompts/panel, and before/after review comparison. It must stop before settings, policy editing, collaboration, analytics, accounts, remote hosting, or decorative charts.

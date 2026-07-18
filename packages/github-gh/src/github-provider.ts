@@ -166,6 +166,9 @@ function invalidRemote(): never {
 
 function normalizedRemote(hostValue: string, pathValue: string): GitHubRemote {
   const host = hostValue.toLowerCase();
+  if (host !== 'github.com') {
+    return invalidRemote();
+  }
   const path = pathValue.replace(/^\/+|\/+$/g, '').replace(/\.git$/i, '');
   const parts = path.split('/');
   if (parts.length !== 2) {

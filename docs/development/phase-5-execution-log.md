@@ -252,6 +252,7 @@ Aggressive findings and corrections:
 - Seeder tests reject inexact targets, ambiguous modes, target-resolution drift, missing branches before the first write, 100-record discovery saturation, conflicting markers, unexpected object kinds/states, and lookalike created-object URLs.
 - Created-object URLs are validated by exact path segments, not a dynamically interpolated regex. GitHub stderr and response bodies are never included in failures.
 - No `--apply` invocation occurred. GitHub CLI remains unavailable in this environment.
+- Final hostile-host review found that generic Git hosts normalized successfully even though later `gh --repo owner/name` requests are GitHub.com-scoped. The provider now rejects every non-`github.com` host; GitHub Enterprise routing remains deferred instead of adding an unverified host-selection path.
 
 GREEN:
 
@@ -263,3 +264,38 @@ GREEN:
 - `pnpm test`: PASS (37 files, 239 tests).
 - `pnpm build`: PASS.
 - `pnpm format:check` and `git diff --check`: PASS.
+
+### Task 9 — integrated attack and phase closeout
+
+Implemented verification:
+
+- Added a real temporary Git repository integration that indexes the active ADR, syncs the raw partial GitHub fixture through Fastify, reviews through the dashboard client, retrieves the exact linked chain, reviews/completes through the MCP client, rejects a submitted `BLOCK`, restarts SQLite/service state, and reloads the identical completed review through both MCP and dashboard clients.
+- The first exact integration assertions corrected fixture accounting only: local indexing writes policy, ADR, and commit documents; remote sync writes nine valid records while retaining one malformed-record failure.
+- A hostile-host RED test proved that arbitrary Git hosts previously normalized even though later `gh --repo owner/name` calls are GitHub.com-scoped. Phase 5 now accepts only exact `github.com` remotes and defers GitHub Enterprise routing.
+- The repository Gatekeeper skill reported a deterministic worktree `FAST_PATH`. After indexed evidence preparation and local completion, it assembled `ESCALATE` because the Phase 4 planning document intentionally contains a prompt-injection example. The evidence remained inert, the review persisted, and no publication or remediation occurred.
+- Ponytail whole-diff review found no removable dependency, abstraction, provider registry, retry layer, worker, or future-phase UI. The seeder's apply path remains isolated and its safety/idempotency code directly implements the plan; no live apply occurred.
+
+Environment limits:
+
+- GitHub CLI is not installed, so live authenticated read-only sync/review remains conditional and was not simulated with a network request.
+- The protected desktop `codex.exe` remains non-executable from this Windows host. Exact seven-tool discovery is covered by official MCP SDK in-memory and real stdio tests.
+
+Final GREEN:
+
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm audit --audit-level high`: PASS; no known vulnerabilities.
+- `pnpm fixtures:prepare`: PASS twice.
+- Focused full-stack Ghost Change integration: PASS.
+- Compiled CLI fixture matrix: `FAST_PATH`, `REQUIRE_CHANGES`, `BLOCK`, and history `FAST_PATH` as expected.
+- Doctor: all required checks PASS; optional `gh` WARN only.
+- Official MCP SDK in-memory and real stdio discovery: PASS; exact seven-tool set.
+- Gatekeeper skill `quick_validate.py`: PASS.
+- Gatekeeper local completion and persisted reload: PASS; assembled `ESCALATE`, never `BLOCK`.
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (38 files, 242 tests).
+- Shuffled test order with seed `518`: PASS (38 files, 242 tests).
+- `pnpm build`: PASS.
+- `pnpm format:check` and `git diff --check`: PASS.
+
+Phase 5 stops here. Phase 6 dashboard progress, EvidenceTimeline, remediation, and before/after work remain unstarted pending an explicit request.

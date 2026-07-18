@@ -41,6 +41,8 @@ describe('normalizeGitHubRemote', () => {
   });
 
   it.each([
+    'https://gitlab.com/acme/demo.git',
+    'git@example.com:acme/demo.git',
     'https://user:secret@github.com/acme/demo.git',
     'https://github.com/acme/demo/extra',
     'file:///tmp/demo',
