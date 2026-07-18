@@ -42,8 +42,8 @@ The requested feature branch is `codex/phase-3-project-memory`.
 
 | Task                                  | State    | Commit    | Verification                         | Failures and corrections  |
 | ------------------------------------- | -------- | --------- | ------------------------------------ | ------------------------- |
-| 1. Storage contracts and migrations   | complete | this step | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
-| 2. Bounded Git indexing sources       | pending  | —         | —                                    | —                         |
+| 1. Storage contracts and migrations   | complete | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
+| 2. Bounded Git indexing sources       | complete | this step | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
 | 3. Incremental indexing and retrieval | pending  | —         | —                                    | —                         |
 | 4. Doctor, CLI, and fixture           | pending  | —         | —                                    | —                         |
 | 5. Persistent local API               | pending  | —         | —                                    | —                         |
@@ -87,6 +87,41 @@ pnpm install --frozen-lockfile   PASS — already up to date
 pnpm lint                        PASS
 pnpm typecheck                   PASS
 pnpm test                        PASS — 22 files, 115 tests
+pnpm build                       PASS
+pnpm format:check                PASS
+pnpm audit --audit-level high    PASS — no known vulnerabilities
+```
+
+## Task 2 evidence
+
+Expected RED:
+
+- Contract and adapter suites failed because the Git-source contracts and `project-memory-source.ts` did not exist.
+- The first implementation returned empty file bodies because unnecessary `git show --format=` options suppress blob output.
+- Unsafe tree paths and malformed commit fields initially escaped as detailed Zod errors instead of stable adapter failures.
+
+Corrections and learning:
+
+- A direct Git probe confirmed that `git show --no-textconv HEAD:<path>` returns the blob while adding `--format=` returns no body. The adapter now uses only the required option and the strictly validated object specifier.
+- Re-sorting `git ls-tree` output with locale-aware comparison changed its deterministic byte ordering. The redundant sort was deleted and native Git order is preserved.
+- Strict contract failures for untrusted path/commit metadata are now translated to `MALFORMED_GIT_OUTPUT`, so error surfaces do not echo repository content.
+- Real repositories prove the 256 KiB document limit, invalid UTF-8 denial, 2,000-character commit-message bound, and literal handling of a commit subject that asks the tool to ignore policy and run a command.
+- The first root lint found six injected Promise-returning runners unnecessarily marked `async`. Returning `Promise.resolve(...)` expresses those test doubles exactly and no lint exception was added.
+
+Focused result:
+
+```text
+Git-source contracts                     PASS — 2 tests
+Committed tree/file/history adapter       PASS — 5 tests
+Total                                    PASS — 7 tests
+```
+
+Task gate:
+
+```text
+pnpm lint                        PASS
+pnpm typecheck                   PASS
+pnpm test                        PASS — 24 files, 122 tests
 pnpm build                       PASS
 pnpm format:check                PASS
 pnpm audit --audit-level high    PASS — no known vulnerabilities

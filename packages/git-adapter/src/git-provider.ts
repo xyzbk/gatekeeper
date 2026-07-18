@@ -7,6 +7,7 @@ import {
   type GitCommandResult,
   type RunGit,
 } from './repository-path.js';
+import { listCommits, listTrackedFiles, readFileAtRef } from './project-memory-source.js';
 import { extractWorktreeDiff, type WorktreeDiffOptions } from './worktree-diff.js';
 
 interface GitProviderOptions {
@@ -19,6 +20,13 @@ export interface GitProvider {
     options?: WorktreeDiffOptions,
   ): ReturnType<typeof extractWorktreeDiff>;
   inspectRepository(repositoryPath: string): Promise<RepositorySnapshot>;
+  listCommits(repositoryPath: string, limit: number): ReturnType<typeof listCommits>;
+  listTrackedFiles(repositoryPath: string): ReturnType<typeof listTrackedFiles>;
+  readFileAtRef(
+    repositoryPath: string,
+    relativePath: string,
+    ref: string,
+  ): ReturnType<typeof readFileAtRef>;
 }
 
 async function runGitCommand(arguments_: readonly string[]): Promise<GitCommandResult> {
@@ -89,6 +97,10 @@ export function createGitProvider(options: GitProviderOptions = {}): GitProvider
     getWorktreeDiff: async (repositoryPath, diffOptions) =>
       extractWorktreeDiff(repositoryPath, runGit, diffOptions),
     inspectRepository: async (repositoryPath) => inspectRepository(repositoryPath, runGit),
+    listCommits: async (repositoryPath, limit) => listCommits(repositoryPath, limit, runGit),
+    listTrackedFiles: async (repositoryPath) => listTrackedFiles(repositoryPath, runGit),
+    readFileAtRef: async (repositoryPath, relativePath, ref) =>
+      readFileAtRef(repositoryPath, relativePath, ref, runGit),
   };
 }
 
