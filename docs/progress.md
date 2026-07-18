@@ -150,3 +150,15 @@ pnpm audit --audit-level high
 ### Scope boundary
 
 Phase 1 stops here. No diff review, review engine, SQLite, Project Memory, FTS5, MCP server, Codex skill, GitHub data call, or model reasoning was added. Phase 2 may begin only when the user explicitly requests it.
+
+## Phase 2 execution status
+
+Phase: Deterministic worktree review
+
+Status: ACTIVE
+
+Started: 2026-07-18 after explicit user approval.
+
+The executable plan is `docs/superpowers/plans/2026-07-18-phase-2-deterministic-worktree-review.md`. Commands, expected RED states, unexpected failures, corrections, decisions, and green commit evidence are recorded in `docs/development/phase-2-execution-log.md`.
+
+The Phase 2 stop gate remains SQLite, Project Memory, FTS5, MCP, model reasoning, GitHub synchronization, and pull-request review.
