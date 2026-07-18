@@ -5,9 +5,9 @@ import { join } from 'node:path';
 import type { RepositoryId, ReviewId } from '@gatekeeper/domain';
 import { createGitHubProvider, normalizeGitHubRemote } from '@gatekeeper/github-gh';
 import { createProjectMemory } from '@gatekeeper/project-memory';
-import { reviewPullRequest } from '@gatekeeper/review-engine';
+import { completeReview, prepareReviewDraft, reviewPullRequest } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createGhostChangeRunner, loadGhostChangeFixture } from './ghost-change-fixture.js';
 
@@ -116,33 +116,46 @@ describe('Ghost Change offline scenario', () => {
         'docs/adr/0003-no-required-redis.md',
       ]);
       expect(results.some(({ evidence }) => evidence.sourceId === 'issue:#99')).toBe(false);
+      const [pullRequest, changeSet] = await Promise.all([
+        provider.getPullRequest(remote, fixture.pullRequestNumber),
+        provider.getPullRequestDiff(remote, fixture.pullRequestNumber),
+      ]);
+      const review = reviewPullRequest({
+        changeSet,
+        pullRequest,
+        createdAt: '2026-07-18T18:00:00.000Z',
+        policy: { version: 1 },
+        repositoryId: repository.repositoryId as RepositoryId,
+        reviewId: 'review_ghost_change' as ReviewId,
+      });
+      await memory.saveReview(review);
+      const searchMemory = vi.fn((input: Parameters<typeof memory.search>[0]) =>
+        memory.search(input),
+      );
+      const draft = await prepareReviewDraft({ review, searchMemory });
+      const completed = completeReview({ review, draft, findings: [], model: null });
+      await memory.saveReview(completed);
+
+      expect(searchMemory).toHaveBeenCalledWith(
+        expect.objectContaining({ query: 'pull_request:#12' }),
+      );
+      expect(draft.evidenceCandidates.map(({ sourceId }) => sourceId)).toEqual(
+        expect.arrayContaining([
+          'issue:#4',
+          'pull_request:#8',
+          'issue:#9',
+          'pull_request:#10',
+          'docs/adr/0003-no-required-redis.md',
+        ]),
+      );
+      expect(completed.findings).toContainEqual(
+        expect.objectContaining({ id: 'finding:content-security:prompt-injection' }),
+      );
+      expect(completed.verdict).toBe('ESCALATE');
+      expect(completed.verdict).not.toBe('BLOCK');
+      await expect(memory.getReview(completed.reviewId)).resolves.toEqual(completed);
     } finally {
       store.close();
     }
-  });
-
-  it('treats hostile PR prose as evidence, escalates, and never lets it produce BLOCK', async () => {
-    const fixture = await loadGhostChangeFixture();
-    const provider = createGitHubProvider({ runGh: createGhostChangeRunner(fixture) });
-    const remote = normalizeGitHubRemote(fixture.remote);
-    const [pullRequest, changeSet] = await Promise.all([
-      provider.getPullRequest(remote, fixture.pullRequestNumber),
-      provider.getPullRequestDiff(remote, fixture.pullRequestNumber),
-    ]);
-
-    const review = reviewPullRequest({
-      changeSet,
-      pullRequest,
-      createdAt: '2026-07-18T18:00:00.000Z',
-      policy: { version: 1 },
-      repositoryId: 'repository_ghost_change' as RepositoryId,
-      reviewId: 'review_ghost_change' as ReviewId,
-    });
-
-    expect(review.findings).toContainEqual(
-      expect.objectContaining({ id: 'finding:content-security:prompt-injection' }),
-    );
-    expect(review.verdict).toBe('ESCALATE');
-    expect(review.verdict).not.toBe('BLOCK');
   });
 });

@@ -60,4 +60,4 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 ## Phase 5 boundary
 
-Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, and verified CLI/Fastify/MCP/dashboard pull-request composition. The Ghost Change fixture remains inside the active Phase 5 gate until its verified slice lands. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.
+Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, verified CLI/Fastify/MCP/dashboard pull-request composition, and a network-free Ghost Change fixture. The optional marker-based demo seeder remains isolated from production and dry-run by default. There is no production GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.

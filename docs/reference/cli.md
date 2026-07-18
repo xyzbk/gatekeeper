@@ -120,3 +120,12 @@ gatekeeper review worktree demo/fixtures/history --format json
 ```
 
 The first three review verdicts are `FAST_PATH`, `REQUIRE_CHANGES`, and `BLOCK`. The history fixture contains a reverted required-Redis proposal, its active ADR, ignored and denied content, and a source change with its required test. Its second index writes zero records, Redis search returns ADR and commit evidence, and its worktree review is `FAST_PATH`. Re-running `pnpm fixtures:prepare` replaces only the generated fixture directories and produces the same states.
+
+The Phase 5 Ghost Change is also exported as a raw GitHub-response fixture. Its offline integration test exercises provider parsing, partial malformed-record survival, ordered linked history, passing checks, inert hostile prose, completion, and persisted `ESCALATE` output:
+
+```bash
+pnpm vitest run --config vitest.workspace.ts demo/ghost-change.test.ts
+pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
+```
+
+The optional seeder defaults to zero-request dry-run. Its separately authorized `--apply` path requires one exact dedicated repository and three prepared branches; see [demo-seeding.md](../development/demo-seeding.md).

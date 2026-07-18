@@ -77,6 +77,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Remote documents retain bounded GitHub URLs for evidence navigation but are stored only in the repository-scoped machine-local database.
 - Partial batches do not advance their cursor, so a malformed record is retried. Stale complete batches cannot rewind the cursor or overwrite newer remote evidence.
 - Local index batches manage only local source types; they cannot delete GitHub evidence. Ordered remote relationships resolve only within the registered repository.
+- The demo seeder is outside the production adapter and defaults to a zero-request dry-run. Its explicit apply executor validates one exact target, preflights fixed branch names, acts only on stable scenario markers, uses executable-plus-argument arrays, and has no merge, delete, reset, or unrelated-object update operation. No live apply is part of automated acceptance.
 
 ## Deferred boundaries
 

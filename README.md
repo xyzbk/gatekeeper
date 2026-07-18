@@ -19,6 +19,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm fixtures:prepare
+pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
 pnpm --filter @gatekeeper/cli start -- --help
 pnpm --filter @gatekeeper/cli start -- doctor --format json
 pnpm --filter @gatekeeper/cli start -- policy validate demo/fixtures/clean
@@ -67,6 +68,7 @@ The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdi
 - [MCP and Codex skill reference](docs/reference/mcp.md)
 - [CLI reference](docs/reference/cli.md)
 - [Development setup](docs/development/setup.md)
+- [Ghost Change demo seeding](docs/development/demo-seeding.md)
 - [Build progress](docs/progress.md)
 - [Build Week execution plan](gatekeeper_codex_build_pack/GATEKEEPER_HACKATHON_PHASED_EXECUTION_PLAN.md)
 

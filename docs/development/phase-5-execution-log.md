@@ -227,3 +227,39 @@ GREEN:
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (35 files, 222 tests).
 - `pnpm build`: PASS.
+
+### Task 8 — Ghost Change fixture and isolated seeder
+
+Expected RED:
+
+- The offline scenario test could not import the not-yet-created fixture adapter.
+- The seeder suite could not import the not-yet-created dry-run/apply implementation.
+- Full test discovery initially treated disposable repositories' `tests/app.test.ts` files as Vitest suites.
+- The complete persisted workflow exposed duplicate prompt-injection finding IDs during completion.
+
+Implemented:
+
+- Added raw, bounded GitHub command responses for the proposal, required-Redis implementation, regression, revert, lexical-noise issue, revived PR, passing checks, linked comments/review, malformed record, active local ADR, and hostile PR prose.
+- The fixture drives the production provider's argument arrays and schemas, persists normalized remote history beside the local ADR, retrieves the explicit six-node chain ahead of lexical noise, prepares/completes the Codex draft, and persists the completed `ESCALATE` review.
+- Added `demo/scenarios.json` plus a separate six-object seeder. Dry-run makes zero GitHub calls. Apply requires one exact target, verifies the repository and three fixed branch prerequisites, discovers stable markers, substitutes actual GitHub numbers, creates only missing marked issues/PRs, and closes only marked historical objects.
+- Added the exact pull-request identity as the first bounded completion query and increased the per-query result window from five to eight under the existing 20-candidate cap so the complete Ghost Change chain reaches Codex.
+- Completion now reuses an existing deterministic prompt-injection finding instead of adding the same stable ID a second time.
+
+Aggressive findings and corrections:
+
+- Narrowed demo test discovery to the real harness and seeder suites; generated repositories remain inert review input.
+- A full root `tsx` smoke could not resolve the workspace package export even though Vitest aliases could. The source-only seeder now imports the repository-relative provider entry without adding a root runtime dependency.
+- Seeder tests reject inexact targets, ambiguous modes, target-resolution drift, missing branches before the first write, 100-record discovery saturation, conflicting markers, unexpected object kinds/states, and lookalike created-object URLs.
+- Created-object URLs are validated by exact path segments, not a dynamically interpolated regex. GitHub stderr and response bodies are never included in failures.
+- No `--apply` invocation occurred. GitHub CLI remains unavailable in this environment.
+
+GREEN:
+
+- Commit `9e18e08` added and pushed the raw offline fixture, scenario metadata, production-provider parity harness, and linked-memory/review assertions.
+- Focused Ghost Change, seeder, and review-completion tests: PASS (19 tests before final seeder attacks; 22 after).
+- Seeder dry-run smoke: PASS; six stable operations printed and zero GitHub requests made.
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (37 files, 239 tests).
+- `pnpm build`: PASS.
+- `pnpm format:check` and `git diff --check`: PASS.

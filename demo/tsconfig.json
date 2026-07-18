@@ -5,7 +5,7 @@
     "rootDir": ".",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "scripts/**/*.ts"],
   "references": [
     { "path": "../packages/contracts" },
     { "path": "../packages/domain" },

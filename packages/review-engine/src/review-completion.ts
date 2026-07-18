@@ -13,7 +13,7 @@ import {
 } from '@gatekeeper/domain';
 
 const MAX_QUERIES = 8;
-const RESULTS_PER_QUERY = 5;
+const RESULTS_PER_QUERY = 8;
 const MAX_EVIDENCE_CANDIDATES = 20;
 const PROMPT_INJECTION_PATTERN =
   /\b(?:ignore|disregard|override)\b.{0,80}\b(?:instruction|prompt|rule)s?\b|\b(?:system|developer)\s+(?:message|prompt)\b|\b(?:reveal|publish|expose)\b.{0,80}\b(?:secret|token|credential)s?\b|\byou are\s+(?:chatgpt|codex)\b/isu;
@@ -45,6 +45,10 @@ function evidenceKey(evidence: EvidencePointer): string {
 
 function memoryQueries(review: ReviewRun): string[] {
   const queries = new Set<string>();
+
+  if (review.target.kind === 'pull_request' && review.target.pullRequestNumber !== undefined) {
+    queries.add(`pull_request:#${review.target.pullRequestNumber}`);
+  }
 
   for (const { path } of review.changes) {
     queries.add(path);
@@ -128,7 +132,11 @@ export async function prepareReviewDraft({
   const deterministicFindings = review.findings.filter(
     ({ authority }) => authority === 'DETERMINISTIC',
   );
-  const injectionFinding = createPromptInjectionFinding(review.repositoryId, evidenceCandidates);
+  const injectionFinding = deterministicFindings.some(
+    ({ id }) => id === 'finding:content-security:prompt-injection',
+  )
+    ? undefined
+    : createPromptInjectionFinding(review.repositoryId, evidenceCandidates);
 
   return {
     schemaVersion: 1,

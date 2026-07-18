@@ -49,7 +49,7 @@ describe('prepareReviewDraft', () => {
     expect(searchMemory.mock.calls.length).toBeGreaterThan(0);
     expect(searchMemory.mock.calls.length).toBeLessThanOrEqual(8);
     expect(searchMemory).toHaveBeenCalledWith(
-      expect.objectContaining({ repositoryId: review.repositoryId, limit: 5 }),
+      expect.objectContaining({ repositoryId: review.repositoryId, limit: 8 }),
     );
     expect(draft.evidenceCandidates).toEqual([adrEvidence]);
     expect(draft.changes).toEqual(review.changes);
