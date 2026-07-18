@@ -2,23 +2,27 @@
 
 Gatekeeper is a local-first, evidence-first repository governance agent. Codex remains the reasoning surface; Gatekeeper owns bounded evidence retrieval and deterministic enforcement.
 
-## Current Phase 2 runtime
+## Current Phase 3 runtime
 
 ```text
-CLI review ─┐
-            ├─> policy loader ─> bounded Git ChangeSet ─> pure review engine ─> ReviewRun v1
-HTTP review ┘                                                        │
-                                                                     ├─> CLI text/JSON
-                                                                     ├─> local API
-                                                                     └─> React Review Inspector
+bounded Git metadata/docs ─> Project Memory index ─> SQLite + FTS5 ─> memory search
+                                                                  │
+CLI review ─┐                                                     │
+            ├─> policy ─> bounded ChangeSet ─> review engine ─> ReviewRun v1
+HTTP review ┘                                                 │       │
+                                                              └─> persisted review
+                                                                  │
+                                    CLI text/JSON <─ local API ─> React dashboard
 ```
 
 The current dependency direction is:
 
 ```text
-apps/cli -> packages/config + packages/git-adapter + packages/review-engine + apps/server
-apps/server -> packages/config + packages/contracts
+apps/cli -> packages/config + packages/git-adapter + packages/project-memory + packages/review-engine + packages/store-sqlite + apps/server
+apps/server -> packages/config + packages/contracts + packages/project-memory + packages/store-sqlite
 apps/dashboard -> packages/contracts
+packages/project-memory -> packages/contracts + inward-facing Git/persistence interfaces
+packages/store-sqlite -> packages/contracts + better-sqlite3 + Drizzle
 packages/review-engine -> packages/domain + packages/contracts + policy types
 packages/git-adapter -> packages/contracts
 packages/contracts -> packages/domain
@@ -31,11 +35,13 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 `review-engine` is pure after its inputs are supplied. It sorts files, calculates metrics, evaluates change-size, source/test, risk-zone, added-relative-import, and protected-path rules, then delegates final verdict assembly to `domain`. It returns ReviewRun v1 with bounded change summaries; inspected added lines never enter that contract. See [review-pipeline.md](review-pipeline.md).
 
-`apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, serves the built dashboard, and exposes health, bootstrap, status, and authenticated worktree-review endpoints. The review endpoint calls one injected function already bound to the startup repository. HTTP input cannot select a different repository.
+`project-memory` normalizes repository identity, reads bounded tracked metadata, selected Markdown/ADR/policy content, and recent commit metadata through an inward-facing Git interface, then writes one complete incremental batch. `store-sqlite` owns WAL mode, foreign keys, migrations, FTS5 synchronization, exact-first search, and atomic review persistence. The database lives under machine-local Gatekeeper app data, outside the target repository by default.
 
-`apps/dashboard` remains a small browser adapter. React Router provides Overview and `/reviews/worktree`; TanStack Query manages the status query and review mutation. A shared closure reads bootstrap once and holds the bearer token only in memory. Review states are explicit: ready, pending, retryable error, and completed. The result renders only the strict ReviewRun contract.
+`apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, migrates/registers the fixed repository before listening, and exposes authenticated fixed-repository index, memory-search, worktree-review, and review-read endpoints. HTTP input cannot select a path or another repository.
 
-`gatekeeper start [path]` composes the same `runWorktreeReview` function used by direct CLI review. It does not open a browser, daemonize, mutate the repository, persist a review, or call a model.
+`apps/dashboard` remains a small browser adapter. React Router provides Overview, `/reviews/worktree`, `/reviews/:reviewId`, and `/memory`; TanStack Query owns request state. A shared closure reads bootstrap once and holds the bearer token only in memory. Repository excerpts render only as bounded plain text with explicit source, match, date, and trust metadata.
+
+`gatekeeper start [path]` composes the same review and Project Memory services used by direct CLI commands. It does not open a browser, daemonize, mutate the repository, make a network request, or call a model.
 
 ## Runtime constraints
 
@@ -44,6 +50,6 @@ The `domain` package owns public entities and the rule that only a hard determin
 - Tests are deterministic and offline.
 - Packages are created only in the phase that needs working behavior.
 
-## Phase 2 boundary
+## Phase 3 boundary
 
-Phase 2 is complete and reviews are intentionally ephemeral. There is no SQLite database, Project Memory, FTS5 index, MCP server, Codex skill, GitHub synchronization, pull-request review, or model reasoning. Those packages and adapters are not created early.
+Phase 3 is complete with durable SQLite Project Memory and local evidence retrieval. There is no MCP server, Codex skill, GitHub synchronization, pull-request review, embedding, background worker, or model reasoning. Those packages and adapters are not created early.

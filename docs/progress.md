@@ -240,3 +240,89 @@ Phase 3 may begin only after an explicit user request. It may create `packages/s
 ## Phase 2 scope boundary audit at completion
 
 No SQLite database, Project Memory, FTS5 index, MCP server, Codex skill, GitHub call, pull-request review, or model call exists. Phase 2 stops at the deterministic ReviewRun v1 gate.
+
+## Phase 3 completion report
+
+Phase: SQLite Project Memory and evidence retrieval
+
+Status: COMPLETE
+
+Completed: 2026-07-18
+
+### Implemented
+
+- Added `packages/store-sqlite` with the focused Drizzle schema, reviewed versioned migration, native better-sqlite3 driver, foreign keys, WAL, FTS5 external-content synchronization, exact-first retrieval, and atomic index/review transactions.
+- Added `packages/project-memory` with stable remote-first repository identity, bounded local Git sources, incremental indexing, path-scoped invalidation, repository-isolated search, and explicit untrusted-content labels.
+- Indexed tracked metadata/hashes, selected Markdown and ADRs, bounded policy content, and up to 200 bounded recent commits while denying known secret names, ignore matches, symlinks, oversized content, and invalid UTF-8.
+- Persisted strict ReviewRun records, findings, evidence pointers, and `previousReviewId`; worktree reviews now survive process restarts.
+- Added Doctor storage checks plus `repo init`, `repo status`, `index`, `memory search`, and `review show` CLI commands.
+- Added fixed-repository registration, index, memory-status/search, persisted-review, and review-persistence APIs with strict shared contracts.
+- Added the dark Project Memory dashboard search and persistent review routes with explicit initial, pending, empty, error, not-found, and success states.
+
+### Verification
+
+All commands exited 0 on 2026-07-18:
+
+```text
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm format:check
+pnpm audit --audit-level high
+pnpm fixtures:prepare
+```
+
+- 27 test files and 156 tests passed; two shuffled full-suite seeds passed the same matrix.
+- Fresh compiled CLI acceptance wrote six documents on the first index and zero files, documents, or commits on the unchanged second index.
+- Redis search returned ADR, commit, and documentation evidence, all labelled `untrusted_repository_content`.
+- A compiled `FAST_PATH` worktree review reopened from Project Memory in a separate CLI process.
+- Complete service shutdown/restart tests returned the same persisted review and linked the next run through `previousReviewId`.
+- Live dashboard inspection at 1440×900 and 375-pixel widths exercised memory search and review-to-reopen without page-wide horizontal overflow.
+- The dependency audit reported no known vulnerabilities.
+
+### Aggressive findings and corrections
+
+- Interrupted migrations, failed index/review transactions, corrupt review JSON, hostile FTS syntax, invalid storage parents, secret denial, repository isolation, restart persistence, and bounded logging were exercised.
+- A forged cross-repository document-ID collision could alter the original document while the second repository reported a write. The SQLite upsert now enforces repository ownership and rolls back the entire batch.
+- A forged cross-repository review-ID collision could transfer a review. The review upsert now enforces the same ownership invariant and preserves the original run.
+- Ponytail's complete phase-diff review found no removable dependency, speculative worker, cache, generic repository layer, or plugin mechanism. The implementation remains limited to canonical Phase 3 behavior.
+
+### Security and privacy
+
+- The database resolves under per-user machine app data and outside target repositories by default.
+- Repository-derived content is always bounded, repository-scoped, parameterized at the SQL boundary, labelled untrusted, and rendered as plain text.
+- Raw source, raw diffs, ignored/denied secrets, bearer tokens, and database details do not enter persisted evidence, API errors, or logs.
+- Document and review identities are repository-owned; collision failures are atomic and fail closed.
+- Default tests require no network, GitHub authentication, or OpenAI key.
+
+### Traceability
+
+The verified implementation steps were committed and pushed individually:
+
+- `dc5dd03` Phase 3 execution contract;
+- `4d19aad` SQLite storage and migrations;
+- `c41a79c` bounded Git memory sources;
+- `a9c3077` incremental indexing and retrieval;
+- `f07210a` Doctor, CLI, fixture, and review persistence;
+- `762a514` persistent local API;
+- `262a308` dashboard memory and stored-review routes;
+- `0967e6b` repository-owned storage hardening.
+
+Expected RED states, unexpected failures, corrections, and command evidence are retained in `docs/development/phase-3-execution-log.md`.
+
+### Deliberate limitations
+
+- Only local worktree review and local Git/document history exist; no pull-request target or GitHub synchronization exists.
+- Search is exact plus FTS5; there are no embeddings, semantic reranking, model-generated findings, or general relationship extraction.
+- `document_links` is the plan-mandated schema slot but remains empty until scheduled explicit relationship extraction exists.
+- The service remains one foreground process for one fixed repository; there is no daemon, worker queue, hosted backend, or multi-repository administration UI.
+
+### Exact next-phase entry condition
+
+Phase 4 may begin only after an explicit user request. It may create the stdio MCP server, trusted-project Codex configuration, repository Gatekeeper skill, seven scheduled tools, and the strict Codex completion handshake. It must stop before GitHub synchronization, pull-request review, publication, or a second model provider.
+
+## Phase 3 scope boundary audit at completion
+
+No MCP server, Codex skill, GitHub network call, pull-request review, embedding, model-generated finding, background worker, publication path, or generic plugin system exists. Phase 3 stops at durable local Project Memory and evidence retrieval.

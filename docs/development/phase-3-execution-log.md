@@ -1,8 +1,10 @@
 # Phase 3 execution log
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Started: 2026-07-18
+
+Completed: 2026-07-18
 
 Goal: deliver canonical SQLite Project Memory and evidence retrieval, then stop before MCP, Codex skill, GitHub, embeddings, or model reasoning.
 
@@ -40,15 +42,15 @@ The requested feature branch is `codex/phase-3-project-memory`.
 
 ## Task ledger
 
-| Task                                  | State       | Commit    | Verification                         | Failures and corrections  |
-| ------------------------------------- | ----------- | --------- | ------------------------------------ | ------------------------- |
-| 1. Storage contracts and migrations   | complete    | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
-| 2. Bounded Git indexing sources       | complete    | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
-| 3. Incremental indexing and retrieval | complete    | a9c3077   | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
-| 4. Doctor, CLI, and fixture           | complete    | f07210a   | Root gates: 26 files, 137 tests PASS | See Task 4 evidence below |
-| 5. Persistent local API               | complete    | 762a514   | Root gates: 26 files, 144 tests PASS | See Task 5 evidence below |
-| 6. Dashboard memory and review routes | complete    | 262a308   | Root gates: 27 files, 153 tests PASS | See Task 6 evidence below |
-| 7. Aggressive acceptance and docs     | in progress | this step | Shuffled: 27 files, 156 tests PASS   | See Task 7 evidence below |
+| Task                                  | State    | Commit  | Verification                              | Failures and corrections  |
+| ------------------------------------- | -------- | ------- | ----------------------------------------- | ------------------------- |
+| 1. Storage contracts and migrations   | complete | 4d19aad | Root gates: 22 files, 115 tests PASS      | See Task 1 evidence below |
+| 2. Bounded Git indexing sources       | complete | c41a79c | Root gates: 24 files, 122 tests PASS      | See Task 2 evidence below |
+| 3. Incremental indexing and retrieval | complete | a9c3077 | Root gates: 25 files, 130 tests PASS      | See Task 3 evidence below |
+| 4. Doctor, CLI, and fixture           | complete | f07210a | Root gates: 26 files, 137 tests PASS      | See Task 4 evidence below |
+| 5. Persistent local API               | complete | 762a514 | Root gates: 26 files, 144 tests PASS      | See Task 5 evidence below |
+| 6. Dashboard memory and review routes | complete | 262a308 | Root gates: 27 files, 153 tests PASS      | See Task 6 evidence below |
+| 7. Aggressive acceptance and docs     | complete | 0967e6b | Root + shuffled: 27 files, 156 tests PASS | See Task 7 evidence below |
 
 ## Task 1 evidence
 
@@ -314,6 +316,19 @@ search source types             adr, commit, documentation
 all search trust labels         untrusted_repository_content
 worktree verdict                FAST_PATH
 stored review round trip        true
+```
+
+Final task gate:
+
+```text
+pnpm install --frozen-lockfile  PASS — already up to date
+pnpm lint                       PASS
+pnpm typecheck                  PASS
+pnpm test                       PASS — 27 files, 156 tests
+pnpm build                      PASS
+pnpm format:check               PASS
+pnpm audit --audit-level high   PASS — no known vulnerabilities
+scope boundary audit            PASS — no Phase 4+ implementation
 ```
 
 ## Scope boundary

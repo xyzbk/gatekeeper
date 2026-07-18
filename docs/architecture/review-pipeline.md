@@ -1,6 +1,6 @@
 # Deterministic worktree review pipeline
 
-Phase 2 has one review composition and three presentation surfaces. The CLI calls it directly; `gatekeeper start` injects it into the local API; the dashboard requests that API. Domain behavior remains outside all three adapters.
+Phase 3 keeps one review composition and three presentation surfaces. The CLI calls it directly; `gatekeeper start` injects it into the local API; the dashboard requests that API. The CLI and server persist the validated ReviewRun through the same Project Memory boundary. Domain behavior remains outside every adapter.
 
 ```text
 requested path
@@ -10,7 +10,8 @@ requested path
   -> pure deterministic policy evaluation
   -> domain verdict assembly
   -> strict ReviewRun v1 validation
-  -> CLI human/JSON | local API | Review Inspector
+  -> atomic Project Memory persistence
+  -> CLI human/JSON | local API | Review Inspector | stored-review route
 ```
 
 ## 1. Fix the repository boundary
@@ -61,6 +62,8 @@ Before leaving composition, Zod validates ReviewRun v1. The output carries bound
 - Unexpected failures become one stable internal error.
 - API and dashboard errors never echo source, diff, YAML content, subprocess output, or bearer tokens.
 
-## Deliberate Phase 2 limits
+## Phase 3 persistence boundary
 
-ReviewRun is ephemeral. There is no database, historical lookup, previous-review comparison, MCP transport, Codex skill, GitHub input, pull-request target, model judgment, or enforcement mutation. The policy parser accepts a few later-phase fields, but only the five checks above execute now.
+ReviewRun is stored only after strict contract validation. SQLite saves the run, findings, and evidence pointers atomically and rejects a review ID already owned by another repository. A later review of the same worktree target records `previousReviewId`, and persisted runs can be reopened through CLI, API, or dashboard after restart.
+
+The deterministic review itself still does not query history or let historical evidence produce `BLOCK`. There is no MCP transport, Codex skill, GitHub input, pull-request target, model judgment, or enforcement mutation in Phase 3. The policy parser accepts a few later-phase fields, but only the five checks above execute now.

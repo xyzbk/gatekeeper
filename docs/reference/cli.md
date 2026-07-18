@@ -84,7 +84,7 @@ Starts the loopback service and built dashboard for one fixed repository:
 gatekeeper start .
 ```
 
-The command prints the canonical repository root and random `127.0.0.1` URL, remains in the foreground, and stops on Ctrl+C. The dashboard Overview and Review Inspector use the same repository for the service lifetime. No review is persisted.
+The command prints the canonical repository root and random `127.0.0.1` URL, remains in the foreground, and stops on Ctrl+C. The dashboard Overview, Review Inspector, stored-review routes, and Project Memory search use the same repository for the service lifetime. Completed reviews and bounded indexes remain available after restart in machine-local Project Memory.
 
 ## Deterministic demo fixtures
 
