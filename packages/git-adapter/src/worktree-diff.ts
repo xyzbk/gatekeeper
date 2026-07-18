@@ -267,6 +267,15 @@ function isIgnored(path: string, matchers: readonly Ignore[]): boolean {
   return matchers.some((matcher) => matcher.ignores(path));
 }
 
+function requireChangeCapacity(includedFileCount: number): void {
+  if (includedFileCount >= MAX_CHANGED_FILES) {
+    throw new WorktreeDiffError(
+      'DIFF_TOO_LARGE',
+      'The worktree contains more than 500 changed paths.',
+    );
+  }
+}
+
 async function validatePath(repositoryRoot: string, path: string): Promise<void> {
   if (!repositoryRelativePathSchema.safeParse(path).success) {
     throw new WorktreeDiffError('UNSAFE_PATH', 'Git returned an unsafe repository path.');
@@ -306,46 +315,57 @@ function decodeText(content: Buffer): string | undefined {
 }
 
 async function readUntrackedFile(repositoryRoot: string, path: string): Promise<ChangedFile> {
-  const absolutePath = resolve(repositoryRoot, ...path.split('/'));
-  const fileStat = await stat(absolutePath);
-  if (!fileStat.isFile()) {
-    throw new WorktreeDiffError('UNSAFE_PATH', 'An untracked path is not a regular file.');
-  }
-  if (fileStat.size > MAX_UNTRACKED_FILE_BYTES) {
-    throw new WorktreeDiffError(
-      'DIFF_TOO_LARGE',
-      'An untracked file exceeds the 1 MiB inspection limit.',
-    );
-  }
+  try {
+    const absolutePath = resolve(repositoryRoot, ...path.split('/'));
+    const fileStat = await stat(absolutePath);
+    if (!fileStat.isFile()) {
+      throw new WorktreeDiffError('UNSAFE_PATH', 'An untracked path is not a regular file.');
+    }
+    if (fileStat.size > MAX_UNTRACKED_FILE_BYTES) {
+      throw new WorktreeDiffError(
+        'DIFF_TOO_LARGE',
+        'An untracked file exceeds the 1 MiB inspection limit.',
+      );
+    }
 
-  const content = await readFile(absolutePath);
-  const text = decodeText(content);
-  if (text === undefined) {
+    const content = await readFile(absolutePath);
+    const text = decodeText(content);
+    if (text === undefined) {
+      return {
+        path,
+        status: 'untracked',
+        additions: 0,
+        deletions: 0,
+        binary: true,
+        contentTruncated: false,
+        addedLines: [],
+      };
+    }
+
+    const lines = text.split(/\r?\n/);
+    if (lines.at(-1) === '') {
+      lines.pop();
+    }
     return {
       path,
       status: 'untracked',
-      additions: 0,
+      additions: lines.length,
       deletions: 0,
-      binary: true,
-      contentTruncated: false,
-      addedLines: [],
+      binary: false,
+      contentTruncated:
+        lines.length > MAX_ADDED_LINES || lines.some((line) => line.length > MAX_ADDED_LINE_LENGTH),
+      addedLines: lines
+        .slice(0, MAX_ADDED_LINES)
+        .map((line) => line.slice(0, MAX_ADDED_LINE_LENGTH)),
     };
+  } catch (error) {
+    if (error instanceof WorktreeDiffError) {
+      throw error;
+    }
+    throw new WorktreeDiffError('UNSAFE_PATH', 'An untracked path could not be read safely.', {
+      cause: error,
+    });
   }
-
-  const lines = text.split(/\r?\n/);
-  if (lines.at(-1) === '') {
-    lines.pop();
-  }
-  return {
-    path,
-    status: 'untracked',
-    additions: lines.length,
-    deletions: 0,
-    binary: false,
-    contentTruncated:
-      lines.length > MAX_ADDED_LINES || lines.some((line) => line.length > MAX_ADDED_LINE_LENGTH),
-    addedLines: lines.slice(0, MAX_ADDED_LINES).map((line) => line.slice(0, MAX_ADDED_LINE_LENGTH)),
-  };
 }
 
 export async function extractWorktreeDiff(
@@ -417,6 +437,7 @@ export async function extractWorktreeDiff(
     if (isIgnored(identity.path, matchers)) {
       continue;
     }
+    requireChangeCapacity(files.length);
     const fileStat = stats.get(identity.path);
     if (fileStat === undefined) {
       return malformedDiff();
@@ -439,14 +460,8 @@ export async function extractWorktreeDiff(
     if (trackedPaths.has(path) || isIgnored(path, matchers)) {
       continue;
     }
+    requireChangeCapacity(files.length);
     files.push(await readUntrackedFile(repositoryRoot, path));
-  }
-
-  if (files.length > MAX_CHANGED_FILES) {
-    throw new WorktreeDiffError(
-      'DIFF_TOO_LARGE',
-      'The worktree contains more than 500 changed paths.',
-    );
   }
 
   files.sort((left, right) => left.path.localeCompare(right.path));

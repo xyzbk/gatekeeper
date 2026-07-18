@@ -103,6 +103,20 @@ describe('worktree change extraction', () => {
     });
   });
 
+  it('accepts a safe path segment that begins with two dots', async () => {
+    const root = await createRepository();
+    await writeRepositoryFile(root, 'README.md', '# Fixture\n');
+    await commitAll(root);
+    await writeRepositoryFile(root, '..config/app.ts', 'export const valid = true;\n');
+    const { createGitProvider } = await import('./git-provider.js');
+
+    const result = await createGitProvider().getWorktreeDiff(root);
+
+    expect(result.files).toContainEqual(
+      expect.objectContaining({ path: '..config/app.ts', status: 'untracked' }),
+    );
+  });
+
   it('reports renames and binary changes without reading binary content', async () => {
     const root = await createRepository();
     await writeRepositoryFile(root, 'src/old.ts', 'export const value = 1;\n');
@@ -195,6 +209,54 @@ describe('worktree change extraction', () => {
     } catch (error) {
       expect(error).toEqual(expect.objectContaining({ code: 'DIFF_TOO_LARGE' }));
       expect(String(error)).not.toContain('privateValue');
+    }
+  });
+
+  it('rejects the 501st included path before reading its content', async () => {
+    const root = await createRepository();
+    await mkdir(join(root, 'untracked'), { recursive: true });
+    const existingPaths = Array.from({ length: 500 }, (_, index) => `untracked/${index}.ts`);
+    await Promise.all(
+      existingPaths.map((path) => writeFile(join(root, ...path.split('/')), '', 'utf8')),
+    );
+    const untrackedOutput = [...existingPaths, 'untracked/missing.ts']
+      .map((path) => `${path}\0`)
+      .join('');
+    const runGit = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 0, stdout: root, stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: untrackedOutput, stderr: '' });
+    const { createGitProvider } = await import('./git-provider.js');
+
+    await expect(createGitProvider({ runGit }).getWorktreeDiff(root)).rejects.toEqual(
+      expect.objectContaining({ code: 'DIFF_TOO_LARGE' }),
+    );
+  });
+
+  it('returns a stable safe error when an untracked file disappears during inspection', async () => {
+    const root = await createRepository();
+    const runGit = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 0, stdout: root, stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'private-disappeared.ts\0',
+        stderr: '',
+      });
+    const { createGitProvider } = await import('./git-provider.js');
+
+    try {
+      await createGitProvider({ runGit }).getWorktreeDiff(root);
+      expect.unreachable('Expected the disappearing file to be rejected.');
+    } catch (error) {
+      expect(error).toEqual(expect.objectContaining({ code: 'UNSAFE_PATH' }));
+      expect(String(error)).not.toContain('private-disappeared');
     }
   });
 

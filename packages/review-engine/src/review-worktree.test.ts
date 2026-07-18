@@ -179,6 +179,40 @@ describe('reviewWorktree', () => {
     );
   });
 
+  it('escalates when a configured import-boundary source was not fully inspected', () => {
+    const result = review(
+      [
+        changedFile('src/routes/users.ts', {
+          addedLines: [],
+          contentTruncated: true,
+        }),
+      ],
+      {
+        version: 1,
+        architecture: {
+          importBoundaries: [
+            {
+              id: 'routes-no-repositories',
+              from: ['src/routes/**'],
+              deny: ['src/repositories/**'],
+              enforcement: 'required',
+            },
+          ],
+        },
+      },
+    );
+
+    expect(result.verdict).toBe('ESCALATE');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        category: 'architecture',
+        title: 'Import-boundary inspection incomplete',
+        authority: 'DETERMINISTIC',
+        humanApprovalRequired: true,
+      }),
+    );
+  });
+
   it('computes deterministic metrics and excludes policy-ignored changes', () => {
     const result = review(
       [

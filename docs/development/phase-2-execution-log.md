@@ -1,8 +1,10 @@
 # Phase 2 execution log
 
-Status: ACTIVE
+Status: COMPLETE
 
 Started: 2026-07-18
+
+Completed: 2026-07-18
 
 Goal: deliver the canonical deterministic worktree-review phase and stop before persistence, MCP, model reasoning, or GitHub review.
 
@@ -34,7 +36,7 @@ No baseline failure was observed. pnpm reported that 11.14.0 exists; the project
 - Execute inline on `master`: the user previously required every passing step on `origin/master`, and the canonical plan forbids delegation without explicit permission.
 - Use one new runtime dependency, `ignore`, only for Git-compatible `.gatekeeperignore` and policy-pattern semantics. Native Git continues to own `.gitignore` handling.
 - Expose bounded file summaries and added-line inspection only inside the Git/review boundary; CLI, API, dashboard, and logs never receive raw diffs.
-- Include `contentTruncated` in each change summary so policy and presentation layers can disclose when bounded added-line evidence is incomplete instead of silently treating it as complete.
+- Include `contentTruncated` in each change summary so presentation can disclose incomplete evidence; a configured import-boundary source with truncated inspection escalates instead of silently passing.
 - Use disposable generated Git repositories for acceptance because nested `.git` directories cannot be committed safely.
 
 ## Task 1 evidence
@@ -158,6 +160,43 @@ pnpm audit --audit-level high           PASS - no known vulnerabilities
 
 The dashboard sends only an empty JSON object and the bearer Authorization header. It displays the already-bounded ReviewRun contract and never receives raw source or diff content.
 
+## Task 6 evidence
+
+Public contract reconciliation:
+
+- README, security model, architecture, policy, verdict, local API, CLI, and review-pipeline documentation now describe the implemented Phase 2 behavior and explicit deferrals.
+- The policy reference identifies later-phase fields that are parsed but not evaluated, preventing configuration support from being mistaken for enforcement.
+- The completion report records the Phase 3 entry condition and stops MCP, Codex skill, GitHub, model, and persistence work from beginning early.
+
+Expected RED and audit corrections:
+
+- A 501-path regression initially reached a missing untracked file and surfaced raw `ENOENT` before the cap. Capacity is now checked before every included content read.
+- A single disappearing untracked file also surfaced the platform error object. It now becomes a stable safe `UNSAFE_PATH` worktree error without echoing the path.
+- The first two-dot path regression failed before reaching containment because its test repository had no `HEAD`. After adding the required baseline commit, it proved that `..config/` was incorrectly treated as parent traversal. Containment now rejects only a complete `..` parent segment while retaining traversal and symlink escape protection.
+- A configured import-boundary source with truncated added-line inspection initially returned `FAST_PATH`. It now produces a deterministic high-severity, human-approval finding and `ESCALATE`; incomplete evidence still cannot produce `BLOCK`.
+- The first post-audit full gate found only Prettier drift in the rewritten untracked reader. Normal formatting corrected it; the complete gate then passed without an exception or suppression.
+
+Final acceptance evidence:
+
+```text
+pnpm install --frozen-lockfile           PASS - already up to date, pnpm 11.9.0
+pnpm lint                                PASS
+pnpm typecheck                           PASS
+pnpm test                                PASS - 20 files, 101 tests
+pnpm build                               PASS
+pnpm format:check                        PASS
+pnpm audit --audit-level high            PASS - no known vulnerabilities
+pnpm fixtures:prepare                    PASS twice
+policy validate clean                    PASS
+review worktree clean --format json      FAST_PATH, schema v1, exit 0
+review worktree missing-test --format json REQUIRE_CHANGES, schema v1, exit 0
+review worktree protected-path --format json BLOCK, schema v1, exit 0
+live POST /v1/reviews/worktree           REQUIRE_CHANGES, schema v1
+foreground service cleanup               PASS
+```
+
+The final backend/security, frontend/accessibility, and Ponytail whole-phase reviews found no unresolved issue after these corrections. No dependency beyond the already-justified `ignore` package was added, and no speculative layer or future-phase package was introduced. Ponytail result: Lean already. Ship.
+
 ## Task ledger
 
 | Task                                 | State    | Commit    | Verification                                                               | Failures and corrections  |
@@ -166,8 +205,8 @@ The dashboard sends only an empty JSON object and the bearer Authorization heade
 | 2. Deterministic review engine       | complete | dd6b1a9   | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
 | 3. Policy loader, CLI, fixtures      | complete | d7d2676   | Focused: 8/8 PASS; root lint/typecheck/test (80)/build/format/audit PASS   | See Task 3 evidence above |
 | 4. Local review API                  | complete | 6008345   | Focused: 21/21 PASS; root lint/typecheck/test (83)/build/format/audit PASS | See Task 4 evidence above |
-| 5. Review Inspector                  | complete | this step | Focused: 32/32 PASS; root lint/typecheck/test (97)/build/format/audit PASS | See Task 5 evidence above |
-| 6. Acceptance and documentation      | pending  | —         | —                                                                          | —                         |
+| 5. Review Inspector                  | complete | 531582d   | Focused: 32/32 PASS; root lint/typecheck/test (97)/build/format/audit PASS | See Task 5 evidence above |
+| 6. Acceptance and documentation      | complete | this step | Root lint/typecheck/test (101)/build/format/audit + fixtures/API PASS      | See Task 6 evidence above |
 
 ## Scope boundary
 

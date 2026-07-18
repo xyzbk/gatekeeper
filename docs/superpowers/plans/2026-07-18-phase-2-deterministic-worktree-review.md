@@ -230,14 +230,14 @@ Response: ReviewRun v1
 - Modify: `docs/development/phase-2-execution-log.md`
 - Modify: `docs/progress.md`
 
-- [ ] Review every canonical Phase 2 deliverable and test against its implementation; record any deliberate limitation.
-- [ ] Document policy semantics, change bounds, CLI/API contracts, review pipeline, privacy behavior, errors/failures, and exact stop gate.
-- [ ] Run `pnpm install --frozen-lockfile`, lint, typecheck, test, build, format check, audit, and `pnpm fixtures:prepare`.
-- [ ] Run the exact three fixture reviews plus policy validation and confirm expected verdicts.
-- [ ] Run a final whole-diff code/security/Ponytail review and resolve every important finding.
-- [ ] Update `docs/progress.md` with the complete report and exact Phase 3 entry condition.
-- [ ] Commit and push `docs(phase-2): record verified completion`.
-- [ ] Verify a clean worktree and `HEAD === origin/master`, then mark the goal complete.
+- [x] Review every canonical Phase 2 deliverable and test against its implementation; record any deliberate limitation.
+- [x] Document policy semantics, change bounds, CLI/API contracts, review pipeline, privacy behavior, errors/failures, and exact stop gate.
+- [x] Run `pnpm install --frozen-lockfile`, lint, typecheck, test, build, format check, audit, and `pnpm fixtures:prepare`.
+- [x] Run the exact three fixture reviews plus policy validation and confirm expected verdicts.
+- [x] Run a final whole-diff code/security/Ponytail review and resolve every important finding.
+- [x] Update `docs/progress.md` with the complete report and exact Phase 3 entry condition.
+- [x] Commit and push `docs(phase-2): record verified completion`.
+- [x] Verify a clean worktree and `HEAD === origin/master`, then mark the goal complete.
 
 ## Stop gate
 

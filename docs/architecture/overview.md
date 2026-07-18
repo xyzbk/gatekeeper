@@ -2,36 +2,40 @@
 
 Gatekeeper is a local-first, evidence-first repository governance agent. Codex remains the reasoning surface; Gatekeeper owns bounded evidence retrieval and deterministic enforcement.
 
-## Intended runtime
+## Current Phase 2 runtime
 
 ```text
-Codex -> repository skill -> stdio MCP -> localhost API -> application core
-Browser dashboard --------------------------^            -> SQLite Project Memory
-                                                           -> local Git / read-only gh
+CLI review ─┐
+            ├─> policy loader ─> bounded Git ChangeSet ─> pure review engine ─> ReviewRun v1
+HTTP review ┘                                                        │
+                                                                     ├─> CLI text/JSON
+                                                                     ├─> local API
+                                                                     └─> React Review Inspector
 ```
 
-The current Phase 1 foundation adds the first concrete infrastructure adapter:
+The current dependency direction is:
 
 ```text
-apps/cli -> packages/config + packages/git-adapter + apps/server
+apps/cli -> packages/config + packages/git-adapter + packages/review-engine + apps/server
 apps/server -> packages/config + packages/contracts
 apps/dashboard -> packages/contracts
+packages/review-engine -> packages/domain + packages/contracts + policy types
 packages/git-adapter -> packages/contracts
 packages/contracts -> packages/domain
 packages/testkit -> packages/domain
 ```
 
-The `domain` package owns public entities and the safety rule that only a hard deterministic finding can produce `BLOCK`. `contracts` owns strict serialized shapes. Presentation and future adapters must depend inward and must not redefine these rules.
+The `domain` package owns public entities and the rule that only a hard deterministic finding can produce `BLOCK`. `contracts` owns strict Zod shapes and their generated JSON Schemas. The review engine owns policy behavior. CLI, HTTP, and React are presentation/composition adapters and do not redefine verdict logic.
 
-`git-adapter` resolves the repository selected at startup, verifies that Git's discovered top level contains the requested path, and returns a strict `RepositorySnapshot` with root, branch, HEAD, dirty state, and origin. Every Git invocation uses `execa` with an executable plus an argument array. Detached HEAD and an absent `origin` are represented as `null` rather than invented values.
+`git-adapter` resolves the selected repository, verifies the canonical top level, and returns a strict repository snapshot. Its Phase 2 worktree provider combines staged and unstaged changes relative to `HEAD` with untracked files, validates every path, applies ignore layers, and caps all content before returning an internal ChangeSet. Every Git call uses `execa` with an executable and argument array.
 
-The Phase 1 status contracts also define health, authenticated status, dashboard bootstrap, tool availability, and machine-local service metadata. Fastify JSON Schemas are generated directly from these Zod contracts.
+`review-engine` is pure after its inputs are supplied. It sorts files, calculates metrics, evaluates change-size, source/test, risk-zone, added-relative-import, and protected-path rules, then delegates final verdict assembly to `domain`. It returns ReviewRun v1 with bounded change summaries; inspected added lines never enter that contract. See [review-pipeline.md](review-pipeline.md).
 
-`apps/server` is a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, serves the static dashboard, and exposes only `/health`, `/bootstrap.json`, and `/v1/status` in this phase. The repository snapshot is provided at startup and no HTTP input can select another path.
+`apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, serves the built dashboard, and exposes health, bootstrap, status, and authenticated worktree-review endpoints. The review endpoint calls one injected function already bound to the startup repository. HTTP input cannot select a different repository.
 
-`apps/dashboard` is the browser presentation adapter. It uses React Router for the small route boundary and TanStack Query for the authenticated status request. A closure reads bootstrap once and retains the bearer token only in memory. The overview renders only contract-validated repository, tool, service, feature, and path data; loading, absent-value, request-error, and unknown-route states are explicit. CSS Modules and shared custom properties provide the restrained product shell without a component framework, charting package, or global state layer.
+`apps/dashboard` remains a small browser adapter. React Router provides Overview and `/reviews/worktree`; TanStack Query manages the status query and review mutation. A shared closure reads bootstrap once and holds the bearer token only in memory. Review states are explicit: ready, pending, retryable error, and completed. The result renders only the strict ReviewRun contract.
 
-`gatekeeper start [path]` composes these adapters without adding another application layer. It resolves one repository snapshot, probes only local tool versions, starts Fastify with the built dashboard, prints the loopback URL, and waits for `SIGINT` or `SIGTERM`. Shutdown closes Fastify and removes ephemeral service metadata. It does not open a browser, daemonize, supervise a child process, or persist lifecycle state.
+`gatekeeper start [path]` composes the same `runWorktreeReview` function used by direct CLI review. It does not open a browser, daemonize, mutate the repository, persist a review, or call a model.
 
 ## Runtime constraints
 
@@ -40,6 +44,6 @@ The Phase 1 status contracts also define health, authenticated status, dashboard
 - Tests are deterministic and offline.
 - Packages are created only in the phase that needs working behavior.
 
-## Phase 1 boundary
+## Phase 2 boundary
 
-Phase 1 is complete with only `packages/git-adapter`, `apps/server`, and `apps/dashboard` added to the Phase 0 workspace. The phase stops before diff review, SQLite, MCP, GitHub calls, and model reasoning; those boundaries remain closed until their scheduled phases.
+Phase 2 is complete and reviews are intentionally ephemeral. There is no SQLite database, Project Memory, FTS5 index, MCP server, Codex skill, GitHub synchronization, pull-request review, or model reasoning. Those packages and adapters are not created early.

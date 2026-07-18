@@ -231,11 +231,15 @@ function importBoundaryFindings(
   return (policy.architecture?.importBoundaries ?? []).flatMap((boundary) => {
     const sourceMatcher = createMatcher(boundary.from);
     const deniedMatcher = createMatcher(boundary.deny);
+    const incompleteSources = new Set<string>();
     const violations = new Set<string>();
     const sources = new Set<string>();
 
     for (const file of files) {
       if (!file.binary && matches(sourceMatcher, file.path)) {
+        if (file.contentTruncated) {
+          incompleteSources.add(file.path);
+        }
         for (const specifier of relativeImportSpecifiers(file.addedLines)) {
           const target = resolveImportPath(file.path, specifier);
           if (target !== undefined && matches(deniedMatcher, target)) {
@@ -246,13 +250,10 @@ function importBoundaryFindings(
       }
     }
 
+    const findings: Finding[] = [];
     const paths = [...uniqueSorted(sources), ...uniqueSorted(violations)];
-    if (paths.length === 0) {
-      return [];
-    }
-
-    return [
-      {
+    if (paths.length > 0) {
+      findings.push({
         id: findingId(`import-boundary:${boundary.id}`),
         category: 'architecture',
         severity: enforcementSeverity(boundary.enforcement),
@@ -268,8 +269,30 @@ function importBoundaryFindings(
         humanApprovalRequired: false,
         policyId: boundary.id,
         enforcement: boundary.enforcement,
-      } satisfies Finding,
-    ];
+      });
+    }
+
+    const incompletePaths = uniqueSorted(incompleteSources);
+    if (incompletePaths.length > 0) {
+      findings.push({
+        id: findingId(`import-boundary:${boundary.id}:incomplete`),
+        category: 'architecture',
+        severity: 'high',
+        authority: 'DETERMINISTIC',
+        confidence: 1,
+        title: 'Import-boundary inspection incomplete',
+        explanation: `Added-line inspection ended before boundary "${boundary.id}" could be checked completely.`,
+        evidence: pathEvidence(repositoryId, incompletePaths),
+        affectedPaths: incompletePaths,
+        remediation: ['Split the change or review the complete import surface manually.'],
+        falsePositiveRisk: 'none',
+        humanApprovalRequired: true,
+        policyId: boundary.id,
+        enforcement: 'advisory',
+      });
+    }
+
+    return findings;
   });
 }
 

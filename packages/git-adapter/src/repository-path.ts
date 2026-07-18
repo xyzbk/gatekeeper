@@ -1,5 +1,5 @@
 import { realpath, stat } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 export interface GitCommandResult {
   exitCode: number;
@@ -26,7 +26,10 @@ export class RepositoryInspectionError extends Error {
 export function isPathWithin(root: string, candidate: string): boolean {
   const pathFromRoot = relative(root, candidate);
 
-  return pathFromRoot === '' || (!pathFromRoot.startsWith('..') && !isAbsolute(pathFromRoot));
+  return (
+    pathFromRoot === '' ||
+    (pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
+  );
 }
 
 async function resolveRequestedDirectory(repositoryPath: string): Promise<string> {
