@@ -1,0 +1,19 @@
+{
+  "name": "@gatekeeper/project-memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@gatekeeper/contracts": "workspace:*",
+    "ignore": "7.0.6"
+  },
+  "devDependencies": {
+    "@gatekeeper/store-sqlite": "workspace:*"
+  }
+}

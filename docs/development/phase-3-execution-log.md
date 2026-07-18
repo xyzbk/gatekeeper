@@ -43,8 +43,8 @@ The requested feature branch is `codex/phase-3-project-memory`.
 | Task                                  | State    | Commit    | Verification                         | Failures and corrections  |
 | ------------------------------------- | -------- | --------- | ------------------------------------ | ------------------------- |
 | 1. Storage contracts and migrations   | complete | 4d19aad   | Root gates: 22 files, 115 tests PASS | See Task 1 evidence below |
-| 2. Bounded Git indexing sources       | complete | this step | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
-| 3. Incremental indexing and retrieval | pending  | —         | —                                    | —                         |
+| 2. Bounded Git indexing sources       | complete | c41a79c   | Root gates: 24 files, 122 tests PASS | See Task 2 evidence below |
+| 3. Incremental indexing and retrieval | complete | this step | Root gates: 25 files, 130 tests PASS | See Task 3 evidence below |
 | 4. Doctor, CLI, and fixture           | pending  | —         | —                                    | —                         |
 | 5. Persistent local API               | pending  | —         | —                                    | —                         |
 | 6. Dashboard memory and review routes | pending  | —         | —                                    | —                         |
@@ -122,6 +122,48 @@ Task gate:
 pnpm lint                        PASS
 pnpm typecheck                   PASS
 pnpm test                        PASS — 24 files, 122 tests
+pnpm build                       PASS
+pnpm format:check                PASS
+pnpm audit --audit-level high    PASS — no known vulnerabilities
+```
+
+## Task 3 evidence
+
+Expected RED:
+
+- The focused suite initially failed because the Project Memory orchestration package did not exist.
+- Repository documentation could not satisfy the shared evidence contract because the evidence source enum omitted `documentation`.
+
+Corrections and learning:
+
+- Spreading a class-backed store fixture erased its prototype methods. The test persistence probe now delegates methods explicitly and every opened database is closed unconditionally.
+- Git accepts commit timestamps with offsets, while the memory contract requires normalized timestamps. Commit evidence is normalized to UTC at the Project Memory boundary.
+- A repository-isolation fixture accidentally put the search term in the second repository's path. The corrected fixture proves isolation using an unrelated path and content.
+- An ignore-order assertion assumed sorting that the adapter intentionally does not perform. The test now verifies the deterministic policy, Gatekeeper, and Git ignore precedence actually passed to the source.
+- `documentation` was added to the shared evidence source enum and the checked-in verdict schema was regenerated, keeping serialized contracts aligned.
+- The first lint pass found injected Promise-returning fakes marked `async` without awaiting. Exact `Promise.resolve` and `Promise.reject` returns removed the noise without suppressions.
+
+Behavior proven:
+
+- Remote-first stable repository identity and first-seen preservation across equivalent GitHub SSH and HTTPS remotes.
+- Incremental first, unchanged, changed, and deleted indexing with zero rewrites for an unchanged tree and path-scoped replacement for changed documents.
+- Markdown chunking capped at 2,000 characters, bounded policy excerpts, secret denial, layered ignore rules, regular-file enforcement, UTF-8 and size limits, and repository isolation.
+- Exact matches precede FTS matches; ADR, documentation, policy, and bounded commit evidence remain explicitly untrusted repository content.
+- Prompt-like repository text remains inert data and is never interpreted as an instruction.
+
+Focused result:
+
+```text
+Project Memory identity/index/search/review behavior   PASS — 7 tests
+Documentation evidence contract                        PASS — included in contract suite
+```
+
+Task gate:
+
+```text
+pnpm lint                        PASS
+pnpm typecheck                   PASS
+pnpm test                        PASS — 25 files, 130 tests
 pnpm build                       PASS
 pnpm format:check                PASS
 pnpm audit --audit-level high    PASS — no known vulnerabilities

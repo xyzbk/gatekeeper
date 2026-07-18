@@ -26,6 +26,7 @@ export const EVIDENCE_SOURCE_TYPES = [
   'issue',
   'comment',
   'adr',
+  'documentation',
   'policy',
   'test',
   'decision',

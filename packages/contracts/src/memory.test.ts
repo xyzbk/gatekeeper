@@ -127,4 +127,28 @@ describe('Project Memory contracts', () => {
     ).toThrow();
     expect(memorySearchResponseJsonSchema.$id).toBe('gatekeeper:memory-search-response-v1');
   });
+
+  it('accepts repository documentation as an evidence source', () => {
+    expect(
+      memorySearchResponseSchema.parse({
+        schemaVersion: 1,
+        results: [
+          {
+            documentId: 'document_readme',
+            match: 'exact',
+            trust: 'untrusted_repository_content',
+            status: 'active',
+            occurredAt: null,
+            evidence: {
+              sourceType: 'documentation',
+              repositoryId: repository.repositoryId,
+              sourceId: 'README.md',
+              path: 'README.md',
+              excerpt: 'Repository guide.',
+            },
+          },
+        ],
+      }).results[0]?.evidence.sourceType,
+    ).toBe('documentation');
+  });
 });

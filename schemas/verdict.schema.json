@@ -92,6 +92,7 @@
                     "issue",
                     "comment",
                     "adr",
+                    "documentation",
                     "policy",
                     "test",
                     "decision"

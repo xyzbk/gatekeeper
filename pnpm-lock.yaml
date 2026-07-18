@@ -165,6 +165,19 @@ importers:
         specifier: 7.0.6
         version: 7.0.6
 
+  packages/project-memory:
+    dependencies:
+      '@gatekeeper/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      ignore:
+        specifier: 7.0.6
+        version: 7.0.6
+    devDependencies:
+      '@gatekeeper/store-sqlite':
+        specifier: workspace:*
+        version: link:../store-sqlite
+
   packages/review-engine:
     dependencies:
       '@gatekeeper/config':
