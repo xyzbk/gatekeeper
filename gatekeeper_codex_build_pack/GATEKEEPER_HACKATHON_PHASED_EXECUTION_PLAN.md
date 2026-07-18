@@ -376,6 +376,12 @@ Required final tool set:
 - gatekeeper_complete_review
 - gatekeeper_get_review
 
+Phase 4 ships the six tools that operate entirely on the fixed local repository:
+`gatekeeper_status`, `gatekeeper_index_repository`, `gatekeeper_review_worktree`,
+`gatekeeper_search_memory`, `gatekeeper_complete_review`, and
+`gatekeeper_get_review`. Phase 5 adds `gatekeeper_review_pull_request` only after
+the read-only GitHub adapter and pull-request review API exist.
+
 Tool requirements:
 
 - Structured content and a concise human summary.
@@ -810,7 +816,13 @@ Make Gatekeeper a native Codex collaborator while keeping enforcement determinis
 - Keep stdout protocol-clean; logs go to stderr and never contain source or secrets.
 - Add project .codex/config.toml using the documented mcp_servers table.
 - Create .agents/skills/gatekeeper/SKILL.md and references.
-- Implement the seven MCP tools defined in this plan.
+- Implement the six local MCP tools assigned to Phase 4:
+  - gatekeeper_status
+  - gatekeeper_index_repository
+  - gatekeeper_review_worktree
+  - gatekeeper_search_memory
+  - gatekeeper_complete_review
+  - gatekeeper_get_review
 - Add accurate read-only/write annotations.
 - Implement the review completion handshake:
   1. Review tool creates deterministic draft and evidence candidates.
@@ -843,7 +855,7 @@ Make Gatekeeper a native Codex collaborator while keeping enforcement determinis
 ## Tests
 
 - Codex-compatible config loads only from a trusted project.
-- MCP server lists exactly the intended tools.
+- MCP server lists exactly the six Phase 4 tools and does not expose pull-request review.
 - Every tool validates inputs and outputs.
 - MCP stdout contains no logs.
 - Prompt injection cannot alter tool behavior.
@@ -873,6 +885,7 @@ Expected:
 - Tool calls reach the local service.
 - A completed review appears in the dashboard.
 - Repository prompt injection is explicitly ignored.
+- Pull-request review is absent until Phase 5 supplies its real backend.
 
 ## Stop gate
 
@@ -903,6 +916,8 @@ Deliver the differentiated historical-reasoning experience on a real pull reques
 - Add bounded remote sync limits in configuration.
 - Add incremental remote synchronization using updated timestamps; do not build organization-wide cursors.
 - Add pull-request review to CLI, API, MCP, and dashboard.
+- Add `gatekeeper_review_pull_request` as the seventh MCP tool only after the
+  pull-request API exists; keep the other six Phase 4 tool contracts stable.
 - Add gatekeeper sync github to the CLI and keep it read-only.
 - Derive evidence search terms from:
   - pull request title
@@ -935,6 +950,8 @@ Deliver the differentiated historical-reasoning experience on a real pull reques
 - Offline fixture produces the same normalized documents as gh adapter output.
 - No GitHub write command exists in production adapters.
 - Seeder writes only with explicit --apply and stable markers.
+- MCP lists the complete seven-tool set and pull-request review reaches the real
+  read-only GitHub-backed review path.
 
 ## Acceptance
 
@@ -942,6 +959,7 @@ Deliver the differentiated historical-reasoning experience on a real pull reques
     pnpm typecheck
     pnpm test
     pnpm build
+    codex mcp list
     gatekeeper sync github demo/gatekeeper-demo-repo
     gatekeeper review pr <redis-pr-number> demo/gatekeeper-demo-repo --format json
 

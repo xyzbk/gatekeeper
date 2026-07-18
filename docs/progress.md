@@ -321,7 +321,7 @@ Expected RED states, unexpected failures, corrections, and command evidence are 
 
 ### Exact next-phase entry condition
 
-Phase 4 may begin only after an explicit user request. It may create the stdio MCP server, trusted-project Codex configuration, repository Gatekeeper skill, seven scheduled tools, and the strict Codex completion handshake. It must stop before GitHub synchronization, pull-request review, publication, or a second model provider.
+Phase 4 may begin only after an explicit user request. It may create the stdio MCP server, trusted-project Codex configuration, repository Gatekeeper skill, six local tools, and the strict Codex completion handshake. The seventh final tool, `gatekeeper_review_pull_request`, belongs to Phase 5 after its real GitHub-backed review path exists. Phase 4 must stop before GitHub synchronization, pull-request review, publication, or a second model provider.
 
 ## Phase 3 scope boundary audit at completion
 
