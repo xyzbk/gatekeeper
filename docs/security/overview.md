@@ -80,7 +80,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 ## Deferred boundaries
 
-Pull-request CLI and fixed-repository API composition are implemented. MCP/dashboard composition remains inside Phase 5. GitHub publication, checks, comments, labels, merges, closes, and Actions remain deferred.
+Pull-request CLI, fixed-repository API, MCP, and dashboard composition are implemented. The dashboard creates external anchors only for parsed `https://github.com/...` evidence URLs and renders all other values as text. GitHub publication, checks, comments, labels, merges, closes, and Actions remain deferred.
 
 ## Logging
 

@@ -208,6 +208,7 @@ The built React application supports direct entry and refresh for these fixed lo
 
 - `GET /` — repository overview;
 - `GET /reviews/worktree` — interactive worktree review;
+- `GET /reviews/pull-request` — explicit read-only history sync and pull-request review;
 - `GET /reviews/:reviewId` — one persisted review selected by its validated ID;
 - `GET /memory` — Project Memory search for the repository fixed at service startup.
 

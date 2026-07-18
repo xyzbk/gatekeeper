@@ -37,6 +37,15 @@ export function AppShell({ children }: AppShellProps) {
               Reviews
             </NavLink>
             <NavLink
+              aria-label="Pull request reviews"
+              className={({ isActive }) =>
+                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+              }
+              to="/reviews/pull-request"
+            >
+              Pull requests
+            </NavLink>
+            <NavLink
               aria-label="Project Memory"
               className={({ isActive }) =>
                 isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink

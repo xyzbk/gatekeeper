@@ -401,6 +401,23 @@
   overflow-wrap: anywhere;
 }
 
+.reviewTarget {
+  margin: 10px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+}
+
+.reviewNotice {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 .reviewActions {
   display: flex;
   flex: 0 0 auto;
@@ -471,6 +488,68 @@
 
 .memorySearchForm input:focus {
   border-color: var(--focus);
+}
+
+.pullRequestForm {
+  max-width: 720px;
+  margin-top: 32px;
+  padding: 22px 0 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.pullRequestForm label {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.pullRequestForm > div {
+  display: flex;
+  gap: 10px;
+}
+
+.pullRequestForm input {
+  width: min(220px, 100%);
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pullRequestForm input:hover {
+  border-color: var(--ink-tertiary);
+}
+
+.pullRequestForm input:focus-visible {
+  border-color: var(--focus);
+}
+
+.pullRequestError {
+  max-width: 720px;
+  margin-top: 20px;
+  color: var(--ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.pullRequestError p {
+  margin: 0;
+}
+
+.pullRequestError p + p {
+  margin-top: 5px;
+}
+
+.pullRequestError .primaryButton {
+  margin-top: 16px;
 }
 
 .memoryProgress,
@@ -917,6 +996,30 @@
   line-height: 1.5;
 }
 
+.evidenceItems {
+  list-style: none;
+  padding-left: 0 !important;
+}
+
+.evidenceItems li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.evidenceItems a {
+  color: var(--ink);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  text-underline-offset: 3px;
+}
+
+.evidenceItems li > span:last-child {
+  color: var(--ink-tertiary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  overflow-wrap: anywhere;
+}
+
 .pathItems {
   list-style: none;
   padding-left: 0 !important;
@@ -1098,6 +1201,16 @@
   .memorySearchForm > div {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pullRequestForm > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pullRequestForm input,
+  .pullRequestForm .primaryButton {
+    width: 100%;
   }
 
   .memorySearchForm .primaryButton {

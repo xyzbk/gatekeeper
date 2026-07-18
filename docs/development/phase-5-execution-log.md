@@ -196,3 +196,34 @@ GREEN:
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (34 files, 215 tests).
 - `pnpm build`: PASS.
+
+### Task 7 — focused dashboard pull-request review
+
+Expected RED:
+
+- The dashboard client had no fixed-repository sync/PR method and the direct `/reviews/pull-request` route did not exist.
+
+Implemented:
+
+- Added an explicit “Sync & review pull request” form with a labelled native positive-integer input, scoped pending/error states, and the existing Review Inspector result language.
+- The browser action reads the fixed repository, requests the explicit bounded sync, then reviews the PR. Complete and partial sync results remain typed; a partial result displays a non-blocking status while valid evidence remains usable.
+- Added the direct React/Fastify route and one focused navigation entry without changing the existing dashboard visual system.
+- Review findings now render evidence identities as text and create external anchors only for parsed `https://github.com/...` URLs with `_blank` plus `noreferrer noopener`.
+
+Aggressive checks and audit findings:
+
+- Zero PR numbers fail before bootstrap or network access; the native form also enforces integer values of at least one.
+- A lookalike `github.com.attacker.example` URL remains plain text while the exact GitHub PR URL becomes a safe link.
+- Simulated private GitHub body/token errors produce only bounded retry guidance.
+- Dashboard typecheck initially rejected an explicit `status={undefined}` under exact optional properties. Conditional prop construction preserved the strict contract.
+- The current Vercel Web Interface Guidelines audit found the new form/link/status structure sound. The unnecessary placeholder was removed and the input border state now uses `:focus-visible`.
+
+GREEN:
+
+- Dashboard tests: PASS (5 files, 40 tests).
+- Focused Fastify static/API suite: PASS (26 tests).
+- Dashboard typecheck: PASS.
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (35 files, 222 tests).
+- `pnpm build`: PASS.

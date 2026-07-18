@@ -7,6 +7,7 @@ import { AppShell } from '../components/app-shell.js';
 import { OverviewRoute } from '../routes/overview-route.js';
 import { MemoryRoute } from '../routes/memory-route.js';
 import { ReviewDetailRoute } from '../routes/review-detail-route.js';
+import { PullRequestReviewRoute } from '../routes/pull-request-review-route.js';
 import { ReviewRoute } from '../routes/review-route.js';
 import styles from '../styles/dashboard.module.css';
 
@@ -14,6 +15,7 @@ interface DashboardAppProps {
   getReview: ReviewClient['getReview'];
   loadStatus: StatusClient['getStatus'];
   reviewWorktree: ReviewClient['reviewWorktree'];
+  reviewPullRequest: ReviewClient['reviewPullRequest'];
   searchMemory: MemoryClient['search'];
 }
 
@@ -32,6 +34,7 @@ export function DashboardApp({
   getReview,
   loadStatus,
   reviewWorktree,
+  reviewPullRequest,
   searchMemory,
 }: DashboardAppProps) {
   return (
@@ -40,6 +43,10 @@ export function DashboardApp({
         <Route element={<OverviewRoute loadStatus={loadStatus} />} path="/" />
         <Route element={<MemoryRoute searchMemory={searchMemory} />} path="/memory" />
         <Route element={<ReviewRoute reviewWorktree={reviewWorktree} />} path="/reviews/worktree" />
+        <Route
+          element={<PullRequestReviewRoute reviewPullRequest={reviewPullRequest} />}
+          path="/reviews/pull-request"
+        />
         <Route element={<ReviewDetailRoute getReview={getReview} />} path="/reviews/:reviewId" />
         <Route element={<NotFoundRoute />} path="*" />
       </Routes>

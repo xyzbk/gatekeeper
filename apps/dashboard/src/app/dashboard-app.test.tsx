@@ -2,7 +2,12 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import type { MemorySearchResult, ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
+import type {
+  GitHubSyncResult,
+  MemorySearchResult,
+  ReviewRunContract,
+  StatusResponse,
+} from '@gatekeeper/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -107,6 +112,27 @@ async function renderDashboard(
   searchMemory: (query: string) => Promise<MemorySearchResult[]> = () =>
     Promise.resolve([memoryResult]),
   getReview: (reviewId: string) => Promise<ReviewRunContract> = () => Promise.resolve(review),
+  reviewPullRequest: (pullRequestNumber: number) => Promise<{
+    review: ReviewRunContract;
+    sync: GitHubSyncResult;
+  }> = () =>
+    Promise.resolve({
+      review: {
+        ...review,
+        target: { kind: 'pull_request', display: 'Pull request #12', pullRequestNumber: 12 },
+      },
+      sync: {
+        schemaVersion: 1,
+        repositoryId: review.repositoryId,
+        provider: 'github',
+        syncedAt: review.createdAt,
+        cursor: null,
+        partial: false,
+        documents: { received: 0, written: 0, unchanged: 0 },
+        links: { received: 0, written: 0, unchanged: 0 },
+        failures: [],
+      },
+    }),
 ) {
   const { DashboardApp } = await import('./dashboard-app.js');
   const queryClient = new QueryClient({
@@ -120,6 +146,7 @@ async function renderDashboard(
           getReview={getReview}
           loadStatus={loadStatus}
           reviewWorktree={reviewWorktree}
+          reviewPullRequest={reviewPullRequest}
           searchMemory={searchMemory}
         />
       </MemoryRouter>
@@ -195,6 +222,18 @@ describe('dashboard application shell', () => {
 
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Return to overview' })).toHaveAttribute('href', '/');
+  });
+
+  it('supports direct entry to the pull-request Review Inspector', async () => {
+    await renderDashboard(() => Promise.resolve(status), '/reviews/pull-request');
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Review a GitHub pull request' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Pull request reviews' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 });
 

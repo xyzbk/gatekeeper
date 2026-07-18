@@ -37,6 +37,7 @@ createRoot(rootElement).render(
           getReview={reviewClient.getReview}
           loadStatus={statusClient.getStatus}
           reviewWorktree={reviewClient.reviewWorktree}
+          reviewPullRequest={reviewClient.reviewPullRequest}
           searchMemory={memoryClient.search}
         />
       </BrowserRouter>

@@ -123,11 +123,11 @@ function FindingList({ review }: { review: ReviewRunContract }) {
   return (
     <section aria-labelledby="review-findings" className={styles.reviewSection}>
       <div className={styles.reviewSectionHeader}>
-        <h2 id="review-findings">Deterministic findings</h2>
+        <h2 id="review-findings">Findings</h2>
         <span>{review.findings.length}</span>
       </div>
       {review.findings.length === 0 ? (
-        <p className={styles.reviewEmpty}>No deterministic policy findings were produced.</p>
+        <p className={styles.reviewEmpty}>No findings were produced.</p>
       ) : (
         <div className={styles.findingList}>
           {review.findings.map((finding) => (
@@ -154,6 +154,29 @@ function FindingList({ review }: { review: ReviewRunContract }) {
                   </ul>
                 </div>
               ) : null}
+              {finding.evidence.length > 0 ? (
+                <div className={styles.findingDetail}>
+                  <h4>Evidence</h4>
+                  <ul className={styles.evidenceItems}>
+                    {finding.evidence.map((evidence) => {
+                      const label = evidence.title ?? evidence.path ?? evidence.sourceId;
+                      const remoteUrl = safeGitHubUrl(evidence.remoteUrl);
+                      return (
+                        <li key={`${evidence.sourceType}:${evidence.sourceId}`}>
+                          {remoteUrl === undefined ? (
+                            <span>{label}</span>
+                          ) : (
+                            <a href={remoteUrl} rel="noreferrer noopener" target="_blank">
+                              {label}
+                            </a>
+                          )}
+                          {label === evidence.sourceId ? null : <span>{evidence.sourceId}</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
               <div className={styles.findingDetail}>
                 <h4>Remediation</h4>
                 <ul>
@@ -168,6 +191,23 @@ function FindingList({ review }: { review: ReviewRunContract }) {
       )}
     </section>
   );
+}
+
+function safeGitHubUrl(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' &&
+      url.hostname === 'github.com' &&
+      url.username === '' &&
+      url.password === ''
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function ChangeSummary({ review }: { review: ReviewRunContract }) {
@@ -230,10 +270,12 @@ export function ReviewResult({
   action,
   context = 'Review complete',
   review,
+  status,
 }: {
   action?: ReactNode;
   context?: string;
   review: ReviewRunContract;
+  status?: string;
 }) {
   return (
     <div aria-live="polite" className={styles.reviewResult}>
@@ -242,10 +284,16 @@ export function ReviewResult({
           <p className={styles.contextLabel}>{context}</p>
           <h1 className={verdictClassName(review.verdict)}>{review.verdict}</h1>
           <p className={styles.reviewSummary}>{review.summary}</p>
+          <p className={styles.reviewTarget}>{review.target.display}</p>
           <p className={styles.reviewIdentity}>Review ID: {review.reviewId}</p>
         </div>
         {action}
       </header>
+      {status === undefined ? null : (
+        <p className={styles.reviewNotice} role="status">
+          {status}
+        </p>
+      )}
       <ReviewMetrics review={review} />
       <FindingList review={review} />
       <ChangeSummary review={review} />

@@ -1,4 +1,9 @@
-import type { DashboardBootstrap, ReviewRunContract } from '@gatekeeper/contracts';
+import type {
+  DashboardBootstrap,
+  GitHubSyncResult,
+  RepositoryRecord,
+  ReviewRunContract,
+} from '@gatekeeper/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 const bearerToken = 'a'.repeat(43);
@@ -31,6 +36,30 @@ const review: ReviewRunContract = {
     },
   ],
   createdAt: '2026-07-18T12:00:00.000Z',
+};
+const repository: RepositoryRecord = {
+  schemaVersion: 1,
+  repositoryId: review.repositoryId,
+  root: 'D:\\work\\gatekeeper',
+  remote: 'https://github.com/xyzbk/gatekeeper.git',
+  createdAt: review.createdAt,
+  updatedAt: review.createdAt,
+};
+const syncResult: GitHubSyncResult = {
+  schemaVersion: 1,
+  repositoryId: repository.repositoryId,
+  provider: 'github',
+  syncedAt: review.createdAt,
+  cursor: null,
+  partial: true,
+  documents: { received: 2, written: 1, unchanged: 0 },
+  links: { received: 1, written: 1, unchanged: 0 },
+  failures: [{ source: 'review:99', code: 'malformed_record' }],
+};
+const pullRequestReview: ReviewRunContract = {
+  ...review,
+  reviewId: 'review_client_pr_12',
+  target: { kind: 'pull_request', display: 'Pull request #12', pullRequestNumber: 12 },
 };
 
 function jsonResponse(body: unknown, statusCode = 200): Response {
@@ -108,5 +137,55 @@ describe('review client', () => {
     await expect(
       createReviewClient(missingFetcher, loadBootstrap).getReview('review_missing'),
     ).rejects.toEqual(new ReviewClientError('NOT_FOUND', 'Stored review not found.'));
+  });
+
+  it('explicitly synchronizes the fixed repository before reviewing one pull request', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(repository))
+      .mockResolvedValueOnce(jsonResponse(syncResult))
+      .mockResolvedValueOnce(jsonResponse(pullRequestReview));
+    const { createReviewClient } = await import('./review-client.js');
+    const client = createReviewClient(fetcher, () => Promise.resolve(bootstrap));
+
+    await expect(client.reviewPullRequest(12)).resolves.toEqual({
+      review: pullRequestReview,
+      sync: syncResult,
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/v1/repositories', {
+      body: '{}',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      `/v1/repositories/${repository.repositoryId}/sync/github`,
+      expect.objectContaining({ body: '{}', method: 'POST' }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      3,
+      '/v1/reviews/pull-request',
+      expect.objectContaining({
+        body: JSON.stringify({ schemaVersion: 1, pullRequestNumber: 12 }),
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('rejects invalid pull-request numbers before loading bootstrap or making a request', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const loadBootstrap = vi.fn(() => Promise.resolve(bootstrap));
+    const { createReviewClient } = await import('./review-client.js');
+
+    await expect(createReviewClient(fetcher, loadBootstrap).reviewPullRequest(0)).rejects.toThrow(
+      'Pull-request number must be a positive integer.',
+    );
+    expect(loadBootstrap).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

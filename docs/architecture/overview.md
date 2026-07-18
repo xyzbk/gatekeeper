@@ -45,7 +45,7 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 `apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, migrates/registers the fixed repository before listening, and exposes authenticated fixed-repository index, GitHub sync, memory-search, worktree/pull-request review, and review-read endpoints. HTTP input cannot select a path, remote, or another repository.
 
-`apps/dashboard` remains a small browser adapter. React Router provides Overview, `/reviews/worktree`, `/reviews/:reviewId`, and `/memory`; TanStack Query owns request state. A shared closure reads bootstrap once and holds the bearer token only in memory. Repository excerpts render only as bounded plain text with explicit source, match, date, and trust metadata.
+`apps/dashboard` remains a small browser adapter. React Router provides Overview, `/reviews/worktree`, `/reviews/pull-request`, `/reviews/:reviewId`, and `/memory`; TanStack Query owns request state. A shared closure reads bootstrap once and holds the bearer token only in memory. Repository and GitHub excerpts render as bounded plain text; only validated `https://github.com/...` evidence becomes a safe external link.
 
 `apps/mcp-server` is a stdio-only presentation adapter. It reads validated ephemeral service metadata, calls only the recorded loopback origin with native fetch, and exposes six strict local tools. The repository skill owns the Codex workflow; the MCP adapter owns no review, evidence, persistence, or verdict behavior. Review preparation and completion remain in `review-engine`, and the foreground service remains the composition/persistence owner.
 
@@ -60,4 +60,4 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 ## Phase 5 boundary
 
-Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, and verified CLI/Fastify/MCP pull-request composition. Dashboard composition and the Ghost Change fixture remain inside the active Phase 5 gate until their verified slices land. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.
+Phase 5 adds the read-only `gh` provider, remote Project Memory foundation, and verified CLI/Fastify/MCP/dashboard pull-request composition. The Ghost Change fixture remains inside the active Phase 5 gate until its verified slice lands. There is no GitHub publication, Action, embedding, general architecture graph, second model provider, background worker, permanent decision workflow, or generic plugin system.

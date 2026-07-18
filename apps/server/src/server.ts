@@ -629,6 +629,7 @@ export async function buildGatekeeperServer(
   });
   server.get('/memory', (_request, reply) => reply.sendFile('index.html'));
   server.get('/reviews/worktree', (_request, reply) => reply.sendFile('index.html'));
+  server.get('/reviews/pull-request', (_request, reply) => reply.sendFile('index.html'));
   server.get('/reviews/:reviewId', (_request, reply) => reply.sendFile('index.html'));
 
   await server.ready();
