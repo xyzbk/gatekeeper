@@ -6,5 +6,6 @@ coverage/
 !.env.example
 .gatekeeper/
 .worktrees/
+demo/fixtures/
 *.log
 *.tsbuildinfo

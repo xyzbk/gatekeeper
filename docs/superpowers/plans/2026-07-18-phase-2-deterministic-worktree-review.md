@@ -142,6 +142,7 @@ function createLocalRepositoryId(canonicalRoot: string): RepositoryId;
 - Create: `apps/cli/src/worktree-review.ts`
 - Create: `apps/cli/src/worktree-review.test.ts`
 - Create: `demo/prepare-fixtures.ts`
+- Create: `demo/tsconfig.json`
 - Modify: `packages/config/src/index.ts`
 - Modify: `apps/cli/src/index.ts`
 - Modify: `apps/cli/package.json`
@@ -156,13 +157,13 @@ gatekeeper policy validate [path]
 gatekeeper review worktree [path] --format human|json
 ```
 
-- [ ] Write RED tests for `.gatekeeper/policies.yaml` discovery, missing-policy safe defaults for review, invalid-policy paths, JSON output validating through `reviewRunSchema`, human verdict/finding/remediation output, and safe exit-code mapping.
-- [ ] Implement `loadRepositoryPolicy` with canonical root validation and a strict `version: 1` empty policy only when review has no file; `policy validate` must report a missing file as configuration error.
-- [ ] Implement one `runWorktreeReview` composition used by every adapter: inspect repository, load policy, extract changes with policy ignores, then call the pure engine with injected clock/ID factories in tests.
-- [ ] Implement Commander groups without moving domain behavior into the CLI.
-- [ ] Implement `pnpm fixtures:prepare` using `node:child_process` executable-plus-array calls. It recreates only `demo/fixtures/{clean,missing-test,protected-path}`, initializes Git, commits a baseline policy/source/test state, then applies the scenario worktree changes.
-- [ ] Run `pnpm fixtures:prepare` and the three source CLI acceptance commands; verify `FAST_PATH`, `REQUIRE_CHANGES`, and `BLOCK`.
-- [ ] Run full gates and audit; record evidence.
+- [x] Write RED tests for `.gatekeeper/policies.yaml` discovery, missing-policy safe defaults for review, invalid-policy paths, JSON output validating through `reviewRunSchema`, human verdict/finding/remediation output, and safe exit-code mapping.
+- [x] Implement `loadRepositoryPolicy` with canonical root validation and a strict `version: 1` empty policy only when review has no file; `policy validate` must report a missing file as configuration error.
+- [x] Implement one `runWorktreeReview` composition used by every adapter: inspect repository, load policy, extract changes with policy ignores, then call the pure engine with injected clock/ID factories in tests.
+- [x] Implement Commander groups without moving domain behavior into the CLI.
+- [x] Implement `pnpm fixtures:prepare` using `node:child_process` executable-plus-array calls. It recreates only `demo/fixtures/{clean,missing-test,protected-path}`, initializes Git, commits a baseline policy/source/test state, then applies the scenario worktree changes.
+- [x] Run `pnpm fixtures:prepare` and the three source CLI acceptance commands; verify `FAST_PATH`, `REQUIRE_CHANGES`, and `BLOCK`.
+- [x] Run full gates and audit; record evidence.
 - [ ] Commit and push `feat(cli): review deterministic worktrees`.
 
 ### Task 4: Authenticated local review API

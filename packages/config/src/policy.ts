@@ -134,10 +134,20 @@ export function parsePolicy(source: string): z.infer<typeof policySchema> {
   const result = policySchema.safeParse(input);
   if (!result.success) {
     throw new PolicyValidationError(
-      result.error.issues.map(({ message, path }) => ({
-        path: path.length === 0 ? '$' : path.map(String).join('.'),
-        message,
-      })),
+      result.error.issues.flatMap((issue) => {
+        if (issue.code === 'unrecognized_keys') {
+          return issue.keys.map((key) => ({
+            path: [...issue.path, key].map(String).join('.'),
+            message: 'Unknown policy field.',
+          }));
+        }
+        return [
+          {
+            path: issue.path.length === 0 ? '$' : issue.path.map(String).join('.'),
+            message: issue.message,
+          },
+        ];
+      }),
     );
   }
 

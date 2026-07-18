@@ -43,9 +43,15 @@ importers:
       '@gatekeeper/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@gatekeeper/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@gatekeeper/git-adapter':
         specifier: workspace:*
         version: link:../../packages/git-adapter
+      '@gatekeeper/review-engine':
+        specifier: workspace:*
+        version: link:../../packages/review-engine
       '@gatekeeper/server':
         specifier: workspace:*
         version: link:../server

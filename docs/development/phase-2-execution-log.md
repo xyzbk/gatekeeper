@@ -75,13 +75,44 @@ Corrections and learning:
 
 No policy finding is produced from model inference, and the existing verdict regression confirms that an inference finding cannot produce `BLOCK`.
 
+## Task 3 evidence
+
+Expected RED:
+
+- The repository-policy suite failed to load because `repository-policy` did not exist.
+- The CLI composition/presentation suite failed to load because `worktree-review` did not exist.
+- A new strict-policy test showed that unknown fields were reported only at `$`; validation now reports the exact unknown key path.
+- A human-output regression showed `1 files`; the formatter now emits the correct singular form.
+
+Corrections and learning:
+
+- Windows denied an unprivileged file-symlink test with `EPERM`. The escape test now uses a directory junction, which requires no elevated privilege and exercises the same out-of-repository realpath rejection.
+- A test fixture accidentally used unescaped Windows path literals, producing tab/carriage-return escapes. Test-only repository roots now use unambiguous POSIX-form paths.
+- The first lint run rejected an unsafe asymmetric matcher assignment. Explicit error narrowing and direct field assertions replaced it without disabling a rule.
+- Policy-validation errors deliberately retain dotted field paths but drop the parser error as a cause, preventing untrusted YAML details from entering later diagnostics.
+- The fixture generator is included in root lint, typecheck, and build through a minimal `demo/tsconfig.json`; acceptance tooling is held to the same gates as product code.
+
+Acceptance evidence:
+
+```text
+pnpm fixtures:prepare                                  PASS (twice)
+policy validate demo/fixtures/clean                    PASS
+review worktree demo/fixtures/clean                    FAST_PATH
+review worktree demo/fixtures/missing-test             REQUIRE_CHANGES
+review worktree demo/fixtures/protected-path           BLOCK
+policy validate . (missing policy)                     exit 2
+review worktree protected-path (without --enforce)     exit 0
+```
+
+The JSON output validates through `reviewRunSchema`; review commands do not become enforcement commands unless a future explicitly scoped `--enforce` option is added.
+
 ## Task ledger
 
 | Task                                 | State    | Commit    | Verification                                                               | Failures and corrections  |
 | ------------------------------------ | -------- | --------- | -------------------------------------------------------------------------- | ------------------------- |
-| 1. Contracts and worktree extraction | complete | this step | Focused: 20/20 PASS; root lint/typecheck/test (63)/build/format/audit PASS | See Task 1 evidence above |
-| 2. Deterministic review engine       | complete | this step | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
-| 3. Policy loader, CLI, fixtures      | pending  | —         | —                                                                          | —                         |
+| 1. Contracts and worktree extraction | complete | e510f2a   | Focused: 20/20 PASS; root lint/typecheck/test (63)/build/format/audit PASS | See Task 1 evidence above |
+| 2. Deterministic review engine       | complete | dd6b1a9   | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
+| 3. Policy loader, CLI, fixtures      | complete | this step | Focused: 8/8 PASS; root lint/typecheck/test (80)/build/format/audit PASS   | See Task 3 evidence above |
 | 4. Local review API                  | pending  | —         | —                                                                          | —                         |
 | 5. Review Inspector                  | pending  | —         | —                                                                          | —                         |
 | 6. Acceptance and documentation      | pending  | —         | —                                                                          | —                         |

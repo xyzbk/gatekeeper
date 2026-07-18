@@ -14,7 +14,8 @@
     "build": "tsc -b --pretty false --force && pnpm --filter @gatekeeper/dashboard build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint packages apps --max-warnings 0",
+    "fixtures:prepare": "tsx demo/prepare-fixtures.ts",
+    "lint": "eslint packages apps demo --max-warnings 0",
     "schema:verdict": "pnpm --filter @gatekeeper/contracts schema:verdict",
     "test": "vitest run --config vitest.workspace.ts",
     "typecheck": "tsc -b --pretty false && pnpm --filter @gatekeeper/dashboard typecheck"

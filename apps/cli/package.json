@@ -12,7 +12,9 @@
   "dependencies": {
     "@gatekeeper/config": "workspace:*",
     "@gatekeeper/contracts": "workspace:*",
+    "@gatekeeper/domain": "workspace:*",
     "@gatekeeper/git-adapter": "workspace:*",
+    "@gatekeeper/review-engine": "workspace:*",
     "@gatekeeper/server": "workspace:*",
     "commander": "15.0.0",
     "execa": "9.6.1"
