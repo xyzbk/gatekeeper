@@ -112,4 +112,9 @@ export const reviewRunJsonSchema = {
   ...z.toJSONSchema(reviewRunSchema, { target: 'draft-2020-12' }),
 };
 
+export const reviewRunApiJsonSchema = {
+  $id: 'gatekeeper:review-run-v1',
+  ...z.toJSONSchema(reviewRunSchema, { target: 'draft-7' }),
+};
+
 export type ReviewRunContract = z.infer<typeof reviewRunSchema>;

@@ -3,8 +3,8 @@ import { access, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { StatusResponse } from '@gatekeeper/contracts';
-import { describe, expect, it } from 'vitest';
+import type { ReviewRunContract, StatusResponse } from '@gatekeeper/contracts';
+import { describe, expect, it, vi } from 'vitest';
 
 const host = '127.0.0.1:43127';
 const bearerToken = 'a'.repeat(43);
@@ -40,13 +40,48 @@ const statusResponse: StatusResponse = {
   },
 };
 
+const reviewResponse: ReviewRunContract = {
+  schemaVersion: 1,
+  reviewId: 'review_api_test',
+  repositoryId: 'repository_api_test',
+  target: { kind: 'worktree', display: 'Current worktree' },
+  verdict: 'FAST_PATH',
+  summary: 'FAST_PATH: 1 changed file, 0 deterministic findings.',
+  findings: [],
+  metrics: {
+    filesChanged: 1,
+    linesAdded: 2,
+    linesDeleted: 1,
+    productionFilesChanged: 1,
+    testFilesChanged: 0,
+    documentationFilesChanged: 0,
+    pathGroups: [{ name: 'src', count: 1 }],
+  },
+  changes: [
+    {
+      path: 'src/app.ts',
+      status: 'modified',
+      additions: 2,
+      deletions: 1,
+      binary: false,
+      contentTruncated: false,
+    },
+  ],
+  createdAt: '2026-07-18T12:00:00.000Z',
+};
+
 async function createDashboardFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'gatekeeper-dashboard-'));
   await writeFile(join(root, 'index.html'), '<!doctype html><title>Gatekeeper</title>', 'utf8');
   return root;
 }
 
-async function buildTestServer(options: { logger?: unknown } = {}) {
+async function buildTestServer(
+  options: {
+    logger?: unknown;
+    reviewWorktree?: () => Promise<ReviewRunContract>;
+  } = {},
+) {
   const [{ buildGatekeeperServer }, dashboardRoot] = await Promise.all([
     import('./server.js'),
     createDashboardFixture(),
@@ -57,6 +92,7 @@ async function buildTestServer(options: { logger?: unknown } = {}) {
     dashboardRoot,
     getStatus: () => statusResponse,
     logger: options.logger ?? false,
+    reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
     version: '0.1.0',
   });
 }
@@ -127,6 +163,88 @@ describe('Gatekeeper local service', () => {
     expect(authorized.body).not.toContain(bearerToken);
   });
 
+  it('authenticates worktree review and returns the exact injected ReviewRun', async () => {
+    const reviewWorktree = vi.fn(() => Promise.resolve(reviewResponse));
+    const server = await buildTestServer({ reviewWorktree });
+
+    const unauthorized = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree',
+      headers: { host },
+      payload: {},
+    });
+    const authorized = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree',
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: {},
+    });
+    await server.close();
+
+    expect(unauthorized.statusCode).toBe(401);
+    expect(authorized.statusCode).toBe(200);
+    expect(authorized.json()).toEqual(reviewResponse);
+    expect(reviewWorktree).toHaveBeenCalledOnce();
+  });
+
+  it('rejects review path selectors and non-empty bodies before composition runs', async () => {
+    const reviewWorktree = vi.fn(() => Promise.resolve(reviewResponse));
+    const server = await buildTestServer({ reviewWorktree });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const bodySelector = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree',
+      headers,
+      payload: { path: 'C:\\private' },
+    });
+    const querySelector = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree?path=C%3A%5Cprivate',
+      headers,
+      payload: {},
+    });
+    await server.close();
+
+    expect(bodySelector.statusCode).toBe(400);
+    expect(querySelector.statusCode).toBe(400);
+    expect(bodySelector.body).not.toContain('C:\\private');
+    expect(querySelector.body).not.toContain('C:\\private');
+    expect(reviewWorktree).not.toHaveBeenCalled();
+  });
+
+  it('returns and logs only safe metadata when review composition fails', async () => {
+    const stream = new PassThrough();
+    let logs = '';
+    stream.setEncoding('utf8');
+    stream.on('data', (chunk: string) => {
+      logs += chunk;
+    });
+    const server = await buildTestServer({
+      logger: { level: 'info', stream },
+      reviewWorktree: () => Promise.reject(new Error('private source, diff, and token detail')),
+    });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree',
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: {},
+    });
+    await server.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'The local service could not complete the request.',
+      },
+    });
+    expect(logs).toContain('POST /v1/reviews/worktree');
+    expect(logs).not.toContain('private source');
+    expect(logs).not.toContain(bearerToken);
+  });
+
   it('rejects arbitrary path input with the shared error envelope', async () => {
     const server = await buildTestServer();
 
@@ -189,6 +307,7 @@ describe('Gatekeeper local service', () => {
     expect(server.getSchema('gatekeeper:status-response-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:dashboard-bootstrap-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:error-envelope')).toBeDefined();
+    expect(server.getSchema('gatekeeper:review-run-v1')).toBeDefined();
     await server.close();
   });
 
@@ -205,6 +324,7 @@ describe('Gatekeeper local service', () => {
       logger: false,
       paths: { appData, serviceMetadata, storage },
       repository,
+      reviewWorktree: () => Promise.resolve(reviewResponse),
       startedAt: '2026-07-17T00:00:00.000Z',
       tools: statusResponse.tools,
       version: '0.1.0',

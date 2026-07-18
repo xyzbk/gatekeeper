@@ -1,4 +1,8 @@
-import type { RepositorySnapshot, ToolAvailability } from '@gatekeeper/contracts';
+import type {
+  RepositorySnapshot,
+  ReviewRunContract,
+  ToolAvailability,
+} from '@gatekeeper/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 const repository: RepositorySnapshot = {
@@ -11,6 +15,26 @@ const repository: RepositorySnapshot = {
 
 const git: ToolAvailability = { available: true, version: 'git version 2.50.1' };
 const gh: ToolAvailability = { available: false, version: null };
+const review = {
+  schemaVersion: 1,
+  reviewId: 'review_start_test',
+  repositoryId: 'repository_start_test',
+  target: { kind: 'worktree', display: 'Current worktree' },
+  verdict: 'FAST_PATH',
+  summary: 'FAST_PATH: 0 changed files, 0 deterministic findings.',
+  findings: [],
+  metrics: {
+    filesChanged: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    productionFilesChanged: 0,
+    testFilesChanged: 0,
+    documentationFilesChanged: 0,
+    pathGroups: [],
+  },
+  changes: [],
+  createdAt: '2026-07-18T12:00:00.000Z',
+} satisfies ReviewRunContract;
 
 describe('start command lifecycle', () => {
   it('starts one fixed repository and closes the foreground service on shutdown', async () => {
@@ -32,7 +56,11 @@ describe('start command lifecycle', () => {
         events.push(`tool:${name}`);
         return Promise.resolve(name === 'git' ? git : gh);
       },
-      startService: (options) => {
+      reviewWorktree: (root) => {
+        events.push(`review:${root}`);
+        return Promise.resolve(review);
+      },
+      startService: async (options) => {
         events.push('start');
         expect(options).toMatchObject({
           dashboardRoot: 'D:\\work\\gatekeeper\\apps\\dashboard\\dist',
@@ -40,7 +68,8 @@ describe('start command lifecycle', () => {
           tools: { git, gh },
           version: '0.1.0',
         });
-        return Promise.resolve({ baseUrl: 'http://127.0.0.1:43127', close });
+        await expect(options.reviewWorktree()).resolves.toEqual(review);
+        return { baseUrl: 'http://127.0.0.1:43127', close };
       },
       waitUntilShutdown: () => {
         events.push('wait');
@@ -56,6 +85,7 @@ describe('start command lifecycle', () => {
       'tool:git',
       'tool:gh',
       'start',
+      'review:D:\\work\\gatekeeper',
       'wait',
       'close',
     ]);
@@ -79,6 +109,7 @@ describe('start command lifecycle', () => {
         dashboardRoot: 'dashboard',
         inspectRepository: () => Promise.resolve(repository),
         inspectTool: (name) => Promise.resolve(name === 'git' ? git : gh),
+        reviewWorktree: () => Promise.resolve(review),
         startService: () => Promise.resolve({ baseUrl: 'http://127.0.0.1:43127', close }),
         waitUntilShutdown: () => Promise.reject(new Error('signal failure')),
         write: () => undefined,

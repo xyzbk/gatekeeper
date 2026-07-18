@@ -106,14 +106,30 @@ review worktree protected-path (without --enforce)     exit 0
 
 The JSON output validates through `reviewRunSchema`; review commands do not become enforcement commands unless a future explicitly scoped `--enforce` option is added.
 
+## Task 4 evidence
+
+Expected RED:
+
+- The contract test failed because the draft-7 ReviewRun API schema did not exist.
+- Authorized review, strict input, safe failure, and schema-registration tests returned `404` until the route was registered.
+- The start lifecycle test failed because the local service had no injected review callback.
+
+Implemented boundary:
+
+- `POST /v1/reviews/worktree` requires the ephemeral bearer token, an empty query, and an exact empty JSON object.
+- The route accepts no repository or path selector and calls only the injected `reviewWorktree` function.
+- Zod validates the callback result; Fastify validates/serializes it through the shared draft-7 `gatekeeper:review-run-v1` schema.
+- `gatekeeper start` binds the callback to its already-inspected repository through the same `runWorktreeReview` composition used by direct CLI review.
+- Failure responses and logs contain only stable error/operation metadata; the regression input includes private source/diff/token text and proves none is emitted.
+
 ## Task ledger
 
 | Task                                 | State    | Commit    | Verification                                                               | Failures and corrections  |
 | ------------------------------------ | -------- | --------- | -------------------------------------------------------------------------- | ------------------------- |
 | 1. Contracts and worktree extraction | complete | e510f2a   | Focused: 20/20 PASS; root lint/typecheck/test (63)/build/format/audit PASS | See Task 1 evidence above |
 | 2. Deterministic review engine       | complete | dd6b1a9   | Focused: 9/9 PASS; root lint/typecheck/test (72)/build/format/audit PASS   | See Task 2 evidence above |
-| 3. Policy loader, CLI, fixtures      | complete | this step | Focused: 8/8 PASS; root lint/typecheck/test (80)/build/format/audit PASS   | See Task 3 evidence above |
-| 4. Local review API                  | pending  | —         | —                                                                          | —                         |
+| 3. Policy loader, CLI, fixtures      | complete | d7d2676   | Focused: 8/8 PASS; root lint/typecheck/test (80)/build/format/audit PASS   | See Task 3 evidence above |
+| 4. Local review API                  | complete | this step | Focused: 21/21 PASS; root lint/typecheck/test (83)/build/format/audit PASS | See Task 4 evidence above |
 | 5. Review Inspector                  | pending  | —         | —                                                                          | —                         |
 | 6. Acceptance and documentation      | pending  | —         | —                                                                          | —                         |
 

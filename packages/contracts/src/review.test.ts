@@ -32,7 +32,7 @@ describe('reviewRunSchema', () => {
   });
 
   it('generates strict JSON Schema from the Zod contract', async () => {
-    const { reviewRunJsonSchema } = await import('./review.js');
+    const { reviewRunApiJsonSchema, reviewRunJsonSchema } = await import('./review.js');
 
     expect(reviewRunJsonSchema.type).toBe('object');
     expect(reviewRunJsonSchema.additionalProperties).toBe(false);
@@ -48,6 +48,9 @@ describe('reviewRunSchema', () => {
     expect(reviewRunJsonSchema.required).toContain('reviewId');
     expect(reviewRunJsonSchema.required).toContain('verdict');
     expect(reviewRunJsonSchema.required).toContain('changes');
+    expect(reviewRunApiJsonSchema.$schema).toBe('http://json-schema.org/draft-07/schema#');
+    expect(reviewRunApiJsonSchema.$id).toBe('gatekeeper:review-run-v1');
+    expect(reviewRunApiJsonSchema.additionalProperties).toBe(false);
   });
 
   it('keeps the committed verdict schema synchronized with Zod', async () => {

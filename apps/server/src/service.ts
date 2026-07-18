@@ -7,6 +7,7 @@ import {
   serviceMetadataSchema,
   statusResponseSchema,
   type RepositorySnapshot,
+  type ReviewRunContract,
   type StatusResponse,
   type ToolAvailability,
 } from '@gatekeeper/contracts';
@@ -20,6 +21,7 @@ export interface StartGatekeeperServiceOptions {
   logger?: BuildGatekeeperServerOptions['logger'];
   paths?: ServicePaths;
   repository: RepositorySnapshot;
+  reviewWorktree: () => Promise<ReviewRunContract>;
   startedAt?: string;
   tools: {
     git: ToolAvailability;
@@ -65,6 +67,7 @@ export async function startGatekeeperService(
 
       return status;
     },
+    reviewWorktree: options.reviewWorktree,
     version: options.version,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   };

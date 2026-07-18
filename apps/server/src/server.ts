@@ -10,9 +10,12 @@ import {
   errorEnvelopeSchema,
   healthResponseJsonSchema,
   healthResponseSchema,
+  reviewRunApiJsonSchema,
+  reviewRunSchema,
   statusResponseJsonSchema,
   statusResponseSchema,
   type StatusResponse,
+  type ReviewRunContract,
 } from '@gatekeeper/contracts';
 import fastify, { type FastifyInstance, LogController } from 'fastify';
 
@@ -39,6 +42,7 @@ export interface BuildGatekeeperServerOptions {
   dashboardRoot: string;
   getStatus: () => StatusResponse;
   logger?: false | GatekeeperLoggerOptions;
+  reviewWorktree: () => Promise<ReviewRunContract>;
   version: string;
 }
 
@@ -117,6 +121,7 @@ export async function buildGatekeeperServer(
   server.addSchema(statusResponseJsonSchema);
   server.addSchema(dashboardBootstrapJsonSchema);
   server.addSchema(emptyRequestJsonSchema);
+  server.addSchema(reviewRunApiJsonSchema);
 
   server.addHook('onRequest', async (request, reply) => {
     if (!isAllowedHost(request.headers.host)) {
@@ -202,6 +207,24 @@ export async function buildGatekeeperServer(
       },
     },
     () => healthResponseSchema.parse({ status: 'ok', version: options.version }),
+  );
+
+  server.post(
+    '/v1/reviews/worktree',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:empty-request#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-run-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async () => reviewRunSchema.parse(await options.reviewWorktree()),
   );
 
   server.get(

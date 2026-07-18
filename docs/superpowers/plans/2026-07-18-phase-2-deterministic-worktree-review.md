@@ -188,10 +188,10 @@ Body: {}
 Response: ReviewRun v1
 ```
 
-- [ ] Write RED API tests for bearer authentication, strict empty body, no path/query selector, shared draft-7 response schema generated from Zod, exact injected ReviewRun response, and safe internal failure without diff/source logging.
-- [ ] Add `reviewWorktree: () => Promise<ReviewRunContract>` to service composition and register the endpoint without importing Git/config behavior into Fastify.
-- [ ] Wire `gatekeeper start` to the same CLI composition used by direct review.
-- [ ] Run focused server/start tests and full gates; record evidence.
+- [x] Write RED API tests for bearer authentication, strict empty body, no path/query selector, shared draft-7 response schema generated from Zod, exact injected ReviewRun response, and safe internal failure without diff/source logging.
+- [x] Add `reviewWorktree: () => Promise<ReviewRunContract>` to service composition and register the endpoint without importing Git/config behavior into Fastify.
+- [x] Wire `gatekeeper start` to the same CLI composition used by direct review.
+- [x] Run focused server/start tests and full gates; record evidence.
 - [ ] Commit and push `feat(server): expose local worktree reviews`.
 
 ### Task 5: Accessible Review Inspector

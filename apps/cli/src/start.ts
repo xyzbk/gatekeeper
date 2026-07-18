@@ -9,6 +9,8 @@ import {
 } from '@gatekeeper/server';
 import { execa } from 'execa';
 
+import { runWorktreeReview } from './worktree-review.js';
+
 export const GATEKEEPER_VERSION = '0.1.0';
 
 interface ToolCommandResult {
@@ -29,6 +31,7 @@ export interface StartCommandDependencies {
   dashboardRoot: string;
   inspectRepository: ReturnType<typeof createGitProvider>['inspectRepository'];
   inspectTool: (name: 'gh' | 'git') => Promise<ToolAvailability>;
+  reviewWorktree: typeof runWorktreeReview;
   startService: StartService;
   waitUntilShutdown: () => Promise<void>;
   write: (message: string) => void;
@@ -87,6 +90,7 @@ const defaultDependencies: StartCommandDependencies = {
   dashboardRoot: fileURLToPath(new URL('../../dashboard/dist', import.meta.url)),
   inspectRepository: (repositoryPath) => gitProvider.inspectRepository(repositoryPath),
   inspectTool: inspectLocalTool,
+  reviewWorktree: runWorktreeReview,
   startService: startGatekeeperService,
   waitUntilShutdown: waitForShutdownSignal,
   write: (message) => {
@@ -106,6 +110,7 @@ export async function runStartCommand(
   const service = await dependencies.startService({
     dashboardRoot: dependencies.dashboardRoot,
     repository,
+    reviewWorktree: () => dependencies.reviewWorktree(repository.root),
     tools: { git, gh },
     version: GATEKEEPER_VERSION,
   });
