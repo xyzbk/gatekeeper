@@ -6,8 +6,10 @@ import {
   type LoadedRepositoryPolicy,
 } from '@gatekeeper/config';
 import {
+  githubSyncLimitsSchema,
   memorySearchResponseSchema,
   repositoryStatusSchema,
+  type GitHubSyncResult,
   type IndexResult,
   type MemorySearchResult,
   type RepositoryRecord,
@@ -22,6 +24,13 @@ import {
   WorktreeDiffError,
 } from '@gatekeeper/git-adapter';
 import {
+  createGitHubProvider,
+  GitHubProviderError,
+  normalizeGitHubRemote,
+  pullRequestToRemoteRecord,
+  type GitHubProvider,
+} from '@gatekeeper/github-gh';
+import {
   createProjectMemory,
   ProjectMemoryError,
   type ProjectMemory,
@@ -33,8 +42,14 @@ import {
   type OutputFormat,
   type WorktreeReviewContext,
 } from './worktree-review.js';
+import {
+  runPullRequestReview,
+  type PullRequestReviewContext,
+  type PullRequestReviewResult,
+} from './pull-request-review.js';
 
-export type ProjectMemoryCommandErrorCode = 'NOT_INITIALIZED' | 'REVIEW_NOT_FOUND';
+export type ProjectMemoryCommandErrorCode =
+  'NOT_INITIALIZED' | 'REMOTE_REQUIRED' | 'REVIEW_NOT_FOUND';
 
 export class ProjectMemoryCommandError extends Error {
   public constructor(
@@ -57,6 +72,7 @@ interface ProjectMemorySession {
 }
 
 interface ProjectMemoryCommandDependencies {
+  githubProvider?: GitHubProvider;
   inspectRepository: (path: string) => Promise<RepositorySnapshot>;
   loadPolicy: (root: string) => Promise<LoadedRepositoryPolicy>;
   openSession: () => Promise<ProjectMemorySession>;
@@ -64,6 +80,11 @@ interface ProjectMemoryCommandDependencies {
     repositoryPath: string,
     context: WorktreeReviewContext,
   ) => Promise<ReviewRunContract>;
+  reviewPullRequest?: (
+    repositoryPath: string,
+    pullRequestNumber: number,
+    context: PullRequestReviewContext,
+  ) => Promise<PullRequestReviewResult>;
 }
 
 export interface ProjectMemoryCommands {
@@ -71,11 +92,14 @@ export interface ProjectMemoryCommands {
   status(repositoryPath: string): Promise<RepositoryStatus>;
   index(repositoryPath: string): Promise<IndexResult>;
   search(repositoryPath: string, query: string, limit?: number): Promise<MemorySearchResult[]>;
+  syncGitHub(repositoryPath: string): Promise<GitHubSyncResult>;
+  reviewPullRequest(pullRequestNumber: number, repositoryPath: string): Promise<ReviewRunContract>;
   reviewWorktree(repositoryPath: string): Promise<ReviewRunContract>;
   showReview(reviewId: string): Promise<ReviewRunContract>;
 }
 
 const gitProvider = createGitProvider();
+const githubProvider = createGitHubProvider();
 
 async function openDefaultSession(): Promise<ProjectMemorySession> {
   const store = openSqliteProjectStore({ databasePath: resolveProjectMemoryDatabasePath() });
@@ -91,9 +115,11 @@ async function openDefaultSession(): Promise<ProjectMemorySession> {
 
 const defaultDependencies: ProjectMemoryCommandDependencies = {
   inspectRepository: (path) => gitProvider.inspectRepository(path),
+  githubProvider,
   loadPolicy: (root) => loadRepositoryPolicy(root),
   openSession: openDefaultSession,
   reviewWorktree: (path, context) => runWorktreeReview(path, undefined, context),
+  reviewPullRequest: (path, number, context) => runPullRequestReview(path, number, context),
 };
 
 async function withSession<T>(
@@ -122,9 +148,24 @@ async function findInitializedRepository(
   return repository;
 }
 
+function requireGitHubRemote(snapshot: RepositorySnapshot) {
+  if (snapshot.remote === null) {
+    throw new ProjectMemoryCommandError(
+      'REMOTE_REQUIRED',
+      'The repository needs a GitHub origin remote for this command.',
+    );
+  }
+  return normalizeGitHubRemote(snapshot.remote);
+}
+
 export function createProjectMemoryCommands(
   dependencies: ProjectMemoryCommandDependencies = defaultDependencies,
 ): ProjectMemoryCommands {
+  const selectedGitHubProvider = dependencies.githubProvider ?? githubProvider;
+  const selectedPullRequestReview =
+    dependencies.reviewPullRequest ??
+    ((path: string, number: number, context: PullRequestReviewContext) =>
+      runPullRequestReview(path, number, context));
   return {
     initialize: async (repositoryPath) => {
       const snapshot = await dependencies.inspectRepository(repositoryPath);
@@ -177,6 +218,58 @@ export function createProjectMemoryCommands(
           query,
           ...(limit === undefined ? {} : { limit }),
         });
+      });
+    },
+    syncGitHub: async (repositoryPath) => {
+      const snapshot = await dependencies.inspectRepository(repositoryPath);
+      const remote = requireGitHubRemote(snapshot);
+      await selectedGitHubProvider.preflight(remote);
+      return withSession(dependencies.openSession, async (memory) => {
+        const repository = await findInitializedRepository(memory, snapshot);
+        const cursor = await memory.getRemoteSyncCursor(repository.repositoryId, 'github');
+        const batch = await selectedGitHubProvider.listHistoricalDocuments(
+          remote,
+          githubSyncLimitsSchema.parse({}),
+          cursor,
+        );
+        return memory.indexRemoteDocuments({
+          repositoryId: repository.repositoryId,
+          provider: 'github',
+          batch,
+        });
+      });
+    },
+    reviewPullRequest: async (pullRequestNumber, repositoryPath) => {
+      const snapshot = await dependencies.inspectRepository(repositoryPath);
+      requireGitHubRemote(snapshot);
+      return withSession(dependencies.openSession, async (memory) => {
+        const repository = await memory.registerRepository({
+          root: snapshot.root,
+          remote: snapshot.remote,
+        });
+        const target = {
+          kind: 'pull_request' as const,
+          display: `Pull request #${pullRequestNumber}`,
+          pullRequestNumber,
+        };
+        const previousReviewId = await memory.latestReviewId(repository.repositoryId, target);
+        const result = await selectedPullRequestReview(snapshot.root, pullRequestNumber, {
+          repositoryId: repository.repositoryId as RepositoryId,
+          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
+        });
+        await memory.indexRemoteDocuments({
+          repositoryId: repository.repositoryId,
+          provider: 'github',
+          batch: {
+            schemaVersion: 1,
+            records: [pullRequestToRemoteRecord(result.pullRequest)],
+            failures: [],
+            cursor: null,
+            partial: false,
+          },
+        });
+        await memory.saveReview(result.review);
+        return result.review;
       });
     },
     reviewWorktree: async (repositoryPath) => {
@@ -243,6 +336,19 @@ export function formatIndexResult(result: IndexResult, format: OutputFormat): st
   ].join('\n');
 }
 
+export function formatGitHubSyncResult(result: GitHubSyncResult, format: OutputFormat): string {
+  if (format === 'json') {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+  return [
+    `GitHub sync: ${result.partial ? 'partial' : 'complete'}`,
+    `Documents: ${result.documents.written} written, ${result.documents.unchanged} unchanged`,
+    `Relationships: ${result.links.written} written, ${result.links.unchanged} unchanged`,
+    `Cursor: ${result.cursor ?? 'not advanced'}`,
+    '',
+  ].join('\n');
+}
+
 export function formatMemorySearch(
   results: readonly MemorySearchResult[],
   format: OutputFormat,
@@ -272,6 +378,12 @@ export function classifyProjectMemoryCommandError(error: unknown): ProjectMemory
   if (error instanceof RepositoryInspectionError || error instanceof WorktreeDiffError) {
     return { exitCode: 3, message: error.message };
   }
+  if (error instanceof GitHubProviderError) {
+    return {
+      exitCode: error.code === 'AUTH_REQUIRED' || error.code === 'GH_UNAVAILABLE' ? 3 : 4,
+      message: [error.message, error.repair].filter(Boolean).join(' '),
+    };
+  }
   if (error instanceof ProjectMemoryError) {
     return {
       exitCode: error.code === 'INDEX_SOURCE_FAILED' ? 4 : 2,
@@ -279,7 +391,7 @@ export function classifyProjectMemoryCommandError(error: unknown): ProjectMemory
     };
   }
   if (error instanceof SqliteProjectStoreError) {
-    if (error.code === 'INDEX_WRITE_FAILED') {
+    if (error.code === 'INDEX_WRITE_FAILED' || error.code === 'REMOTE_SYNC_WRITE_FAILED') {
       return { exitCode: 4, message: error.message };
     }
     if (

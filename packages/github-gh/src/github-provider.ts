@@ -219,6 +219,21 @@ export function normalizeGitHubRemote(value: string): GitHubRemote {
   return normalizedRemote(url.hostname, url.pathname);
 }
 
+export function pullRequestToRemoteRecord(pullRequest: PullRequestRecord): GitHubRemoteRecord {
+  return githubRemoteRecordSchema.parse({
+    kind: 'pull_request',
+    sourceId: `pull_request:#${pullRequest.number}`,
+    number: pullRequest.number,
+    parentSourceId: null,
+    title: pullRequest.title,
+    body: pullRequest.body,
+    url: pullRequest.url,
+    state: pullRequest.state.toLowerCase(),
+    createdAt: pullRequest.createdAt,
+    updatedAt: pullRequest.updatedAt,
+  });
+}
+
 function safeJson(output: string): unknown {
   if (Buffer.byteLength(output, 'utf8') > MAX_OUTPUT_BYTES) {
     throw new GitHubProviderError('GH_OUTPUT_TOO_LARGE', 'GitHub CLI output exceeded 2 MiB.');

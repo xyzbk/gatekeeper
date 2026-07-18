@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 
 import type { GatekeeperPolicy } from '@gatekeeper/config';
-import type { ChangedFile, ChangeSet } from '@gatekeeper/contracts';
+import type { ChangedFile, ChangeSet, PullRequestRecord } from '@gatekeeper/contracts';
 import {
   assembleVerdict,
   type ChangedFileSummary,
@@ -18,16 +18,24 @@ import {
 } from '@gatekeeper/domain';
 import ignore, { type Ignore } from 'ignore';
 
+import { createPromptInjectionFinding } from './review-completion.js';
+
 const TEST_PATHS = ['test/**', 'tests/**', '**/__tests__/**', '**/*.test.*', '**/*.spec.*'];
 const DOCUMENTATION_PATHS = ['docs/**', '**/*.md', '**/*.mdx'];
 
-export interface ReviewWorktreeInput {
+export interface ReviewChangeSetInput {
   changeSet: ChangeSet;
   createdAt: string;
   policy: GatekeeperPolicy;
   repositoryId: RepositoryId;
   reviewId: ReviewId;
   previousReviewId?: ReviewId;
+}
+
+export type ReviewWorktreeInput = ReviewChangeSetInput;
+
+export interface ReviewPullRequestInput extends ReviewChangeSetInput {
+  pullRequest: PullRequestRecord;
 }
 
 function createMatcher(patterns: readonly string[]): Ignore {
@@ -384,7 +392,7 @@ function summarizeChange(file: ChangedFile): ChangedFileSummary {
     : { ...summary, previousPath: file.previousPath };
 }
 
-export function reviewWorktree(input: ReviewWorktreeInput): ReviewRun {
+export function reviewChangeSet(input: ReviewChangeSetInput): ReviewRun {
   const ignoreMatcher = createMatcher(input.policy.paths?.ignore ?? []);
   const files = input.changeSet.files
     .filter(({ path }) => !matches(ignoreMatcher, path))
@@ -410,6 +418,89 @@ export function reviewWorktree(input: ReviewWorktreeInput): ReviewRun {
     metrics: classifyMetrics(files),
     changes: files.map(summarizeChange),
     createdAt: input.createdAt,
+  };
+}
+
+export function reviewWorktree(input: ReviewWorktreeInput): ReviewRun {
+  if (input.changeSet.target.kind !== 'worktree') {
+    throw new Error('Worktree review requires a worktree change target.');
+  }
+  return reviewChangeSet(input);
+}
+
+function pullRequestEvidence(
+  repositoryId: RepositoryId,
+  pullRequest: PullRequestRecord,
+): EvidencePointer {
+  return {
+    sourceType: 'pull_request',
+    repositoryId,
+    sourceId: `pull_request:#${pullRequest.number}`,
+    title: pullRequest.title,
+    remoteUrl: pullRequest.url,
+    excerpt: pullRequest.body.slice(0, 2_000),
+  };
+}
+
+function pullRequestCheckFinding(
+  repositoryId: RepositoryId,
+  pullRequest: PullRequestRecord,
+): Finding | undefined {
+  if (pullRequest.checks === 'unknown') {
+    return undefined;
+  }
+  const checksPass = pullRequest.checks === 'pass';
+  const checksPending = pullRequest.checks === 'pending';
+  return {
+    id: findingId(`github:checks-${pullRequest.checks}`),
+    category: 'github-checks',
+    severity: checksPass ? 'info' : checksPending ? 'medium' : 'medium',
+    authority: 'DETERMINISTIC',
+    confidence: 1,
+    title: checksPass
+      ? 'Pull request checks pass'
+      : checksPending
+        ? 'Pull request checks are pending'
+        : 'Pull request checks fail',
+    explanation: checksPass
+      ? 'GitHub reports the pull request checks as successful.'
+      : checksPending
+        ? 'GitHub reports one or more pull request checks as pending.'
+        : 'GitHub reports one or more pull request checks as failed.',
+    evidence: [pullRequestEvidence(repositoryId, pullRequest)],
+    remediation: checksPass
+      ? []
+      : checksPending
+        ? ['Wait for required checks to complete before maintainer approval.']
+        : ['Fix the failing checks before maintainer approval.'],
+    falsePositiveRisk: 'none',
+    humanApprovalRequired: checksPending,
+    policyId: 'github.checks',
+    enforcement: checksPass || checksPending ? 'advisory' : 'required',
+  };
+}
+
+export function reviewPullRequest(input: ReviewPullRequestInput): ReviewRun {
+  const target = input.changeSet.target;
+  if (target.kind !== 'pull_request' || target.pullRequestNumber !== input.pullRequest.number) {
+    throw new Error('Pull-request metadata does not match the change target.');
+  }
+
+  const review = reviewChangeSet(input);
+  const evidence = pullRequestEvidence(input.repositoryId, input.pullRequest);
+  const extraFindings = [
+    pullRequestCheckFinding(input.repositoryId, input.pullRequest),
+    createPromptInjectionFinding(input.repositoryId, [evidence]),
+  ].filter((finding): finding is Finding => finding !== undefined);
+  const findings = [...review.findings, ...extraFindings].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  );
+  const verdict = assembleVerdict(findings);
+  return {
+    ...review,
+    verdict,
+    findings,
+    summary: summarize(verdict, review.changes.length, findings.length),
   };
 }
 

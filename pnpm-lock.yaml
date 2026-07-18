@@ -49,6 +49,9 @@ importers:
       '@gatekeeper/git-adapter':
         specifier: workspace:*
         version: link:../../packages/git-adapter
+      '@gatekeeper/github-gh':
+        specifier: workspace:*
+        version: link:../../packages/github-gh
       '@gatekeeper/project-memory':
         specifier: workspace:*
         version: link:../../packages/project-memory

@@ -1,10 +1,16 @@
 import type {
+  ChangeSet,
+  GitHubHistoryBatch,
+  GitHubRemote,
+  GitHubSyncResult,
   IndexResult,
   MemorySearchResult,
+  PullRequestRecord,
   RepositoryRecord,
   RepositorySnapshot,
   ReviewRunContract,
 } from '@gatekeeper/contracts';
+import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
 import type { ProjectMemory } from '@gatekeeper/project-memory';
 import { ProjectMemoryError } from '@gatekeeper/project-memory';
 import { SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
@@ -81,6 +87,83 @@ const review: ReviewRunContract = {
   createdAt: '2026-07-18T12:02:00.000Z',
 };
 
+const githubRemote: GitHubRemote = {
+  host: 'github.com',
+  owner: 'example',
+  name: 'repository',
+  nameWithOwner: 'example/repository',
+  url: 'https://github.com/example/repository',
+};
+
+const pullRequest: PullRequestRecord = {
+  number: 12,
+  title: 'Require Redis cache',
+  body: 'Bounded PR body.',
+  state: 'OPEN',
+  url: 'https://github.com/example/repository/pull/12',
+  author: 'octocat',
+  baseRefName: 'master',
+  headRefName: 'redis-cache',
+  headRefOid: 'b'.repeat(40),
+  additions: 1,
+  deletions: 0,
+  changedFiles: 1,
+  checks: 'pass',
+  isDraft: false,
+  closingIssueNumbers: [4],
+  createdAt: '2026-07-18T12:00:00.000Z',
+  updatedAt: '2026-07-18T12:01:00.000Z',
+  closedAt: null,
+  mergedAt: null,
+};
+
+const pullRequestReview: ReviewRunContract = {
+  ...review,
+  reviewId: 'review_pr_12',
+  target: {
+    kind: 'pull_request',
+    display: 'Pull request #12',
+    pullRequestNumber: 12,
+    base: 'master',
+    head: 'redis-cache',
+  },
+};
+
+const historyBatch: GitHubHistoryBatch = {
+  schemaVersion: 1,
+  cursor: '2026-07-18T12:01:00.000Z',
+  partial: false,
+  failures: [],
+  records: [],
+};
+
+const syncResult: GitHubSyncResult = {
+  schemaVersion: 1,
+  repositoryId: repository.repositoryId,
+  provider: 'github',
+  syncedAt: '2026-07-18T12:02:00.000Z',
+  cursor: historyBatch.cursor,
+  partial: false,
+  documents: { received: 0, written: 0, unchanged: 0 },
+  links: { received: 0, written: 0, unchanged: 0 },
+  failures: [],
+};
+
+function fakeGitHubProvider(overrides: Partial<GitHubProvider> = {}): GitHubProvider {
+  return {
+    preflight: () => Promise.resolve({ schemaVersion: 1, host: 'github.com', authenticated: true }),
+    getPullRequest: () => Promise.resolve(pullRequest),
+    getPullRequestDiff: () =>
+      Promise.resolve({
+        schemaVersion: 1,
+        target: { kind: 'pull_request', display: 'Pull request #12', pullRequestNumber: 12 },
+        files: [],
+      } satisfies ChangeSet),
+    listHistoricalDocuments: () => Promise.resolve(historyBatch),
+    ...overrides,
+  };
+}
+
 function fakeMemory(overrides: Partial<ProjectMemory> = {}): ProjectMemory {
   return {
     migrate: () => Promise.resolve(),
@@ -88,7 +171,9 @@ function fakeMemory(overrides: Partial<ProjectMemory> = {}): ProjectMemory {
     findRepository: () => Promise.resolve(repository),
     getRepository: () => Promise.resolve(repository),
     getIndexState: () => Promise.resolve(null),
+    getRemoteSyncCursor: () => Promise.resolve(null),
     indexLocalRepository: () => Promise.resolve(indexResult),
+    indexRemoteDocuments: () => Promise.resolve(syncResult),
     search: () => Promise.resolve([searchResult]),
     saveReview: () => Promise.resolve(),
     getReview: () => Promise.resolve(review),
@@ -158,6 +243,50 @@ describe('Project Memory CLI composition', () => {
     expect(close).toHaveBeenCalledTimes(3);
   });
 
+  it('syncs bounded GitHub history and persists one pull-request review read-only', async () => {
+    const close = vi.fn();
+    const indexRemoteDocuments = vi.fn(() => Promise.resolve(syncResult));
+    const saveReview = vi.fn(() => Promise.resolve());
+    const getRemoteSyncCursor = vi.fn(() => Promise.resolve(null));
+    const listHistoricalDocuments = vi.fn(() => Promise.resolve(historyBatch));
+    const reviewPullRequest = vi.fn(() =>
+      Promise.resolve({
+        review: pullRequestReview,
+        pullRequest,
+        remote: githubRemote,
+      }),
+    );
+    const githubProvider = fakeGitHubProvider({ listHistoricalDocuments });
+    const memory = fakeMemory({
+      getRemoteSyncCursor,
+      indexRemoteDocuments,
+      latestReviewId: () => Promise.resolve(null),
+      saveReview,
+    });
+    const commands = createProjectMemoryCommands({
+      inspectRepository: () => Promise.resolve(snapshot),
+      loadPolicy: () => Promise.resolve({ path: null, source: 'default', policy: { version: 1 } }),
+      openSession: () => Promise.resolve({ memory, close }),
+      reviewWorktree: () => Promise.resolve(review),
+      githubProvider,
+      reviewPullRequest,
+    });
+
+    await expect(commands.syncGitHub('.')).resolves.toEqual(syncResult);
+    await expect(commands.reviewPullRequest(12, '.')).resolves.toEqual(pullRequestReview);
+
+    expect(getRemoteSyncCursor).toHaveBeenCalledWith(repository.repositoryId, 'github');
+    expect(listHistoricalDocuments).toHaveBeenCalledWith(githubRemote, expect.any(Object), null);
+    expect(indexRemoteDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({ repositoryId: repository.repositoryId, provider: 'github' }),
+    );
+    expect(reviewPullRequest).toHaveBeenCalledWith(snapshot.root, 12, {
+      repositoryId: repository.repositoryId,
+    });
+    expect(saveReview).toHaveBeenCalledWith(pullRequestReview);
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
   it('returns stable errors, closes failed sessions, and formats trust labels', async () => {
     const close = vi.fn();
     const commands = createProjectMemoryCommands({
@@ -213,6 +342,18 @@ describe('Project Memory CLI composition', () => {
         new SqliteProjectStoreError('INDEX_WRITE_FAILED', 'The index transaction failed.'),
       ),
     ).toEqual({ exitCode: 4, message: 'The index transaction failed.' });
+    expect(
+      classifyProjectMemoryCommandError(
+        new GitHubProviderError(
+          'AUTH_REQUIRED',
+          'GitHub CLI authentication is required.',
+          'Run `gh auth login`.',
+        ),
+      ),
+    ).toEqual({
+      exitCode: 3,
+      message: 'GitHub CLI authentication is required. Run `gh auth login`.',
+    });
     expect(
       classifyProjectMemoryCommandError(
         Object.assign(new Error('private invalid query detail'), { name: 'ZodError' }),

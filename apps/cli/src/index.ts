@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-import { Command, Option } from 'commander';
+import { Command, InvalidArgumentError, Option } from 'commander';
 
 import { normalizeArgv } from './argv.js';
 import { runDoctor } from './doctor.js';
 import {
   classifyProjectMemoryCommandError,
   createProjectMemoryCommands,
+  formatGitHubSyncResult,
   formatIndexResult,
   formatMemorySearch,
   formatRepositoryRecord,
@@ -21,6 +22,14 @@ import {
 } from './worktree-review.js';
 
 const projectMemory = createProjectMemoryCommands();
+
+function positiveInteger(value: string): number {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new InvalidArgumentError('Expected a positive integer.');
+  }
+  return number;
+}
 
 function outputFormatOption(): Option {
   return new Option('--format <format>', 'output format')
@@ -92,6 +101,19 @@ reviewCommand
   });
 
 reviewCommand
+  .command('pr')
+  .description('Review one GitHub pull request without publishing to GitHub.')
+  .argument('<number>', 'pull-request number', positiveInteger)
+  .argument('[path]', 'local repository path', '.')
+  .addOption(outputFormatOption())
+  .action(async (number: number, path: string, { format }: { format: OutputFormat }) => {
+    await runProjectMemoryCommand(
+      () => projectMemory.reviewPullRequest(number, path),
+      (review) => formatWorktreeReview(review, format),
+    );
+  });
+
+reviewCommand
   .command('show')
   .description('Show one persisted review by ID.')
   .argument('<review-id>', 'persisted review ID')
@@ -138,6 +160,20 @@ program
     await runProjectMemoryCommand(
       () => projectMemory.index(path),
       (result) => formatIndexResult(result, format),
+    );
+  });
+
+const syncCommand = program.command('sync').description('Synchronize read-only remote history.');
+
+syncCommand
+  .command('github')
+  .description('Synchronize bounded GitHub history for one initialized local repository.')
+  .argument('[path]', 'local repository path', '.')
+  .addOption(outputFormatOption())
+  .action(async (path: string, { format }: { format: OutputFormat }) => {
+    await runProjectMemoryCommand(
+      () => projectMemory.syncGitHub(path),
+      (result) => formatGitHubSyncResult(result, format),
     );
   });
 

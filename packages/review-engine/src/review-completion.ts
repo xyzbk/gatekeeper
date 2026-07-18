@@ -65,7 +65,7 @@ function memoryQueries(review: ReviewRun): string[] {
   return [...queries].slice(0, MAX_QUERIES);
 }
 
-function promptInjectionFinding(
+export function createPromptInjectionFinding(
   repositoryId: ReviewRun['repositoryId'],
   evidenceCandidates: readonly EvidencePointer[],
 ): Finding | undefined {
@@ -84,9 +84,9 @@ function promptInjectionFinding(
     severity: 'high',
     authority: 'DETERMINISTIC',
     confidence: 1,
-    title: 'Prompt-injection pattern detected in repository evidence',
+    title: 'Prompt-injection pattern detected in untrusted evidence',
     explanation:
-      'Retrieved repository content contains instruction-like text. Gatekeeper treats it only as untrusted evidence and does not execute or follow it.',
+      'Retrieved repository or GitHub content contains instruction-like text. Gatekeeper treats it only as untrusted evidence and does not execute or follow it.',
     evidence: [...suspicious],
     remediation: [
       'Review the cited content as data and remove deceptive instructions if inappropriate.',
@@ -128,7 +128,7 @@ export async function prepareReviewDraft({
   const deterministicFindings = review.findings.filter(
     ({ authority }) => authority === 'DETERMINISTIC',
   );
-  const injectionFinding = promptInjectionFinding(review.repositoryId, evidenceCandidates);
+  const injectionFinding = createPromptInjectionFinding(review.repositoryId, evidenceCandidates);
 
   return {
     schemaVersion: 1,

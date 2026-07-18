@@ -14,6 +14,7 @@
     "@gatekeeper/contracts": "workspace:*",
     "@gatekeeper/domain": "workspace:*",
     "@gatekeeper/git-adapter": "workspace:*",
+    "@gatekeeper/github-gh": "workspace:*",
     "@gatekeeper/project-memory": "workspace:*",
     "@gatekeeper/review-engine": "workspace:*",
     "@gatekeeper/server": "workspace:*",

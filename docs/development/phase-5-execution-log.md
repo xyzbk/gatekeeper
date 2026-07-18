@@ -67,8 +67,6 @@ GREEN:
 - `pnpm test`: PASS (34 files, 203 tests).
 - `pnpm build`: PASS.
 
-Further RED states, GREEN commands, unexpected failures, corrections, aggressive-test findings, and commit hashes will be appended per verified task.
-
 ### Task 3 — incremental remote Project Memory
 
 Expected RED:
@@ -98,3 +96,41 @@ GREEN:
 - `pnpm typecheck`: PASS.
 - `pnpm test`: PASS (34 files, 207 tests).
 - `pnpm build`: PASS.
+
+### Task 4 — deterministic pull-request review and CLI adapters
+
+Expected RED:
+
+- The review engine did not export a pull-request reviewer, so the new PR behavior suite failed at import/use time.
+- Project Memory CLI composition had no GitHub sync or pull-request review commands.
+
+Implemented:
+
+- Generalized the existing deterministic change-set evaluator while retaining `reviewWorktree` as its stable wrapper.
+- Added `reviewPullRequest`, which validates target identity, evaluates the same policy table, records GitHub check state, and turns prompt-injection-like pull-request descriptions into an inert content-security escalation with a bounded GitHub evidence URL.
+- Added the positive-integer `review pr <number> [path]` and local-path `sync github [path]` commands.
+- Composed local repository identity, normalized remote resolution, authenticated read-only provider calls, incremental remote memory, policy evaluation, persisted reviews, and previous-review linkage without adding domain behavior to Commander or the provider.
+- Classified missing `gh` or authentication as exit `3` with repair guidance, bounded sync failures as exit `4`, and retained verdicts as successful product output.
+
+Unexpected failures and corrections:
+
+- A misplaced type-only import line produced an OXC parse error. The import was restored to the contracts import block.
+- The focused test initially loaded the package's prior compiled export and could not see `pullRequestToRemoteRecord`. Rebuilding the referenced composite package restored the workspace package boundary; root typecheck/build remains the authoritative clean-build path.
+
+Aggressive checks:
+
+- A pull-request number that disagrees with the fetched target is rejected before review assembly.
+- Hostile description text plus passing checks yields `ESCALATE`, retains a safe clickable evidence URL, and never creates a hard-authority finding.
+- A clean Redis lexical mention with passing checks remains `FAST_PATH`; historical wording alone does not change the deterministic verdict.
+- GitHub provider failures expose bounded classifications and repair text rather than captured stderr or remote bodies.
+
+GREEN:
+
+- Focused engine/CLI composition tests: PASS (17 tests).
+- `pnpm lint`: PASS.
+- `pnpm typecheck`: PASS.
+- `pnpm test`: PASS (34 files, 210 tests).
+- `pnpm build`: PASS.
+- Compiled command help and invalid zero-number rejection: PASS.
+
+Further RED states, GREEN commands, unexpected failures, corrections, aggressive-test findings, and commit hashes will be appended per verified task.

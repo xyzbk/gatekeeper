@@ -62,18 +62,34 @@ gatekeeper repo status . --format json
 gatekeeper index .
 gatekeeper memory search "redis cache" . --format json
 gatekeeper review show review_<id> --format json
+gatekeeper sync github .
 ```
 
 The index stores tracked file metadata and hashes, bounded Markdown/ADR/policy excerpts, and up to 200 recent commit records. It does not store full private source files. Gatekeeper excludes ignore-matched paths, known secret/config names, non-regular files, oversized documents, and invalid UTF-8. Every returned repository excerpt is labelled `untrusted_repository_content`; exact path/source/title matches precede FTS5 matches.
 
 `repo status` is read-only with respect to repository registration. `index` and `memory search` require prior initialization. A repeated unchanged index reports zero writes. `review show` reads a strict persisted ReviewRun v1 by ID.
 
+`sync github` also requires prior initialization. It derives the GitHub repository from the local repository's `origin` remote, verifies `gh` authentication, and imports a bounded batch of issues, pull requests, comments, and reviews. The production command is read-only: it does not create, edit, label, comment on, close, merge, or otherwise mutate GitHub content. Complete batches advance an incremental cursor; partial batches keep their valid records but retain the cursor so malformed records can be retried.
+
+## `review pr <number> [path]`
+
+Reviews one positive-numbered pull request belonging to the local repository and registers that repository in Project Memory when needed:
+
+```bash
+gatekeeper review pr 42 .
+gatekeeper review pr 42 . --format json
+```
+
+The command resolves and validates the local repository's GitHub remote, reads bounded pull-request metadata and files through authenticated `gh`, then evaluates the resulting change set with the same deterministic policy engine used by `review worktree`. GitHub check status and prompt-injection-like pull-request text become inert findings and evidence; remote text is never treated as an instruction. The review is persisted with previous-review linkage and the current pull request is indexed as remote Project Memory evidence.
+
+Passing checks are advisory evidence. Failed required checks require changes, pending checks escalate for human judgment, and suspicious instruction text escalates. Model-authored conclusions may add evidence-supported findings or escalate, but cannot produce `BLOCK`; only deterministic policy rules can do that.
+
 Project Memory command exit codes are:
 
 - `0`: command completed, including an empty search or non-fast-path verdict;
 - `2`: usage, policy/configuration, invalid query, not-initialized, or not-found error;
-- `3`: Git, native SQLite, database, or migration environment error;
-- `4`: bounded indexing source or transaction error;
+- `3`: Git, GitHub CLI/authentication, native SQLite, database, or migration environment error;
+- `4`: bounded indexing/sync source or transaction error;
 - `6`: unexpected internal failure.
 
 ## `start [path]`
