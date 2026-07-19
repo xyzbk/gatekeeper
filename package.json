@@ -12,7 +12,10 @@
   },
   "scripts": {
     "build": "tsc -b --pretty false --force && pnpm --filter @gatekeeper/dashboard build",
+    "demo": "tsx demo/judge-demo.ts",
     "demo:seed": "tsx demo/scripts/seed-github.ts",
+    "demo:smoke": "tsx demo/evaluate.ts --smoke",
+    "eval": "tsx demo/evaluate.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "fixtures:prepare": "tsx demo/prepare-fixtures.ts",

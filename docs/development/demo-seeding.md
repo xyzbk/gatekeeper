@@ -8,6 +8,19 @@ Run the offline scenario:
 pnpm vitest run --config vitest.workspace.ts demo/ghost-change.test.ts
 ```
 
+## One-command local judge demo
+
+Build once, then run the finite proof or open the foreground dashboard:
+
+```bash
+pnpm build
+pnpm demo:smoke
+pnpm eval
+pnpm demo
+```
+
+`pnpm demo:smoke` exercises the six Golden Evaluation scenarios and exits with their exact verdicts. `pnpm eval` regenerates [the checked-in report](../release/golden-evaluation.md). `pnpm demo` starts a disposable local Git repository, the real loopback service, and the built dashboard with the committed Ghost fixture transport. It makes zero external network/model calls and never starts the live `gh` executable. Stop it with Ctrl+C; only its temporary demo root is removed.
+
 ## Optional GitHub metadata seeder
 
 Preview the exact marked objects without installing `gh`, authenticating, or making a GitHub request:

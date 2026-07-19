@@ -26,6 +26,14 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - GREEN: `pnpm model-data:dry-run` runs the fixture-backed production provider, Project Memory, and review-draft path in a disposable SQLite database, then prints only source IDs/types/paths and counts with `modelCalls: 0` and `transport: "none"`.
 - Correction: the first root-level `tsx` invocation could not resolve workspace package aliases. The existing runnable demo pattern uses relative source entrypoints, so the report now follows that pattern; its root script succeeds without adding a package or dependency.
 
+### Judge demo and golden evaluation
+
+- RED: the judge launcher and evaluator modules were absent, so their focused tests failed at module import.
+- GREEN: `pnpm demo` starts the real loopback service on a disposable local Git repository with only the committed Ghost fixture transport and deterministic-only completion refusal. It prints one dashboard URL and removes only that owned temporary root on shutdown.
+- GREEN: `pnpm demo:smoke` proves clean bug fix `FAST_PATH`, missing test `REQUIRE_CHANGES`, protected path `BLOCK`, authentication risk `ESCALATE`, Redis revival `ESCALATE`, and prompt injection `ESCALATE`. `pnpm eval` regenerates the stable-ID report with zero external network and model calls.
+- Correction: direct server composition needed the existing TypeScript project-reference pattern extended to `apps/server`; no package or runtime dependency was added. The evaluator initially produced a valid but unaligned Markdown table, so it now emits stable column widths and passes formatting immediately after regeneration.
+- Environment limitation: the desktop terminal backend could observe `pnpm demo` reaching its loopback URL but could not send Ctrl+C to its foreground process. The process was stopped without source changes; focused lifecycle tests call the same close path and prove owned-root cleanup.
+
 ## External authorization boundary
 
 The user authorized Phase 7 engineering work. They have not authorized publishing a video, sharing repository access, creating or submitting Devpost content, or transmitting a feedback session identifier. Phase 7 prepares these artifacts but does not perform those external actions.

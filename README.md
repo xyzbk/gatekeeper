@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phases 0 through 6 are complete. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard now closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. GitHub publication, embeddings, a second model provider, packaging, and submission work remain behind later phase gates.
+Phases 0 through 6 are complete; Phase 7 release hardening is in progress. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
 
 ## Quick start
 
@@ -20,6 +20,8 @@ pnpm test
 pnpm build
 pnpm playwright test
 pnpm fixtures:prepare
+pnpm demo:smoke
+pnpm eval
 pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
 pnpm --filter @gatekeeper/cli start -- --help
 pnpm --filter @gatekeeper/cli start -- doctor --format json
@@ -31,6 +33,18 @@ pnpm --filter @gatekeeper/cli start -- index demo/fixtures/history
 pnpm --filter @gatekeeper/cli start -- memory search "redis cache" demo/fixtures/history
 pnpm --filter @gatekeeper/cli start -- start .
 ```
+
+## Judge demo
+
+After `pnpm build`, run the complete local proof with no GitHub credential, external network request, or model key:
+
+```bash
+pnpm demo:smoke
+pnpm eval
+pnpm demo
+```
+
+`pnpm demo:smoke` verifies six golden outcomes and exits: clean bug fix (`FAST_PATH`), missing test (`REQUIRE_CHANGES`), protected path (`BLOCK`), authentication risk (`ESCALATE`), Redis revival (`ESCALATE`), and prompt injection (`ESCALATE`). `pnpm eval` regenerates [the checked-in outcome report](docs/release/golden-evaluation.md) from the committed Ghost fixture/provider and deterministic review functions. `pnpm demo` starts the real loopback service with the built dashboard and a disposable local Ghost Change repository; open the printed URL, then use Pull request review to inspect the linked Redis history. It never invokes the live `gh` executable or a model endpoint, and Ctrl+C removes only its temporary demo files.
 
 `review worktree` loads `.gatekeeper/policies.yaml` when present and otherwise uses an empty version-1 policy. `policy validate` intentionally requires the file. A completed review exits successfully even when its verdict is `BLOCK`; Phase 2 reports decisions but does not enforce repository mutation.
 
