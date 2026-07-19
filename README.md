@@ -1,118 +1,111 @@
 # Gatekeeper
 
-> The code was correct. The decision was wrong. Gatekeeper knew the difference and showed the evidence.
+> Understand the project before changing the project.
 
-Gatekeeper is a local-first repository intelligence and governance agent for Codex. It is designed to help Codex judge whether a change belongs in a project—not only whether the changed code is locally correct—by combining deterministic policy with durable, traceable project memory.
+Gatekeeper is a local-first repository intelligence tool for Codex, contributors, and maintainers. It answers a question ordinary code review often misses: **does this engineering decision belong in this repository, and what evidence supports that conclusion?**
 
-## Current status
+It combines deterministic repository policy with durable Project Memory, then shows the verdict, evidence, and next review step through a CLI, local dashboard, Codex/MCP workflow, and read-only GitHub pull-request review.
 
-Phases 0 through 7 are complete. This user-authorized post-freeze extension adds immutable historical-commit review. Gatekeeper reviews local worktrees, selected local commits, and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, nine-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
+## What Gatekeeper does
 
-## Quick start
+- Reviews a local worktree, immutable local commit, or GitHub pull request against repository policy.
+- Explains `FAST_PATH`, `REQUIRE_CHANGES`, `ESCALATE`, and `BLOCK` with bounded evidence.
+- Stores local Project Memory for prior reviews, decisions, selected documentation, and commit history.
+- Lets Codex retrieve evidence and complete a review without taking control of the final verdict.
+- Keeps `BLOCK` deterministic: model inference can add evidence-supported context or uncertainty, never a hard block.
 
-Requirements: Node.js 24 LTS and pnpm 11.
+## Start here
 
-```bash
-pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test
+You need [Node.js 24 LTS](https://nodejs.org/), pnpm 11, and Git. `gh` is optional unless you review a live GitHub pull request.
+
+```powershell
+git clone https://github.com/xyzbk/gatekeeper.git
+cd gatekeeper
+pnpm install --frozen-lockfile
 pnpm build
-pnpm playwright test
-pnpm fixtures:prepare
-pnpm demo:smoke
-pnpm eval
-pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
-node apps/cli/dist/index.js --help
-node apps/cli/dist/index.js doctor --format json
-node apps/cli/dist/index.js policy validate demo/fixtures/clean
-node apps/cli/dist/index.js review worktree demo/fixtures/missing-test
-node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --format json
-node apps/cli/dist/index.js review commit <full-sha> demo/fixtures/history --format json
-node apps/cli/dist/index.js repo init demo/fixtures/history
-node apps/cli/dist/index.js index demo/fixtures/history
-node apps/cli/dist/index.js memory search "redis cache" demo/fixtures/history
-node apps/cli/dist/index.js start .
 ```
 
-## Judge demo
+### Review a repository
 
-After `pnpm build`, run the complete local proof with no GitHub credential, external network request, or model key:
+Run these commands from the Gatekeeper workspace root. Replace the example path with the repository you want Gatekeeper to inspect.
 
-```bash
-pnpm demo:smoke
-pnpm eval
-pnpm demo
+```powershell
+node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js review worktree "C:\path\to\your\repository"
+node apps/cli/dist/index.js start "C:\path\to\your\repository"
 ```
 
-`pnpm demo:smoke` verifies six golden outcomes and exits: clean bug fix (`FAST_PATH`), missing test (`REQUIRE_CHANGES`), protected path (`BLOCK`), authentication risk (`ESCALATE`), Redis revival (`ESCALATE`), and prompt injection (`ESCALATE`). `pnpm eval` regenerates [the checked-in outcome report](docs/release/golden-evaluation.md) from the committed Ghost fixture/provider and deterministic review functions. `pnpm demo` starts the real loopback service with the built dashboard and a disposable local Ghost Change repository; open the printed URL, then use Pull request review to inspect the linked Redis history. It never invokes the live `gh` executable or a model endpoint, and Ctrl+C removes only its temporary demo files.
+The first command checks your local setup. The second prints a review verdict. The third starts the local dashboard and prints a `127.0.0.1` URL; leave that terminal open while you use the dashboard, then stop it with `Ctrl+C`.
 
-## Judge test
+Gatekeeper does not check out branches, stage files, reset Git state, or modify the reviewed repository. Its local SQLite Project Memory is stored in your user app-data directory, outside the repository by default.
 
-Use the frozen-lockfile sequence in [clean install and uninstall](docs/release/clean-install-uninstall.md). The judge path is local after dependencies are installed: `pnpm demo:smoke`, `pnpm eval`, and `pnpm model-data:dry-run` need no GitHub credential or model key.
+## Choose your workflow
 
-Phase 7's final attack, browser, reproducibility, formatting, and high-severity dependency gates passed on Windows. A post-freeze process-safety correction bounded every release-helper and local-probe subprocess with the existing 30-second limit. The remaining video, feedback, repository-sharing, Devpost, and submission steps need explicit user authorization; see the [submission checklist](docs/release/submission-checklist.md).
+| If you want to…                        | Start with…                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| Review current changes                 | [`review worktree`](docs/reference/cli.md#review-worktree-path)                    |
+| Review one immutable commit            | [`review commit`](docs/reference/cli.md#review-commit-full-sha-path)               |
+| Browse local commits or Project Memory | [`start`](docs/reference/cli.md#start-path) and open the local dashboard           |
+| Search earlier decisions and evidence  | [Project Memory commands](docs/reference/cli.md#project-memory)                    |
+| Use Gatekeeper from Codex              | [MCP and Codex skill setup](docs/reference/mcp.md#setup)                           |
+| Review a GitHub pull request           | [`review pr`](docs/reference/cli.md#review-pr-number-path) with authenticated `gh` |
 
-## Supported platforms
+## How it works
 
-Windows is the verified Phase 7 desktop platform. Ubuntu has existing non-browser CI coverage; macOS and a browser release run were not independently verified for this submission. See [clean install and uninstall](docs/release/clean-install-uninstall.md) for exact requirements and state locations.
+```mermaid
+flowchart LR
+  R[Your repository] --> G[Gatekeeper]
+  G --> P[Deterministic policy]
+  G --> M[Local Project Memory]
+  P --> V[Verdict and findings]
+  M --> V
+  V --> U[CLI, dashboard, Codex, or MCP]
+```
 
-## Prior work
+1. Gatekeeper fixes one local repository for the service lifetime.
+2. It evaluates bounded change metadata against deterministic policy and retrieves relevant local evidence.
+3. It persists a strict review record locally, so a later review can show the evidence chain and compare the result.
+4. Codex may add validated evidence-supported findings, but Gatekeeper owns the final verdict.
 
-The product specification and Phase 0 contract baseline predate the later Build Week slices. The implemented workflow and release evidence are traceable in this repository; see the [Devpost project draft](docs/release/devpost-project.md) for the exact disclosure.
+## Trust and privacy
 
-## GPT-5.6 and Devpost
+| Principle                 | What it means                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Local-first               | No hosted backend or global account is required.                                                           |
+| Read-only by default      | Gatekeeper does not mutate the repository or publish to GitHub.                                            |
+| Evidence before inference | Repository and GitHub text is untrusted data, never instructions.                                          |
+| Deterministic authority   | Only hard deterministic policy findings can produce `BLOCK`.                                               |
+| Bounded storage           | Project Memory stores validated metadata and bounded evidence, not full private source files or raw diffs. |
 
-GPT-5.6 in Codex assisted the implementation process; Gatekeeper’s enforcement remains deterministic and contract-validated. The prepared [Devpost draft](docs/release/devpost-project.md) and [video narration](docs/release/demo-video-script.md) require user approval before any external upload, sharing, or submission.
+Live GitHub review uses an authenticated `gh` CLI and is read-only. Default tests, the local judge demo, and deterministic workflows do not require GitHub access or an OpenAI key. See the [security overview](docs/security/overview.md) for the full trust model.
 
-`review worktree` loads `.gatekeeper/policies.yaml` when present and otherwise uses an empty version-1 policy. `policy validate` intentionally requires the file. A completed review exits successfully even when its verdict is `BLOCK`; Phase 2 reports decisions but does not enforce repository mutation.
+## Try the local proof
 
-`gh` remains optional for the offline workflow. Doctor reports its absence as a warning and verifies the native SQLite driver, app-data writability, WAL mode, and FTS5 without authenticating or making network calls. Live `sync github` and `review pr` require an installed, authenticated GitHub CLI; default tests and the Ghost Change fixture do not.
+After building, run the reproducible offline judge path:
 
-`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Open Reviews to run and persist a worktree or pull-request review, follow real progress and ordered evidence, copy a bounded remediation prompt, and compare a re-review; use Memory to search bounded evidence or select one of the ten newest indexed commits for a first-parent historical review. That review uses the current policy and never checks out or modifies the target repository. Stop the process with Ctrl+C; it does not install a service, mutate the repository, or run in the background.
+```powershell
+pnpm demo:smoke
+pnpm eval
+pnpm model-data:dry-run
+```
 
-After `pnpm build`, trusted Codex projects discover the local server through `.codex/config.toml` and the Gatekeeper workflow through `.agents/skills/gatekeeper`. Start the foreground service, then ask Codex: “Review my current worktree with Gatekeeper. Show deterministic findings first, then Project Memory evidence. Do not change files.” Gatekeeper—not Codex—validates completion and assembles the persisted verdict.
+It proves six committed outcomes—including deterministic `BLOCK` and evidence-led `ESCALATE` cases—without a GitHub credential, external network request, or model call. See the [golden evaluation](docs/release/golden-evaluation.md) and [clean install guide](docs/release/clean-install-uninstall.md) for exact platform and release evidence.
 
-## Foundation
+## Learn more
 
-- `packages/domain`: pure IDs, review entities, and deterministic verdict rules.
-- `packages/contracts`: strict Zod contracts and generated JSON Schema.
-- `packages/config`: policy parsing and app-data path resolution.
-- `packages/git-adapter`: safe repository discovery plus bounded staged, unstaged, and untracked change extraction.
-- `packages/github-gh`: bounded authenticated GitHub.com reads through argument-array `gh` commands.
-- `packages/review-engine`: pure metrics, five deterministic policy checks, and verdict assembly.
-- `packages/project-memory`: repository identity, bounded incremental indexing, and evidence retrieval orchestration.
-- `packages/store-sqlite`: reviewed Drizzle schema, versioned migrations, WAL persistence, FTS5, and atomic review storage.
-- `packages/testkit`: deterministic fixtures shared by tests.
-- `apps/cli`: offline Doctor, policy validation, Project Memory/GitHub sync commands, worktree/PR review, and the foreground `start [path]` lifecycle.
-- `apps/server`: loopback-only Fastify service with secure bootstrap and fixed-repository review, GitHub, and memory APIs.
-- `apps/mcp-server`: protocol-clean stdio adapter exposing nine strict fixed-repository tools to Codex.
-- `apps/dashboard`: authenticated React/Vite repository overview, pollable worktree/PR Review Inspector, evidence timeline, remediation and re-review comparison, persisted review routes, and Project Memory search.
-
-The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdict.schema.json), generated from the Zod contract and checked for drift by tests. The canonical policy example is [gatekeeper.policy.example.yaml](gatekeeper.policy.example.yaml).
-
-## Project documents
-
-- [Architecture overview](docs/architecture/overview.md)
-- [Review pipeline](docs/architecture/review-pipeline.md)
-- [Architecture decisions](docs/architecture/decisions.md)
-- [Security model](docs/security/overview.md)
-- [Verdict reference](docs/reference/verdicts.md)
-- [Policy reference](docs/reference/policy.md)
-- [Local API reference](docs/reference/local-api.md)
-- [MCP and Codex skill reference](docs/reference/mcp.md)
 - [CLI reference](docs/reference/cli.md)
+- [MCP and Codex skill reference](docs/reference/mcp.md)
+- [Local API reference](docs/reference/local-api.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Verdict and finding reference](docs/reference/verdicts.md)
+- [Policy reference](docs/reference/policy.md)
 - [Development setup](docs/development/setup.md)
-- [Ghost Change demo seeding](docs/development/demo-seeding.md)
-- [Build progress](docs/progress.md)
-- [Build Week execution plan](gatekeeper_codex_build_pack/GATEKEEPER_HACKATHON_PHASED_EXECUTION_PLAN.md)
+- [Build progress and verification record](docs/progress.md)
 
-The complete specification is the long-term product authority. The Build Week plan controls the hackathon execution order and stop gates.
+## Contributing
 
-## Privacy and trust
-
-Gatekeeper is local-first, read-only by default, and treats repository/GitHub content as untrusted data. It performs authenticated bounded GitHub.com reads but has no hosted model call or production publication path. It stores tracked metadata and hashes plus bounded selected documentation, policy, commit, issue, PR, comment, review, and operation evidence—not full private source files or raw diffs. CLI, API, dashboard, MCP, and logs receive only validated bounded records, and `BLOCK` still requires a hard deterministic policy finding. See [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, quality gates, review boundaries, and how to propose a change. Please report security concerns through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)
