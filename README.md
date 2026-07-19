@@ -39,6 +39,25 @@ The first command checks your local setup. The second prints a review verdict. T
 
 Gatekeeper does not check out branches, stage files, reset Git state, or modify the reviewed repository. Its local SQLite Project Memory is stored in your user app-data directory, outside the repository by default.
 
+## Try the demo before a real repository
+
+Start with the disposable demo repositories in `demo/fixtures`. They let you see Gatekeeper's verdicts without touching your own work.
+
+```powershell
+pnpm fixtures:prepare
+node apps/cli/dist/index.js review worktree demo/fixtures/clean
+node apps/cli/dist/index.js review worktree demo/fixtures/missing-test
+node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --format json
+```
+
+| Demo repository  | What it demonstrates                      | Expected verdict  |
+| ---------------- | ----------------------------------------- | ----------------- |
+| `clean`          | A change that satisfies the sample policy | `FAST_PATH`       |
+| `missing-test`   | A source change without its related test  | `REQUIRE_CHANGES` |
+| `protected-path` | A change to a hard-protected path         | `BLOCK`           |
+
+`pnpm fixtures:prepare` recreates only those disposable fixture directories. Once those results make sense, replace the fixture path with your own repository path in the commands above.
+
 ## Choose your workflow
 
 | If you want to…                        | Start with…                                                                        |
@@ -122,7 +141,7 @@ flowchart LR
 
 Live GitHub review uses an authenticated `gh` CLI and is read-only. Default tests, the local judge demo, and deterministic workflows do not require GitHub access or an OpenAI key. See the [security overview](docs/security/overview.md) for the full trust model.
 
-## Try the local proof
+## Run the full offline demo
 
 After building, run the reproducible offline judge path:
 
