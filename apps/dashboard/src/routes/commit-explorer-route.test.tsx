@@ -93,6 +93,8 @@ describe('Commit Explorer', () => {
 
     expect(await screen.findByRole('heading', { name: 'Browse local commits' })).toBeVisible();
     expect(screen.getByRole('combobox', { name: 'Branch' })).toHaveValue('master');
+    expect(screen.getByLabelText('Commit date from')).toHaveAttribute('type', 'date');
+    expect(screen.getByLabelText('Commit date to')).toHaveAttribute('type', 'date');
     expect(exploreCommits).toHaveBeenCalledWith(
       {
         schemaVersion: 1,

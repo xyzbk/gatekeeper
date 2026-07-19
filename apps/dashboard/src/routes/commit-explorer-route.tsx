@@ -217,7 +217,7 @@ export function CommitExplorerRoute({
             />
           </label>
           <label>
-            <span>Authored after</span>
+            <span>Commit date from</span>
             <input
               onChange={(event) =>
                 setDraft((current) => ({ ...current, authoredAfter: event.target.value }))
@@ -227,7 +227,7 @@ export function CommitExplorerRoute({
             />
           </label>
           <label>
-            <span>Authored before</span>
+            <span>Commit date to</span>
             <input
               onChange={(event) =>
                 setDraft((current) => ({ ...current, authoredBefore: event.target.value }))
