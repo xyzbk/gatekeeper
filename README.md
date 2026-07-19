@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phases 0 through 5 are complete. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. GitHub publication, embeddings, a second model provider, and the Phase 6 remediation/comparison experience remain behind later phase gates.
+Phases 0 through 6 are complete. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard now closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. GitHub publication, embeddings, a second model provider, packaging, and submission work remain behind later phase gates.
 
 ## Quick start
 
@@ -18,6 +18,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm playwright test
 pnpm fixtures:prepare
 pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
 pnpm --filter @gatekeeper/cli start -- --help
@@ -35,7 +36,7 @@ pnpm --filter @gatekeeper/cli start -- start .
 
 `gh` remains optional for the offline workflow. Doctor reports its absence as a warning and verifies the native SQLite driver, app-data writability, WAL mode, and FTS5 without authenticating or making network calls. Live `sync github` and `review pr` require an installed, authenticated GitHub CLI; default tests and the Ghost Change fixture do not.
 
-`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Open Reviews to run and persist a worktree or pull-request review, or Memory to search bounded evidence. Stop the process with Ctrl+C; it does not install a service, mutate the repository, or run in the background.
+`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Open Reviews to run and persist a worktree or pull-request review, follow real progress and ordered evidence, copy a bounded remediation prompt, and compare a re-review; use Memory to search bounded evidence directly. Stop the process with Ctrl+C; it does not install a service, mutate the repository, or run in the background.
 
 After `pnpm build`, trusted Codex projects discover the local server through `.codex/config.toml` and the Gatekeeper workflow through `.agents/skills/gatekeeper`. Start the foreground service, then ask Codex: “Review my current worktree with Gatekeeper. Show deterministic findings first, then Project Memory evidence. Do not change files.” Gatekeeper—not Codex—validates completion and assembles the persisted verdict.
 
@@ -77,7 +78,7 @@ The complete specification is the long-term product authority. The Build Week pl
 
 ## Privacy and trust
 
-Gatekeeper is local-first, read-only by default, and treats repository/GitHub content as untrusted data. Phase 5 adds authenticated bounded GitHub.com reads but no hosted model call or production publication path. It stores tracked metadata and hashes plus bounded selected documentation, policy, commit, issue, PR, comment, and review evidence—not full private source files or raw diffs. CLI, API, dashboard, MCP, and logs receive only validated bounded records, and `BLOCK` still requires a hard deterministic policy finding. See [SECURITY.md](SECURITY.md).
+Gatekeeper is local-first, read-only by default, and treats repository/GitHub content as untrusted data. It performs authenticated bounded GitHub.com reads but has no hosted model call or production publication path. It stores tracked metadata and hashes plus bounded selected documentation, policy, commit, issue, PR, comment, review, and operation evidence—not full private source files or raw diffs. CLI, API, dashboard, MCP, and logs receive only validated bounded records, and `BLOCK` still requires a hard deterministic policy finding. See [SECURITY.md](SECURITY.md).
 
 ## License
 

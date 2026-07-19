@@ -15,6 +15,8 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm exec playwright install chromium
+pnpm playwright test
 ```
 
 All dependency versions are pinned in `pnpm-lock.yaml`. pnpm is configured to allow the lifecycle script for `esbuild` only; arbitrary dependency build scripts remain denied.
@@ -32,8 +34,8 @@ Doctor checks Node 24, pnpm, Git, optional `gh`, and a writable per-user app-dat
 
 ## Test-first workflow
 
-Write one failing behavior test, confirm the expected failure, implement the minimum passing behavior, then run the affected test and the full quality gate. Tests live beside source and are excluded from package build output.
+Write one failing behavior test, confirm the expected failure, implement the minimum passing behavior, then run the affected test and the full quality gate. Unit and integration tests live beside source and are excluded from package build output. The browser acceptance lives under `tests/e2e`, builds on the real local service and Ghost Change fixture, and requires the Playwright Chromium browser once per development environment.
 
 ## Platform status
 
-Phase 0 is developed and manually verified on Windows. CI verifies the same root commands on Ubuntu. Full cross-platform product packaging is deferred to the final hardening phase.
+Phases 0 through 6 are developed and verified on Windows. CI verifies the root non-browser commands on Ubuntu; the Playwright Ghost Change acceptance is currently a local release gate. Full cross-platform packaging remains deferred to final hardening.

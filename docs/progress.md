@@ -430,3 +430,72 @@ Detailed RED/GREEN evidence, failures, corrections, and environment limits are r
 
 - Live GitHub reads require an installed, authenticated `gh` and an existing approved repository. GitHub Enterprise routing, publication, Actions, comments, checks, labels, merges, hosted services, and permanent maintainer decisions remain absent.
 - Phase 6 may begin only after an explicit user request. It may build the dashboard hero experience, real review-progress polling, ordered EvidenceTimeline, remediation prompts/panel, and before/after review comparison. It must stop before settings, policy editing, collaboration, analytics, accounts, remote hosting, or decorative charts.
+
+## Phase 6 — Dashboard hero experience and remediation loop
+
+Status: complete on 2026-07-19.
+
+### Implemented
+
+- Added strict persisted review operations with queued, running, failed, and completed states; bounded real stages; atomic ReviewRun completion; restart interruption recovery; and deep links that survive process restarts.
+- Added dashboard-only asynchronous worktree and pull-request start routes while preserving the synchronous CLI/MCP/API review paths.
+- Added relationship-aware Project Memory results and an ordered evidence timeline with proposal, implementation, incident, revert, decision, revived-change, and bounded context roles.
+- Completed operations now compose the immutable current review, matching previous review, nullable bounded GitHub sync status, and up to fifty safe evidence items without moving verdict ownership out of the review engine.
+- Rebuilt the Review Inspector around real polling, explicit partial/offline/failure states, plain-text findings and excerpts, validated GitHub/internal links, grouped remediation, local clipboard prompts, re-review, and stable finding/evidence comparison.
+- Preserved the OpenAI/Codex-inspired graphite system, IBM Plex Sans, semantic color, keyboard navigation, visible focus, reduced motion, and responsive laptop composition without adding a component library, chart, animation package, or hosted surface.
+- Added one deterministic Playwright Chromium proof using the real service, temporary Git repository, SQLite Project Memory, exported Ghost provider, and built dashboard.
+
+### Verification
+
+All final commands exited 0 on 2026-07-19:
+
+```text
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm playwright test
+pnpm format:check
+pnpm audit --audit-level high
+git diff --check
+```
+
+- 41 Vitest files and 253 tests passed; the Playwright Ghost Change acceptance passed separately in Chromium.
+- The real browser observed invalid PR containment, durable progress, `ESCALATE`, six ordered history nodes, partial-history disclosure, clipboard remediation, service restart, `FAST_PATH`, and an immutable before/after comparison.
+- Full-page escalation and comparison captures at 1440x900, 1280x720, and 1024x768 were individually inspected with no document overflow or broken hierarchy.
+- The fresh Web Interface Guidelines audit and Impeccable detector had no remaining applicable findings; the high-severity dependency audit found no known vulnerabilities.
+
+### Aggressive findings and corrections
+
+- The first browser fixture omitted repository indexing and truthfully produced only five timeline nodes. It now indexes the temporary repository through the authenticated API so the active ADR earns the sixth decision node.
+- Persisted operation ownership, corrupt JSON, interrupted restart, callback failure, malformed contracts, unsafe links, hostile HTML/script prose, long evidence, offline states, partial sync, and clipboard failure are covered across storage, server, contract, component, and browser boundaries.
+- The dashboard no longer duplicates GitHub synchronization: one start request owns synchronization and review, and the completed operation carries its bounded partial-sync result.
+- Ponytail removed a redundant overflow assertion and found no removable production abstraction or dependency beyond the required browser test package.
+
+### Security and privacy
+
+- Repository and GitHub prose remains labelled untrusted and is rendered as text. The dashboard receives bounded evidence pointers and change summaries, never raw source, raw diffs, tokens, private exceptions, or shell output.
+- GitHub links are credential-free validated `https://github.com` URLs; unsafe links fall back to internal Project Memory search.
+- Review progress and comparisons are derived from persisted local contracts. Prompt controls copy bounded text locally and never call Codex, a model, or an external service.
+- Model inference still cannot produce `BLOCK`; deterministic policy remains the only hard-block authority.
+
+### Traceability
+
+- `ac12642` — define Phase 6 dashboard execution;
+- `dbc6c01` — persist review operation progress;
+- `bc75b70` — expose pollable review progress;
+- `b106db9` — expose the review evidence timeline;
+- `6d85fa9` — complete the dashboard remediation loop;
+- the Phase 6 completion commit adds the real-browser proof and closes the documentation gate.
+
+Detailed RED/GREEN states, browser failures, corrections, audits, and visual evidence are retained in `docs/development/phase-6-execution-log.md`.
+
+### Deliberate limitations and exact next-phase entry condition
+
+- Gatekeeper remains one local foreground process for one fixed repository. It has no worker, hosted backend, collaboration, accounts, analytics, settings, policy editor, permanent maintainer decision write, decorative charts, or GitHub publication path.
+- In-process operations interrupted by shutdown become bounded failures rather than resuming automatically. Playwright Chromium is a local release gate and is not yet part of CI.
+- Phase 7 may begin only after an explicit user request. It may package the reproducible demo, harden cross-platform delivery, prepare submission evidence, and perform the final hackathon audit. It must not broaden Gatekeeper into a hosted multi-user product or add deferred product surfaces.
+
+## Phase 6 scope boundary audit at completion
+
+No hosted service, background worker, queue, SSE stream, account system, collaboration layer, analytics surface, settings/policy editor, chart package, GitHub write path, or second model provider exists. Phase 6 stops at the verified local remediation loop.

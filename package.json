@@ -16,13 +16,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "fixtures:prepare": "tsx demo/prepare-fixtures.ts",
-    "lint": "eslint packages apps demo --max-warnings 0",
+    "lint": "eslint packages apps demo tests playwright.config.ts --max-warnings 0",
     "schema:verdict": "pnpm --filter @gatekeeper/contracts schema:verdict",
     "test": "vitest run --config vitest.workspace.ts",
-    "typecheck": "tsc -b --pretty false && pnpm --filter @gatekeeper/dashboard typecheck"
+    "typecheck": "tsc -b --pretty false && pnpm --filter @gatekeeper/dashboard typecheck && tsc --noEmit --pretty false -p tsconfig.playwright.json"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
     "@types/node": "24.13.3",
     "eslint": "10.7.0",
     "prettier": "3.9.5",

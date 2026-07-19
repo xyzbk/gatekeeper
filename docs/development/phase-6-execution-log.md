@@ -93,6 +93,23 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - The inspector preserves the approved OpenAI/Codex-inspired graphite tokens and IBM Plex Sans. New sections use one restrained hierarchy, semantic boundaries, one timeline rail, and no charts, gradients, icon pack, animation library, nested dashboard cards, or invented metrics.
 - Fresh root gate: lint, typecheck, formatting, and diff checks passed; 41 files and 253 tests passed; the production dashboard build completed. The verified slice removes 254 more lines than it adds while replacing the synchronous dashboard path with the persisted remediation loop.
 
+### Real-browser Ghost Change proof
+
+- RED: the exact Playwright command failed because the repository did not yet contain the planned browser dependency.
+- RED: the first real browser run rendered five timeline nodes. The temporary repository ADR had not been indexed, unlike the existing service integration setup, so the decision evidence was truthfully absent.
+- GREEN: the fixture now registers and indexes the temporary repository through the authenticated real API before starting PR #12. The browser observes progress, `ESCALATE`, all six ordered evidence roles, remediation, clipboard output, restart persistence, `FAST_PATH`, and the stable before/after comparison.
+- The test initially found two assertion defects after the product path had succeeded: an unscoped `FAST_PATH` locator matched the verdict, summary, and comparison; a body click did not clear the previously focused button. The assertions now scope comparison output semantically and reload the persisted route before proving the skip link is the first visible keyboard focus.
+- The Playwright fixture adds only pinned `@playwright/test` and Chromium configuration. It uses a temporary Git repository, the exported Ghost provider, the real SQLite-backed service, and the built dashboard; no production demo server, network call, GitHub authentication, or model key was added.
+- Full-page screenshots at 1440x900, 1280x720, and 1024x768 plus the 1440px escalation state were each inspected. Hierarchy, wrapping, timeline continuity, comparison, controls, and horizontal containment remained sound at every size.
+
+### Attack and audit conclusions
+
+- The browser rejects PR number zero through native constraint validation and never starts an operation. Focus visibility, reduced motion, clipboard access, deep-link restart, and document overflow are asserted in Chromium.
+- Existing focused tests cover operation-ID ownership collisions, failing callbacks, corrupt persisted operation JSON, interrupted operations, offline lookup/polling, unsafe URLs, hostile `<script>` excerpts rendered as text, and 2,000-character evidence bounds. These attacks remain below the shared contract/service/storage boundaries rather than being duplicated as theatrical browser cases.
+- The fresh Web Interface Guidelines review of the changed dashboard surface and the Impeccable detector both returned no remaining applicable findings after the Task 5 corrections.
+- Ponytail removed a redundant pre-check from the overflow helper. The final phase diff retains one operation table, two start routes, one polling query, one browser dependency, and no queue, SSE layer, retry framework, UI library, chart, animation dependency, or future-phase surface. Lean already; ship.
+- Final fresh gate on 2026-07-19: lint, TypeScript (including Playwright), 41 Vitest files / 253 tests, production build, one Playwright Chromium acceptance, formatting, high-severity dependency audit, and diff checks all passed. The audit found no known vulnerabilities.
+
 ## Scope ledger
 
 Deferred by the Phase 6 stop gate: settings, policy editors, collaboration, analytics, user accounts, remote hosting, permanent decision writes, decorative charts, and Phase 7 packaging/submission work.
