@@ -141,6 +141,60 @@ describe('SQLite Project Memory store', () => {
     expect(store.recentCommits('repository_other')).toEqual([]);
   });
 
+  it('returns indexed and immutable-review state only for the requested repository commits', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root,
+      normalizedRoot: root,
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const indexedSha = 'a'.repeat(40);
+    const reviewedSha = 'b'.repeat(40);
+    const absentSha = 'c'.repeat(40);
+    store.applyIndex(
+      createBatch({
+        commits: [
+          {
+            sha: indexedSha,
+            authoredAt: '2026-07-19T12:00:00.000Z',
+            title: 'Indexed local commit',
+            message: 'Bounded commit metadata.',
+          },
+        ],
+      }),
+    );
+    store.saveReview({
+      ...createReviewRunFixture(),
+      reviewId: 'review_indexed_commit_state',
+      repositoryId: 'repository_fixture',
+      target: {
+        kind: 'commit_range',
+        display: `Commit ${reviewedSha.slice(0, 12)}`,
+        base: 'd'.repeat(40),
+        head: reviewedSha,
+      },
+    });
+
+    expect(
+      store.commitStates('repository_fixture', [indexedSha, reviewedSha, absentSha, indexedSha]),
+    ).toEqual([
+      { sha: indexedSha, indexed: true, reviewed: false },
+      { sha: reviewedSha, indexed: false, reviewed: true },
+      { sha: absentSha, indexed: false, reviewed: false },
+    ]);
+    expect(store.commitStates('repository_other', [indexedSha, reviewedSha])).toEqual([
+      { sha: indexedSha, indexed: false, reviewed: false },
+      { sha: reviewedSha, indexed: false, reviewed: false },
+    ]);
+  });
+
   it('upserts remote documents and ordered links without deleting local memory', async () => {
     const root = await temporaryRoot();
     const store = openStore({ databasePath: join(root, 'gatekeeper.db') });

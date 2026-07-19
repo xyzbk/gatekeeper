@@ -274,18 +274,12 @@ describe('Project Memory contracts', () => {
       commits: [commit],
       nextCursor: 48,
     });
-    expect(() =>
-      commitExplorerInputSchema.parse({ ...input, cursor: -1 }),
-    ).toThrow();
+    expect(() => commitExplorerInputSchema.parse({ ...input, cursor: -1 })).toThrow();
     expect(() =>
       commitExplorerInputSchema.parse({ ...input, authoredAfter: '2026-07-40' }),
     ).toThrow();
-    expect(() =>
-      commitExplorerInputSchema.parse({ ...input, query: 'x'.repeat(257) }),
-    ).toThrow();
-    expect(() =>
-      commitExplorerInputSchema.parse({ ...input, unexpected: 'selector' }),
-    ).toThrow();
+    expect(() => commitExplorerInputSchema.parse({ ...input, query: 'x'.repeat(257) })).toThrow();
+    expect(() => commitExplorerInputSchema.parse({ ...input, unexpected: 'selector' })).toThrow();
     expect(() =>
       commitExplorerResponseSchema.parse({
         schemaVersion: 1,

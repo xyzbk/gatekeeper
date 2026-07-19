@@ -213,7 +213,9 @@ export async function listBranchCommits(
     '--format=format:%H%x00%aI%x00%s%x00%b%x00',
     ...(input.sort === 'oldest' ? ['--reverse'] : []),
     ...(input.authoredAfter === undefined ? [] : [`--since=${input.authoredAfter}T00:00:00.000Z`]),
-    ...(input.authoredBefore === undefined ? [] : [`--until=${input.authoredBefore}T23:59:59.999Z`]),
+    ...(input.authoredBefore === undefined
+      ? []
+      : [`--until=${input.authoredBefore}T23:59:59.999Z`]),
     input.ref,
   ];
   return parseCommitRecords(successfulResult(await runGit(arguments_)));

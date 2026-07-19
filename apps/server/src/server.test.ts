@@ -5,6 +5,8 @@ import { join } from 'node:path';
 
 import type {
   GitHubSyncResult,
+  CommitExplorerInput,
+  CommitExplorerResponse,
   IndexResult,
   IndexState,
   MemorySearchResult,
@@ -19,6 +21,7 @@ import type {
 } from '@gatekeeper/contracts';
 import {
   recentCommitEvidenceResponseSchema,
+  commitExplorerResponseSchema,
   reviewLookupSchema,
   reviewOperationSchema,
   reviewRunSchema,
@@ -156,6 +159,28 @@ const recentCommits: RecentCommitEvidence[] = [
   },
 ];
 
+const commitExplorerResponse: CommitExplorerResponse = {
+  schemaVersion: 1,
+  branches: ['master'],
+  selection: {
+    schemaVersion: 1,
+    branch: 'master',
+    source: 'all_local',
+    reviewState: 'all',
+    sort: 'newest',
+  },
+  commits: [
+    {
+      sha: 'c'.repeat(40),
+      authoredAt: '2026-07-19T12:00:00.000Z',
+      title: 'Add bounded commit explorer',
+      indexed: true,
+      reviewed: false,
+    },
+  ],
+  nextCursor: null,
+};
+
 const reviewDraft: ReviewDraftContract = {
   schemaVersion: 1,
   reviewId: reviewResponse.reviewId,
@@ -278,6 +303,7 @@ async function buildTestServer(
       reviewId: string,
       input: ReviewCompletionInput,
     ) => Promise<ReviewRunContract | null>;
+    exploreCommits?: (input: CommitExplorerInput) => Promise<CommitExplorerResponse>;
     deterministicOnly?: boolean;
     logger?: unknown;
     prepareReview?: (reviewId: string) => Promise<ReviewDraftContract | null>;
@@ -303,6 +329,7 @@ async function buildTestServer(
         Promise.resolve(reviewId === reviewResponse.reviewId ? completedReview : null)),
     dashboardRoot,
     deterministicOnly: options.deterministicOnly,
+    exploreCommits: options.exploreCommits ?? (() => Promise.resolve(commitExplorerResponse)),
     getStatus: () => statusResponse,
     logger: options.logger ?? false,
     projectMemory: {
@@ -333,6 +360,56 @@ async function buildTestServer(
 }
 
 describe('Gatekeeper local service', () => {
+  it('returns one authenticated bounded Commit Explorer page', async () => {
+    const exploreCommits = vi.fn(() => Promise.resolve(commitExplorerResponse));
+    const server = await buildTestServer({ exploreCommits });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+    const input = {
+      schemaVersion: 1,
+      branch: 'master',
+      source: 'all_local',
+      reviewState: 'all',
+      sort: 'newest',
+    } as const;
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/commits/explore',
+      headers,
+      payload: input,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(commitExplorerResponseSchema.parse(response.json())).toEqual(commitExplorerResponse);
+    expect(exploreCommits).toHaveBeenCalledWith(input);
+    await server.close();
+  });
+
+  it('keeps a stale local branch recoverable without invoking Git through the HTTP boundary', async () => {
+    const { CommitExplorerBranchUnavailableError } = await import('./commit-explorer.js');
+    const server = await buildTestServer({
+      exploreCommits: () => Promise.reject(new CommitExplorerBranchUnavailableError()),
+    });
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/commits/explore',
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: {
+        schemaVersion: 1,
+        branch: 'deleted-branch',
+        source: 'all_local',
+        reviewState: 'all',
+        sort: 'newest',
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: { code: 'NOT_FOUND', message: 'The selected local branch is unavailable.' },
+    });
+    await server.close();
+  });
+
   it('returns bounded recent commit evidence for the fixed local repository', async () => {
     const recentCommitRecords = vi.fn(() => Promise.resolve(recentCommits));
     const server = await buildTestServer({ projectMemory: { recentCommits: recentCommitRecords } });

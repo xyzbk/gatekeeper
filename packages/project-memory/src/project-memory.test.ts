@@ -52,6 +52,7 @@ function recordingPersistence(
     applyRemoteSync: (batch) => store.applyRemoteSync(batch),
     getSyncCursor: (repositoryId, provider) => store.getSyncCursor(repositoryId, provider),
     recentCommits: (repositoryId) => store.recentCommits(repositoryId),
+    commitStates: (repositoryId, shas) => store.commitStates(repositoryId, shas),
     search: (input) => store.search(input),
     saveReview: (review) => store.saveReview(review),
     saveReviewOperation: (operation) => store.saveReviewOperation(operation),
@@ -247,6 +248,25 @@ describe('Project Memory', () => {
         .map(({ sha, authoredAt, title }) => ({ sha, authoredAt, title })),
     );
     store.close();
+  });
+
+  it('forwards bounded indexed and reviewed commit state without exposing review records', async () => {
+    const root = await temporaryRoot();
+    const store = openStore(join(root, 'gatekeeper.db'));
+    const state = fakeGit(root, {
+      commits: [commit('a', 'Indexed commit')],
+    });
+    const memory = memoryWith(state, store);
+    await memory.migrate();
+    const repository = await memory.registerRepository({ root, remote: state.snapshot.remote });
+    await memory.indexLocalRepository({ repositoryId: repository.repositoryId });
+
+    await expect(
+      memory.commitStates(repository.repositoryId, ['a'.repeat(40), 'b'.repeat(40)]),
+    ).resolves.toEqual([
+      { sha: 'a'.repeat(40), indexed: true, reviewed: false },
+      { sha: 'b'.repeat(40), indexed: false, reviewed: false },
+    ]);
   });
 
   it('normalizes explicit GitHub relationships and ranks them before lexical matches', async () => {

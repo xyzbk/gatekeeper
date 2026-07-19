@@ -179,6 +179,28 @@ The query is 1–256 characters and the optional limit is 1–50. Results are bo
 
 Returns at most ten newest indexed commit records for the fixed repository, ordered by authored time then SHA. Each result contains only SHA, authored time, and title; titles are untrusted repository data. The endpoint accepts no selector, query field, commit body, or diff request. It is history evidence, not a repository browser or pagination API.
 
+### `POST /v1/commits/explore`
+
+Returns one bounded local Commit Explorer page for the fixed repository:
+
+```json
+{
+  "schemaVersion": 1,
+  "branch": "master",
+  "source": "all_local",
+  "query": "cache",
+  "authoredAfter": "2026-07-01",
+  "authoredBefore": "2026-07-31",
+  "reviewState": "all",
+  "sort": "newest",
+  "cursor": 24
+}
+```
+
+`branch` is optional: Gatekeeper selects `master` when it exists and otherwise the current local branch. Any requested branch must exactly match a local ref at request time; a stale or deleted branch returns `404 NOT_FOUND` with a bounded recovery message. The response includes at most 24 records, a current local branch list, the resolved selection, and a nullable next cursor. It contains only full SHA, authored time, title, and the booleans `indexed` and `reviewed`.
+
+`all_local` reads the selected branch's local Git history. `project_memory` returns only selected-branch commits that are currently indexed in Project Memory. The `reviewState` filter reflects an existing immutable commit review for the same full SHA. Query, authored-date, review-state, and sort filters apply to both sources. The endpoint does not accept a repository path, ref expression, remote, diff, source text, or review body; it lists refs and reads metadata through argument-array Git commands only. It never checks out, switches, moves, fetches, resets, stages, or otherwise changes the target repository.
+
 ### `GET /v1/reviews/:reviewId`
 
 Reads one strict ReviewOperation v1 when the ID belongs to a dashboard operation, including after completion; otherwise it reads the legacy strict ReviewRun v1. Operations progress through `queued`, `running`, `failed`, or `completed`, with bounded stages that are safe to display. The completed operation embeds the persisted ReviewRun using the same review ID, the matching previous ReviewRun when available, nullable bounded GitHub synchronization status, and up to fifty ordered evidence-timeline items. Timeline items expose a semantic role, explicit relationship when present, repository or GitHub authority, historical status, the bounded evidence pointer, and only a validated `https://github.com` link. Missing review IDs return `NOT_FOUND`. Reviews and operation state remain available after the foreground service restarts because they live in machine-local Project Memory.

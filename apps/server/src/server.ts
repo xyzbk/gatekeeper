@@ -5,6 +5,10 @@ import fastifyStatic from '@fastify/static';
 import {
   dashboardBootstrapJsonSchema,
   dashboardBootstrapSchema,
+  commitExplorerInputJsonSchema,
+  commitExplorerInputSchema,
+  commitExplorerResponseJsonSchema,
+  commitExplorerResponseSchema,
   commitReviewInputJsonSchema,
   commitReviewInputSchema,
   emptyRequestJsonSchema,
@@ -45,6 +49,8 @@ import {
   statusResponseSchema,
   type IndexResult,
   type IndexState,
+  type CommitExplorerInput,
+  type CommitExplorerResponse,
   type CommitReviewInput,
   type GitHubSyncResult,
   type MemorySearchInput,
@@ -61,6 +67,8 @@ import {
 import { GitHubProviderError } from '@gatekeeper/github-gh';
 import { InvalidReviewCompletionError } from '@gatekeeper/review-engine';
 import fastify, { type FastifyInstance, LogController } from 'fastify';
+
+import { CommitExplorerBranchUnavailableError } from './commit-explorer.js';
 
 const contentSecurityPolicy = [
   "default-src 'none'",
@@ -95,6 +103,7 @@ export interface BuildGatekeeperServerOptions {
   ) => Promise<ReviewRunContract | null>;
   dashboardRoot: string;
   deterministicOnly?: boolean;
+  exploreCommits: (input: CommitExplorerInput) => Promise<CommitExplorerResponse>;
   getStatus: () => StatusResponse | Promise<StatusResponse>;
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
@@ -208,6 +217,8 @@ export async function buildGatekeeperServer(
   server.addSchema(reviewOperationApiJsonSchema);
   server.addSchema(reviewLookupApiJsonSchema);
   server.addSchema(reviewDraftJsonSchema);
+  server.addSchema(commitExplorerInputJsonSchema);
+  server.addSchema(commitExplorerResponseJsonSchema);
   server.addSchema(reviewCompletionInputJsonSchema);
   server.addSchema(commitReviewInputJsonSchema);
   server.addSchema(pullRequestReviewInputJsonSchema);
@@ -241,6 +252,11 @@ export async function buildGatekeeperServer(
   });
 
   server.setErrorHandler((error, request, reply) => {
+    if (error instanceof CommitExplorerBranchUnavailableError) {
+      return reply
+        .code(404)
+        .send(createError('NOT_FOUND', 'The selected local branch is unavailable.'));
+    }
     if (error instanceof ReviewOperationUnavailableError) {
       return reply
         .code(503)
@@ -339,6 +355,28 @@ export async function buildGatekeeperServer(
       },
     },
     () => healthResponseSchema.parse({ status: 'ok', version: options.version }),
+  );
+
+  server.post<{ Body: CommitExplorerInput }>(
+    '/v1/commits/explore',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:commit-explorer-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:commit-explorer-response-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request) =>
+      commitExplorerResponseSchema.parse(
+        await options.exploreCommits(commitExplorerInputSchema.parse(request.body)),
+      ),
   );
 
   server.post(

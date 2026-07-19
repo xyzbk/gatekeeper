@@ -47,6 +47,7 @@ import {
   ReviewOperationUnavailableError,
   type BuildGatekeeperServerOptions,
 } from './server.js';
+import { exploreCommits as exploreLocalCommits } from './commit-explorer.js';
 
 export interface StartGatekeeperServiceOptions {
   bearerToken?: string;
@@ -494,6 +495,16 @@ export async function startGatekeeperService(
       },
       dashboardRoot: options.dashboardRoot,
       ...(options.deterministicOnly === true ? { deterministicOnly: true } : {}),
+      exploreCommits: async (input) => {
+        const snapshot = await inspectFixedRepository();
+        return exploreLocalCommits(input, {
+          currentBranch: snapshot.branch,
+          git,
+          memory,
+          repositoryId: registeredRepository.repositoryId,
+          repositoryRoot: snapshot.root,
+        });
+      },
       getStatus: async () => {
         if (status === undefined) {
           throw new Error('Service status is not ready.');

@@ -60,6 +60,12 @@ export interface ProjectMemoryIndexedCommit {
   message: string;
 }
 
+export interface CommitMemoryState {
+  sha: string;
+  indexed: boolean;
+  reviewed: boolean;
+}
+
 export interface ProjectMemoryDocument {
   documentId: string;
   sourceType: ReviewRunContract['findings'][number]['evidence'][number]['sourceType'];
@@ -117,6 +123,7 @@ export interface ProjectMemoryPersistence {
   applyRemoteSync(batch: ProjectMemoryRemoteSyncBatch): GitHubSyncResult;
   getSyncCursor(repositoryId: string, provider: 'github'): string | null;
   recentCommits(repositoryId: string): RecentCommitEvidence[];
+  commitStates(repositoryId: string, shas: readonly string[]): CommitMemoryState[];
   search(input: { repositoryId: string; query: string; limit?: number }): MemorySearchResult[];
   saveReview(review: ReviewRunContract): void;
   saveReviewOperation(operation: ReviewOperationContract): void;
@@ -159,6 +166,7 @@ export interface ProjectMemory {
   indexRemoteDocuments(input: RemoteIndexInput): Promise<GitHubSyncResult>;
   getRemoteSyncCursor(repositoryId: string, provider: 'github'): Promise<string | null>;
   recentCommits(repositoryId: string): Promise<RecentCommitEvidence[]>;
+  commitStates(repositoryId: string, shas: readonly string[]): Promise<CommitMemoryState[]>;
   search(input: MemorySearchInput): Promise<MemorySearchResult[]>;
   saveReview(review: ReviewRunContract): Promise<void>;
   saveReviewOperation(operation: ReviewOperationContract): Promise<void>;
@@ -737,6 +745,7 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
     getRemoteSyncCursor: (id, provider) =>
       Promise.resolve(options.persistence.getSyncCursor(id, provider)),
     recentCommits: (id) => Promise.resolve(options.persistence.recentCommits(id)),
+    commitStates: (id, shas) => Promise.resolve(options.persistence.commitStates(id, shas)),
     indexLocalRepository: async (input) => {
       const repository = options.persistence.getRepository(input.repositoryId);
       if (repository === null) {

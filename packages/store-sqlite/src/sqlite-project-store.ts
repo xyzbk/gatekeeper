@@ -28,6 +28,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 const DEFAULT_MIGRATIONS_FOLDER = fileURLToPath(new URL('../drizzle', import.meta.url));
 const TRUST_LABEL = 'untrusted_repository_content' as const;
+const MAX_COMMIT_STATE_LOOKUP = 48;
 
 export type SqliteProjectStoreErrorCode =
   | 'CORRUPT_DATA'
@@ -129,6 +130,12 @@ export interface SqliteIndexBatch {
 type FileRow = SqliteIndexedFile;
 
 type CommitRow = SqliteIndexedCommit;
+
+interface CommitMemoryState {
+  sha: string;
+  indexed: boolean;
+  reviewed: boolean;
+}
 
 interface DocumentRow extends SqliteMemoryDocument {
   rowid: number;
@@ -405,6 +412,46 @@ export class SqliteProjectStore {
       )
       .all(repositoryId)
       .map((row) => recentCommitEvidenceSchema.parse(row));
+  }
+
+  public commitStates(repositoryId: string, shas: readonly string[]): CommitMemoryState[] {
+    const uniqueShas = [...new Set(shas)];
+    if (
+      uniqueShas.length > MAX_COMMIT_STATE_LOOKUP ||
+      uniqueShas.some((sha) => !/^[0-9a-f]{40,64}$/.test(sha))
+    ) {
+      throw new SqliteProjectStoreError(
+        'INVALID_INDEX_BATCH',
+        'Commit Explorer requires a bounded list of full commit IDs.',
+      );
+    }
+    if (uniqueShas.length === 0) {
+      return [];
+    }
+    const placeholders = uniqueShas.map(() => '?').join(', ');
+    const indexed = new Set(
+      this.#database
+        .prepare<unknown[], { sha: string }>(
+          `SELECT sha FROM commits WHERE repository_id = ? AND sha IN (${placeholders})`,
+        )
+        .all(repositoryId, ...uniqueShas)
+        .map(({ sha }) => sha),
+    );
+    const reviewed = new Set(
+      this.#database
+        .prepare<unknown[], { targetKey: string }>(
+          `SELECT target_key AS targetKey FROM review_runs
+           WHERE repository_id = ? AND target_kind = 'commit_range'
+             AND target_key IN (${placeholders})`,
+        )
+        .all(repositoryId, ...uniqueShas.map((sha) => `commit:${sha}`))
+        .map(({ targetKey }) => targetKey.slice('commit:'.length)),
+    );
+    return uniqueShas.map((sha) => ({
+      sha,
+      indexed: indexed.has(sha),
+      reviewed: reviewed.has(sha),
+    }));
   }
 
   public applyIndex(batch: SqliteIndexBatch): IndexResult {
