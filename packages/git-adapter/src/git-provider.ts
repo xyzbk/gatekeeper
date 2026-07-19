@@ -7,7 +7,14 @@ import {
   type GitCommandResult,
   type RunGit,
 } from './repository-path.js';
-import { listCommits, listTrackedFiles, readFileAtRef } from './project-memory-source.js';
+import {
+  listBranchCommits,
+  listCommits,
+  listLocalBranches,
+  listTrackedFiles,
+  readFileAtRef,
+  type LocalCommitPageInput,
+} from './project-memory-source.js';
 import {
   extractCommitDiff,
   extractWorktreeDiff,
@@ -29,7 +36,12 @@ export interface GitProvider {
     options?: WorktreeDiffOptions,
   ): ReturnType<typeof extractWorktreeDiff>;
   inspectRepository(repositoryPath: string): Promise<RepositorySnapshot>;
+  listBranchCommits(
+    repositoryPath: string,
+    input: LocalCommitPageInput,
+  ): ReturnType<typeof listBranchCommits>;
   listCommits(repositoryPath: string, limit: number): ReturnType<typeof listCommits>;
+  listLocalBranches(repositoryPath: string): ReturnType<typeof listLocalBranches>;
   listTrackedFiles(repositoryPath: string): ReturnType<typeof listTrackedFiles>;
   readFileAtRef(
     repositoryPath: string,
@@ -108,7 +120,10 @@ export function createGitProvider(options: GitProviderOptions = {}): GitProvider
     getWorktreeDiff: async (repositoryPath, diffOptions) =>
       extractWorktreeDiff(repositoryPath, runGit, diffOptions),
     inspectRepository: async (repositoryPath) => inspectRepository(repositoryPath, runGit),
+    listBranchCommits: async (repositoryPath, input) =>
+      listBranchCommits(repositoryPath, input, runGit),
     listCommits: async (repositoryPath, limit) => listCommits(repositoryPath, limit, runGit),
+    listLocalBranches: async (repositoryPath) => listLocalBranches(repositoryPath, runGit),
     listTrackedFiles: async (repositoryPath) => listTrackedFiles(repositoryPath, runGit),
     readFileAtRef: async (repositoryPath, relativePath, ref) =>
       readFileAtRef(repositoryPath, relativePath, ref, runGit),

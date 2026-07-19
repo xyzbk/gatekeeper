@@ -7,7 +7,9 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  listBranchCommits,
   listCommits,
+  listLocalBranches,
   listTrackedFiles,
   ProjectMemorySourceError,
   readFileAtRef,
@@ -168,6 +170,55 @@ describe('Project Memory Git sources', () => {
     expect(commits[1]).toMatchObject({ title: 'Document Redis history' });
   });
 
+  it('lists local branch refs and one bounded immutable branch page without changing checkout', async () => {
+    const root = await createRepository();
+    await writeFixture(root, 'README.md', '# Updated\n');
+    await runGit(root, ['add', 'README.md']);
+    await runGit(root, ['commit', '--message', 'Second local commit']);
+    const calls: string[][] = [];
+    const run: RunGit = async (arguments_) => {
+      calls.push([...arguments_]);
+      const output = await execFileAsync('git', arguments_, {
+        encoding: 'utf8',
+        maxBuffer: 2 * 1_024 * 1_024,
+        windowsHide: true,
+      });
+      return result({ stdout: output.stdout });
+    };
+
+    await expect(listLocalBranches(root, run)).resolves.toEqual([
+      { name: 'master', ref: 'refs/heads/master' },
+    ]);
+    await expect(
+      listBranchCommits(
+        root,
+        {
+          ref: 'refs/heads/master',
+          cursor: 0,
+          limit: 2,
+          sort: 'newest',
+          authoredAfter: '2026-07-01',
+          authoredBefore: '2026-07-31',
+        },
+        run,
+      ),
+    ).resolves.toMatchObject([
+      { title: 'Second local commit' },
+      { title: 'Document Redis history' },
+    ]);
+    expect(calls).toContainEqual([
+      '-C',
+      root,
+      'for-each-ref',
+      '--format=%(refname)%00',
+      'refs/heads',
+    ]);
+    expect(calls.flat()).not.toContain('checkout');
+    expect(calls.flat()).not.toContain('switch');
+    expect(calls.flat()).not.toContain('reset');
+    expect(calls.flat()).not.toContain('fetch');
+  });
+
   it('rejects malformed, oversized, timed-out, and over-limit Git responses', async () => {
     const malformed: RunGit = () => Promise.resolve(result({ stdout: 'not a tree record\0' }));
     await expect(listTrackedFiles('D:/fixture', malformed)).rejects.toMatchObject({
@@ -207,5 +258,12 @@ describe('Project Memory Git sources', () => {
     await expect(
       listCommits('D:/fixture', 201, () => Promise.resolve(result())),
     ).rejects.toBeInstanceOf(ProjectMemorySourceError);
+    await expect(
+      listBranchCommits(
+        'D:/fixture',
+        { ref: '--unsafe', cursor: 0, limit: 1, sort: 'newest' },
+        () => Promise.resolve(result()),
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_REF' });
   });
 });

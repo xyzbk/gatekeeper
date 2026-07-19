@@ -111,6 +111,54 @@ export const recentCommitEvidenceResponseSchema = z
   })
   .strict();
 
+const localBranchNameSchema = z.string().trim().min(1).max(255);
+const commitExplorerSourceSchema = z.enum(['all_local', 'project_memory']);
+const commitExplorerReviewStateSchema = z.enum(['all', 'reviewed', 'not_reviewed']);
+const commitExplorerSortSchema = z.enum(['newest', 'oldest']);
+const commitExplorerCursorSchema = z.int().nonnegative().max(50_000);
+const commitExplorerFiltersSchema = z
+  .object({
+    source: commitExplorerSourceSchema,
+    query: z.string().trim().min(1).max(256).optional(),
+    authoredAfter: z.iso.date().optional(),
+    authoredBefore: z.iso.date().optional(),
+    reviewState: commitExplorerReviewStateSchema,
+    sort: commitExplorerSortSchema,
+    cursor: commitExplorerCursorSchema.optional(),
+  })
+  .strict();
+
+export const commitExplorerInputSchema = commitExplorerFiltersSchema
+  .extend({
+    schemaVersion: z.literal(1),
+    branch: localBranchNameSchema.optional(),
+  })
+  .strict();
+
+export const commitExplorerSelectionSchema = commitExplorerFiltersSchema
+  .extend({
+    schemaVersion: z.literal(1),
+    branch: localBranchNameSchema,
+  })
+  .strict();
+
+export const commitExplorerCommitSchema = recentCommitEvidenceSchema
+  .extend({
+    indexed: z.boolean(),
+    reviewed: z.boolean(),
+  })
+  .strict();
+
+export const commitExplorerResponseSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    branches: z.array(localBranchNameSchema).min(1).max(500),
+    selection: commitExplorerSelectionSchema,
+    commits: z.array(commitExplorerCommitSchema).max(24),
+    nextCursor: commitExplorerCursorSchema.nullable(),
+  })
+  .strict();
+
 export const repositoryRecordJsonSchema = {
   $id: 'gatekeeper:repository-record-v1',
   ...z.toJSONSchema(repositoryRecordSchema, { target: 'draft-7' }),
@@ -141,6 +189,16 @@ export const recentCommitEvidenceResponseJsonSchema = {
   ...z.toJSONSchema(recentCommitEvidenceResponseSchema, { target: 'draft-7' }),
 };
 
+export const commitExplorerInputJsonSchema = {
+  $id: 'gatekeeper:commit-explorer-input-v1',
+  ...z.toJSONSchema(commitExplorerInputSchema, { target: 'draft-7' }),
+};
+
+export const commitExplorerResponseJsonSchema = {
+  $id: 'gatekeeper:commit-explorer-response-v1',
+  ...z.toJSONSchema(commitExplorerResponseSchema, { target: 'draft-7' }),
+};
+
 export const repositoryStatusJsonSchema = {
   $id: 'gatekeeper:repository-status-v1',
   ...z.toJSONSchema(repositoryStatusSchema, { target: 'draft-7' }),
@@ -167,3 +225,7 @@ export type MemorySearchResult = z.infer<typeof memorySearchResultSchema>;
 export type MemorySearchResponse = z.infer<typeof memorySearchResponseSchema>;
 export type RecentCommitEvidence = z.infer<typeof recentCommitEvidenceSchema>;
 export type RecentCommitEvidenceResponse = z.infer<typeof recentCommitEvidenceResponseSchema>;
+export type CommitExplorerInput = z.infer<typeof commitExplorerInputSchema>;
+export type CommitExplorerSelection = z.infer<typeof commitExplorerSelectionSchema>;
+export type CommitExplorerCommit = z.infer<typeof commitExplorerCommitSchema>;
+export type CommitExplorerResponse = z.infer<typeof commitExplorerResponseSchema>;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  commitExplorerInputSchema,
+  commitExplorerResponseSchema,
   indexResultSchema,
   indexStateSchema,
   memorySearchInputSchema,
@@ -232,6 +234,74 @@ describe('Project Memory contracts', () => {
       recentCommitEvidenceResponseSchema.parse({
         schemaVersion: 1,
         commits: [{ ...commit, authoredAt: 'not-a-date' }],
+      }),
+    ).toThrow();
+  });
+
+  it('strictly validates a bounded local Commit Explorer request and response', () => {
+    const commit = {
+      sha: 'a'.repeat(40),
+      authoredAt: '2026-07-19T20:00:00.000Z',
+      title: 'Preserve immutable review identity',
+      indexed: true,
+      reviewed: false,
+    } as const;
+    const input = {
+      schemaVersion: 1,
+      branch: 'master',
+      source: 'all_local',
+      query: 'review identity',
+      authoredAfter: '2026-07-01',
+      authoredBefore: '2026-07-31',
+      reviewState: 'not_reviewed',
+      sort: 'newest',
+      cursor: 24,
+    } as const;
+
+    expect(commitExplorerInputSchema.parse(input)).toEqual(input);
+    expect(
+      commitExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        branches: ['master', 'release/0.1'],
+        selection: input,
+        commits: [commit],
+        nextCursor: 48,
+      }),
+    ).toEqual({
+      schemaVersion: 1,
+      branches: ['master', 'release/0.1'],
+      selection: input,
+      commits: [commit],
+      nextCursor: 48,
+    });
+    expect(() =>
+      commitExplorerInputSchema.parse({ ...input, cursor: -1 }),
+    ).toThrow();
+    expect(() =>
+      commitExplorerInputSchema.parse({ ...input, authoredAfter: '2026-07-40' }),
+    ).toThrow();
+    expect(() =>
+      commitExplorerInputSchema.parse({ ...input, query: 'x'.repeat(257) }),
+    ).toThrow();
+    expect(() =>
+      commitExplorerInputSchema.parse({ ...input, unexpected: 'selector' }),
+    ).toThrow();
+    expect(() =>
+      commitExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        branches: Array.from({ length: 501 }, (_, index) => `branch-${index}`),
+        selection: input,
+        commits: [],
+        nextCursor: null,
+      }),
+    ).toThrow();
+    expect(() =>
+      commitExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        branches: ['master'],
+        selection: input,
+        commits: Array.from({ length: 25 }, () => commit),
+        nextCursor: null,
       }),
     ).toThrow();
   });
