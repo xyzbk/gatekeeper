@@ -148,6 +148,7 @@ describe('Project Memory contracts', () => {
         {
           documentId: 'document_redis',
           match: 'fts',
+          relationship: 'supersedes',
           trust: 'untrusted_repository_content',
           status: 'active',
           occurredAt: '2026-07-17T12:00:00.000Z',
@@ -165,6 +166,7 @@ describe('Project Memory contracts', () => {
     } as const;
 
     expect(memorySearchResponseSchema.parse(response)).toEqual(response);
+    expect(memorySearchResponseSchema.parse(response).results[0]?.relationship).toBe('supersedes');
     expect(() =>
       memorySearchResponseSchema.parse({
         ...response,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { evidencePointerSchema } from './review.js';
+import { evidencePointerSchema, evidenceRelationshipSchema } from './review.js';
 
 const identifierSchema = z.string().trim().min(1).max(300);
 const countSchema = z.int().nonnegative();
@@ -84,6 +84,7 @@ export const memorySearchResultSchema = z
   .object({
     documentId: identifierSchema,
     match: z.enum(['exact', 'linked', 'fts']),
+    relationship: evidenceRelationshipSchema.optional(),
     trust: z.literal('untrusted_repository_content'),
     status: z.enum(['active', 'historical', 'superseded', 'unknown']),
     occurredAt: z.iso.datetime().nullable(),

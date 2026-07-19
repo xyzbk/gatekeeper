@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type {
   GitCommitRecord,
   GitHubHistoryBatch,
+  MemorySearchResult,
   RepositorySnapshot,
   TrackedFileRecord,
 } from '@gatekeeper/contracts';
@@ -17,6 +18,7 @@ import { createReviewRunFixture } from '@gatekeeper/testkit';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildEvidenceTimeline,
   createProjectMemory,
   normalizeRemoteIdentity,
   type ProjectMemoryPersistence,
@@ -83,6 +85,38 @@ function commit(shaCharacter: string, title: string, message = ''): GitCommitRec
     authoredAt: '2026-07-17T12:00:00+03:00',
     title,
     message,
+  };
+}
+
+function timelineResult(
+  sourceType: MemorySearchResult['evidence']['sourceType'],
+  sourceId: string,
+  options: {
+    match?: MemorySearchResult['match'];
+    path?: string;
+    relationship?: NonNullable<MemorySearchResult['relationship']>;
+    remoteUrl?: string;
+    status?: MemorySearchResult['status'];
+    title?: string;
+  } = {},
+): MemorySearchResult {
+  return {
+    documentId: `document_${sourceId}`,
+    match: options.match ?? 'linked',
+    ...(options.relationship === undefined ? {} : { relationship: options.relationship }),
+    trust: 'untrusted_repository_content',
+    status: options.status ?? 'historical',
+    occurredAt: '2026-07-18T18:00:00.000Z',
+    evidence: {
+      sourceType,
+      repositoryId: 'repository_fixture',
+      sourceId,
+      title: options.title ?? sourceId,
+      ...(options.path === undefined ? {} : { path: options.path }),
+      ...(options.remoteUrl === undefined ? {} : { remoteUrl: options.remoteUrl }),
+      excerpt: `Bounded evidence for ${sourceId}.`,
+      contentHash: sourceId.padEnd(64, 'a').slice(0, 64),
+    },
   };
 }
 
@@ -285,6 +319,98 @@ describe('Project Memory', () => {
       'docs/adr/0003-no-required-redis.md',
     ]);
     expect(results.some(({ evidence }) => evidence.sourceId === 'issue:#99')).toBe(false);
+  });
+
+  it('builds the ordered Ghost Change timeline from explicit relationships', () => {
+    const head = 'a'.repeat(40);
+    const results: MemorySearchResult[] = [
+      timelineResult('pull_request', 'pull_request:#12', {
+        match: 'exact',
+        remoteUrl: 'https://github.com/example/fixture/pull/12',
+        status: 'active',
+      }),
+      timelineResult('issue', 'issue:#4', {
+        relationship: 'implements',
+        remoteUrl: 'https://github.com/example/fixture/issues/4',
+      }),
+      timelineResult('pull_request', 'pull_request:#8', {
+        relationship: 'supersedes',
+        remoteUrl: 'https://github.com/example/fixture/pull/8',
+      }),
+      timelineResult('issue', 'issue:#9', {
+        relationship: 'caused_by',
+        remoteUrl: 'https://github.com/example/fixture/issues/9',
+      }),
+      timelineResult('pull_request', 'pull_request:#10', {
+        relationship: 'reverts',
+        remoteUrl: 'https://github.com/example/fixture/pull/10',
+      }),
+      timelineResult('adr', 'docs/adr/0003-no-required-redis.md', {
+        path: 'docs/adr/0003-no-required-redis.md',
+        relationship: 'supersedes',
+        status: 'active',
+      }),
+      timelineResult('issue', 'issue:#4', {
+        relationship: 'mentions',
+        remoteUrl: 'https://github.com/example/fixture/issues/4',
+      }),
+    ];
+
+    const timeline = buildEvidenceTimeline({
+      repositoryHead: head,
+      repositoryRemote: 'git@github.com:Example/Fixture.git',
+      results,
+    });
+
+    expect(timeline.map(({ role }) => role)).toEqual([
+      'proposal',
+      'implementation',
+      'incident',
+      'revert',
+      'decision',
+      'revived_change',
+    ]);
+    expect(timeline.map(({ evidence }) => evidence.sourceId)).toEqual([
+      'issue:#4',
+      'pull_request:#8',
+      'issue:#9',
+      'pull_request:#10',
+      'docs/adr/0003-no-required-redis.md',
+      'pull_request:#12',
+    ]);
+    expect(timeline.map(({ sourceAuthority }) => sourceAuthority)).toEqual([
+      'github',
+      'github',
+      'github',
+      'github',
+      'repository',
+      'github',
+    ]);
+    expect(timeline.find(({ role }) => role === 'implementation')?.status).toBe('superseded');
+    expect(timeline.find(({ role }) => role === 'decision')?.status).toBe('active');
+    expect(timeline.find(({ role }) => role === 'decision')?.href).toBe(
+      `https://github.com/example/fixture/blob/${head}/docs/adr/0003-no-required-redis.md`,
+    );
+  });
+
+  it('uses a bounded context fallback and rejects unsafe evidence links', () => {
+    const results = Array.from({ length: 55 }, (_, index) =>
+      timelineResult('comment', `comment:${index}`, {
+        remoteUrl: `javascript:alert(${index})`,
+        title: `<script>${index}</script>`,
+      }),
+    );
+
+    const timeline = buildEvidenceTimeline({
+      repositoryHead: 'b'.repeat(40),
+      repositoryRemote: 'https://example.invalid/private.git',
+      results,
+    });
+
+    expect(timeline).toHaveLength(50);
+    expect(timeline.every(({ role }) => role === 'context')).toBe(true);
+    expect(timeline.every(({ href }) => href === undefined)).toBe(true);
+    expect(timeline[0]?.evidence.title).toBe('<script>0</script>');
   });
 
   it('indexes once, performs zero unchanged rewrites, invalidates one changed ADR, and deletes it', async () => {

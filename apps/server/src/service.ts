@@ -32,7 +32,7 @@ import {
   pullRequestToRemoteRecord,
   type GitHubProvider,
 } from '@gatekeeper/github-gh';
-import { createProjectMemory } from '@gatekeeper/project-memory';
+import { buildEvidenceTimeline, createProjectMemory } from '@gatekeeper/project-memory';
 import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
@@ -150,6 +150,50 @@ export async function startGatekeeperService(
         repositoryId: registeredRepository.repositoryId,
         provider: 'github',
         batch,
+      });
+    };
+    const getComposedReviewOperation = async (
+      reviewId: string,
+    ): Promise<ReviewOperationContract | null> => {
+      const operation = await memory.getReviewOperation(reviewId);
+      if (operation === null || operation.status !== 'completed') {
+        return operation;
+      }
+      const previousReview =
+        operation.review.previousReviewId === undefined
+          ? null
+          : await memory.getReview(operation.review.previousReviewId);
+      const queries =
+        operation.review.target.kind === 'pull_request' &&
+        operation.review.target.pullRequestNumber !== undefined
+          ? [`pull_request:#${operation.review.target.pullRequestNumber}`]
+          : [
+              ...new Set(
+                operation.review.findings.flatMap(({ evidence }) =>
+                  evidence.map(({ sourceId }) => sourceId),
+                ),
+              ),
+            ].slice(0, 8);
+      const results = (
+        await Promise.all(
+          queries.map((query) =>
+            memory.search({
+              schemaVersion: 1,
+              repositoryId: registeredRepository.repositoryId,
+              query,
+              limit: 20,
+            }),
+          ),
+        )
+      ).flat();
+      return reviewOperationSchema.parse({
+        ...operation,
+        previousReview,
+        evidenceTimeline: buildEvidenceTimeline({
+          repositoryHead: options.repository.head,
+          repositoryRemote: registeredRepository.remote,
+          results,
+        }),
       });
     };
     const executePullRequestReview = async (
@@ -287,7 +331,7 @@ export async function startGatekeeperService(
         repository: registeredRepository,
         getIndexState: () => memory.getIndexState(registeredRepository.repositoryId),
         getReview: (reviewId) => memory.getReview(reviewId),
-        getReviewOperation: (reviewId) => memory.getReviewOperation(reviewId),
+        getReviewOperation: getComposedReviewOperation,
         indexRepository: async () => {
           const loadedPolicy = await loadRepositoryPolicy(options.repository.root);
           return memory.indexLocalRepository({

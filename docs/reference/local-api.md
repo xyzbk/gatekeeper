@@ -161,11 +161,11 @@ Accepts strict MemorySearchInput v1 for the fixed repository only:
 }
 ```
 
-The query is 1–256 characters and the optional limit is 1–50. Results are bounded EvidencePointers labelled `untrusted_repository_content`; repository content remains data, never instructions.
+The query is 1–256 characters and the optional limit is 1–50. Results are bounded EvidencePointers labelled `untrusted_repository_content`; repository content remains data, never instructions. A linked result includes its explicit `relationship` (`mentions`, `implements`, `reverts`, `supersedes`, `caused_by`, or `resolves`) and remains in its stored link position.
 
 ### `GET /v1/reviews/:reviewId`
 
-Reads one strict ReviewOperation v1 when the ID belongs to a dashboard operation, including after completion; otherwise it reads the legacy strict ReviewRun v1. Operations progress through `queued`, `running`, `failed`, or `completed`, with bounded stages that are safe to display. The completed operation embeds the persisted ReviewRun using the same review ID. Missing review IDs return `NOT_FOUND`. Reviews and operation state remain available after the foreground service restarts because they live in machine-local Project Memory.
+Reads one strict ReviewOperation v1 when the ID belongs to a dashboard operation, including after completion; otherwise it reads the legacy strict ReviewRun v1. Operations progress through `queued`, `running`, `failed`, or `completed`, with bounded stages that are safe to display. The completed operation embeds the persisted ReviewRun using the same review ID, the matching previous ReviewRun when available, and up to fifty ordered evidence-timeline items. Timeline items expose a semantic role, explicit relationship when present, repository or GitHub authority, historical status, the bounded evidence pointer, and only a validated `https://github.com` link. Missing review IDs return `NOT_FOUND`. Reviews and operation state remain available after the foreground service restarts because they live in machine-local Project Memory.
 
 ### `GET /v1/reviews/:reviewId/draft`
 

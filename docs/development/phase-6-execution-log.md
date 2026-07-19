@@ -57,6 +57,23 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - The detached operation owns a terminal catch so failures cannot become unhandled promise rejections. User-visible failures remain generic and never include repository content, provider output, paths, tokens, or raw exception text.
 - The first combined quality command used unsupported `&&` syntax in the available Windows PowerShell and was rejected before any command ran. The acceptance commands were rerun independently; lint then caught three unsafe test-only `response.json()` returns, which were corrected by parsing the shared lookup contract.
 
+### Relationship-aware inspector data
+
+- RED: 5 of 50 focused tests failed because linked memory results discarded relationship types, no timeline contract or builder existed, and completed operations had no comparison inputs.
+- GREEN: the strict memory result retains an optional explicit relationship; exact and FTS results remain unchanged. The SQLite linked query selects `l.type` while its existing `ORDER BY l.position` preserves link order.
+- GREEN: the pure Project Memory timeline test produced the Ghost sequence `proposal -> implementation -> incident -> revert -> decision -> revived_change`, deduplicated repeated pointers, capped fallback context at fifty items, and omitted unsafe links.
+- RED: the real Ghost service route completed with an empty timeline, proving persistence alone did not compose inspector data.
+- GREEN: the completed lookup now joins the previous immutable ReviewRun and relationship-aware timeline. Two consecutive Ghost operations proved previous-review identity and the six historical roles.
+
+### Findings and corrections
+
+- The first Ghost composition returned two extra lexical context matches after the exact linked chain. When any exact or linked evidence exists, the timeline now excludes lower-authority FTS spillover; FTS remains the bounded context fallback only when no identity chain exists.
+- A superseded implementation is derived only from an explicit `supersedes` relationship to a pull request. An active ADR targeted by the current proposal remains active; Gatekeeper does not claim that an unmerged change already superseded repository authority.
+- Remote links are emitted only for credential-free `https://github.com` URLs. Repository paths become GitHub blob links only when both normalized repository identity and a safe relative path are available; otherwise the item remains useful plain text with no link.
+- Comparison data is not persisted as a second truth. The completed contract carries the prior review, current review, evidence hashes, and superseded statuses so the dashboard can derive resolved, remaining, and unchanged evidence by stable IDs.
+- The first root lint run for this slice caught one stale test-only `ReviewId` import left after switching the Ghost runner to the service-preallocated ID. It was removed before verification.
+- Fresh root gate: lint and typecheck passed; 39 files and 256 tests passed; the production dashboard build completed.
+
 ## Scope ledger
 
 Deferred by the Phase 6 stop gate: settings, policy editors, collaboration, analytics, user accounts, remote hosting, permanent decision writes, decorative charts, and Phase 7 packaging/submission work.

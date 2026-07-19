@@ -178,10 +178,8 @@ describe('review completion contracts', () => {
 
 describe('review operation contracts', () => {
   it('accepts strict queued, running, failed, and completed operation states', async () => {
-    const [{ reviewOperationSchema }, { createReviewRunFixture }] = await Promise.all([
-      import('./review.js'),
-      import('@gatekeeper/testkit'),
-    ]);
+    const [{ evidenceTimelineItemSchema, reviewOperationSchema }, { createReviewRunFixture }] =
+      await Promise.all([import('./review.js'), import('@gatekeeper/testkit')]);
     const review = createReviewRunFixture();
     const base = {
       schemaVersion: 1 as const,
@@ -220,8 +218,58 @@ describe('review operation contracts', () => {
         status: 'completed',
         stage: 'completed',
         review,
+        previousReview: null,
+        evidenceTimeline: [
+          evidenceTimelineItemSchema.parse({
+            role: 'decision',
+            relationship: 'supersedes',
+            sourceAuthority: 'repository',
+            status: 'active',
+            evidence: {
+              sourceType: 'adr',
+              repositoryId: review.repositoryId,
+              sourceId: 'docs/adr/0001.md',
+              path: 'docs/adr/0001.md',
+              excerpt: 'Keep local review dependencies optional.',
+            },
+            href: 'https://github.com/example/gatekeeper/blob/main/docs/adr/0001.md',
+          }),
+        ],
       }),
-    ).toEqual(expect.objectContaining({ status: 'completed', review }));
+    ).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        review,
+        previousReview: null,
+        evidenceTimeline: [expect.objectContaining({ role: 'decision' })],
+      }),
+    );
+    expect(() =>
+      evidenceTimelineItemSchema.parse({
+        role: 'context',
+        sourceAuthority: 'github',
+        status: 'unknown',
+        evidence: {
+          sourceType: 'adr',
+          repositoryId: review.repositoryId,
+          sourceId: 'docs/adr/0001.md',
+        },
+        href: 'javascript:alert(1)',
+      }),
+    ).toThrow();
+    expect(() =>
+      evidenceTimelineItemSchema.parse({
+        role: 'context',
+        sourceAuthority: 'github',
+        status: 'unknown',
+        evidence: {
+          sourceType: 'issue',
+          repositoryId: review.repositoryId,
+          sourceId: 'issue:#1',
+        },
+        href: 'https://user:secret@github.com/example/gatekeeper/issues/1',
+      }),
+    ).toThrow();
   });
 
   it('rejects mismatched branches, oversized failure copy, and unknown fields', async () => {
@@ -256,8 +304,82 @@ describe('review operation contracts', () => {
         status: 'completed',
         stage: 'completed',
         review,
+        previousReview: null,
+        evidenceTimeline: [],
         unexpected: true,
       }),
     ).toThrow();
+  });
+
+  it('preserves immutable previous-review and evidence inputs for client comparison', async () => {
+    const [{ reviewOperationSchema }, { createReviewRunFixture }] = await Promise.all([
+      import('./review.js'),
+      import('@gatekeeper/testkit'),
+    ]);
+    const baseReview = createReviewRunFixture();
+    const finding = (id: string) => ({
+      id,
+      category: 'architecture-history',
+      severity: 'medium' as const,
+      authority: 'EVIDENCE_SUPPORTED' as const,
+      confidence: 0.9,
+      title: `Finding ${id}`,
+      explanation: 'Historical evidence conflicts with this change.',
+      evidence: [
+        {
+          sourceType: 'adr' as const,
+          repositoryId: baseReview.repositoryId,
+          sourceId: 'docs/adr/0001.md',
+          path: 'docs/adr/0001.md',
+          contentHash: 'a'.repeat(64),
+        },
+      ],
+      remediation: ['Keep the dependency optional.'],
+      humanApprovalRequired: true,
+    });
+    const previousReview = {
+      ...baseReview,
+      reviewId: 'review_previous',
+      findings: [finding('finding_resolved'), finding('finding_remaining')],
+    };
+    const review = {
+      ...baseReview,
+      reviewId: 'review_current',
+      previousReviewId: previousReview.reviewId,
+      findings: [finding('finding_remaining')],
+    };
+
+    const completed = reviewOperationSchema.parse({
+      schemaVersion: 1,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      status: 'completed',
+      stage: 'completed',
+      review,
+      previousReview,
+      evidenceTimeline: [
+        {
+          role: 'implementation',
+          relationship: 'supersedes',
+          sourceAuthority: 'repository',
+          status: 'superseded',
+          evidence: finding('finding_remaining').evidence[0],
+        },
+      ],
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    });
+
+    expect(completed.status).toBe('completed');
+    if (completed.status !== 'completed') {
+      throw new Error('Expected completed review operation.');
+    }
+    expect(completed.previousReview?.findings.map(({ id }) => id)).toEqual([
+      'finding_resolved',
+      'finding_remaining',
+    ]);
+    expect(completed.review.findings.map(({ id }) => id)).toEqual(['finding_remaining']);
+    expect(completed.evidenceTimeline[0]).toMatchObject({ status: 'superseded' });
   });
 });

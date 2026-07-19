@@ -28,6 +28,44 @@ export const evidencePointerSchema = z
   })
   .strict();
 
+export const evidenceRelationshipSchema = z.enum([
+  'mentions',
+  'implements',
+  'reverts',
+  'supersedes',
+  'caused_by',
+  'resolves',
+]);
+
+const githubEvidenceHrefSchema = z.url({ protocol: /^https$/ }).refine((value) => {
+  const url = new URL(value);
+  return (
+    url.hostname.toLowerCase() === 'github.com' &&
+    url.username.length === 0 &&
+    url.password.length === 0 &&
+    url.port.length === 0
+  );
+});
+
+export const evidenceTimelineItemSchema = z
+  .object({
+    role: z.enum([
+      'proposal',
+      'implementation',
+      'incident',
+      'revert',
+      'decision',
+      'revived_change',
+      'context',
+    ]),
+    relationship: evidenceRelationshipSchema.optional(),
+    sourceAuthority: z.enum(['repository', 'github']),
+    status: z.enum(['active', 'historical', 'superseded', 'unknown']),
+    evidence: evidencePointerSchema,
+    href: githubEvidenceHrefSchema.optional(),
+  })
+  .strict();
+
 export const reviewTargetSchema = z
   .object({
     kind: z.enum(REVIEW_TARGET_KINDS),
@@ -151,6 +189,8 @@ export const reviewOperationSchema = z
         status: z.literal('completed'),
         stage: z.literal('completed'),
         review: reviewRunSchema,
+        previousReview: reviewRunSchema.nullable(),
+        evidenceTimeline: z.array(evidenceTimelineItemSchema).max(50),
       })
       .strict(),
   ])
@@ -166,6 +206,32 @@ export const reviewOperationSchema = z
         code: 'custom',
         message: 'Completed operation identity must match its review.',
         path: ['review'],
+      });
+    }
+    if (
+      operation.status === 'completed' &&
+      operation.previousReview !== null &&
+      (operation.previousReview.reviewId !== operation.review.previousReviewId ||
+        operation.previousReview.repositoryId !== operation.repositoryId ||
+        operation.previousReview.target.kind !== operation.target.kind ||
+        operation.previousReview.target.display !== operation.target.display)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Previous review identity must match the completed review history.',
+        path: ['previousReview'],
+      });
+    }
+    if (
+      operation.status === 'completed' &&
+      operation.evidenceTimeline.some(
+        ({ evidence }) => evidence.repositoryId !== operation.repositoryId,
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Timeline evidence must belong to the review repository.',
+        path: ['evidenceTimeline'],
       });
     }
   });
@@ -250,3 +316,4 @@ export type ReviewCompletionFinding = z.infer<typeof reviewCompletionFindingSche
 export type ReviewCompletionInput = z.infer<typeof reviewCompletionInputSchema>;
 export type ReviewOperationContract = z.infer<typeof reviewOperationSchema>;
 export type ReviewLookupContract = z.infer<typeof reviewLookupSchema>;
+export type EvidenceTimelineItem = z.infer<typeof evidenceTimelineItemSchema>;

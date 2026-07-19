@@ -235,6 +235,12 @@ describe('SQLite Project Memory store', () => {
       'docs/adr/0003-no-required-redis.md',
     ]);
     expect(evidence.map(({ match }) => match)).toEqual(['exact', 'linked', 'linked', 'linked']);
+    expect(evidence.map(({ relationship }) => relationship)).toEqual([
+      undefined,
+      'implements',
+      'reverts',
+      'supersedes',
+    ]);
     expect(evidence[0]?.evidence.remoteUrl).toBe('https://github.com/acme/demo/pull/12');
   });
 
@@ -685,6 +691,8 @@ describe('SQLite Project Memory store', () => {
       status: 'completed',
       stage: 'completed',
       review,
+      previousReview: null,
+      evidenceTimeline: [],
       updatedAt: review.createdAt,
     });
 

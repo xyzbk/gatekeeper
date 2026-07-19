@@ -7,6 +7,7 @@ import {
   type GitHubHistoryBatch,
   type GitHubRemoteRecord,
   type GitHubSyncResult,
+  type EvidenceTimelineItem,
   type IndexResult,
   type IndexState,
   type MemorySearchInput,
@@ -23,6 +24,7 @@ const MAX_EXCERPT_CHARACTERS = 2_000;
 const MAX_DOCUMENT_BYTES = 256 * 1_024;
 const MAX_IGNORE_BYTES = 64 * 1_024;
 const COMMIT_LIMIT = 200;
+const MAX_TIMELINE_ITEMS = 50;
 
 export type ProjectMemoryErrorCode =
   'INDEX_SOURCE_FAILED' | 'INVALID_IGNORE_FILE' | 'REPOSITORY_MISMATCH' | 'REPOSITORY_NOT_FOUND';
@@ -199,6 +201,140 @@ export function normalizeRemoteIdentity(remote: string | null): string | null {
   } catch {
     return stripGitSuffix(value.replaceAll('\\', '/'));
   }
+}
+
+function safeGitHubHref(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' &&
+      url.hostname.toLowerCase() === 'github.com' &&
+      url.username.length === 0 &&
+      url.password.length === 0 &&
+      url.port.length === 0
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function repositoryGitHubUrl(remote: string | null): string | undefined {
+  const identity = normalizeRemoteIdentity(remote);
+  const match = /^github\.com\/([a-z0-9_.-]+)\/([a-z0-9_.-]+)$/iu.exec(identity ?? '');
+  return match?.[1] === undefined || match[2] === undefined
+    ? undefined
+    : `https://github.com/${match[1]}/${match[2]}`;
+}
+
+function safeRepositoryPath(path: string | undefined): string[] | undefined {
+  if (path === undefined || /^[\\/]/u.test(path)) {
+    return undefined;
+  }
+  const segments = path.replaceAll('\\', '/').split('/');
+  return segments.length === 0 ||
+    segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')
+    ? undefined
+    : segments;
+}
+
+function timelineRole(result: MemorySearchResult): EvidenceTimelineItem['role'] {
+  if (result.match === 'exact' && result.evidence.sourceType === 'pull_request') {
+    return 'revived_change';
+  }
+  if (result.evidence.sourceType === 'adr' || result.evidence.sourceType === 'decision') {
+    return 'decision';
+  }
+  if (result.relationship === 'implements' && result.evidence.sourceType === 'issue') {
+    return 'proposal';
+  }
+  if (result.relationship === 'supersedes' && result.evidence.sourceType === 'pull_request') {
+    return 'implementation';
+  }
+  if (result.relationship === 'caused_by' && result.evidence.sourceType === 'issue') {
+    return 'incident';
+  }
+  if (result.relationship === 'reverts' && result.evidence.sourceType === 'pull_request') {
+    return 'revert';
+  }
+  return 'context';
+}
+
+export function buildEvidenceTimeline(input: {
+  repositoryHead: string;
+  repositoryRemote: string | null;
+  results: readonly MemorySearchResult[];
+}): EvidenceTimelineItem[] {
+  const repositoryUrl = repositoryGitHubUrl(input.repositoryRemote);
+  const results = input.results.some(({ match }) => match === 'exact' || match === 'linked')
+    ? input.results.filter(({ match }) => match !== 'fts')
+    : input.results;
+  const order = new Map<EvidenceTimelineItem['role'], number>(
+    [
+      'proposal',
+      'implementation',
+      'incident',
+      'revert',
+      'decision',
+      'revived_change',
+      'context',
+    ].map((role, index) => [role as EvidenceTimelineItem['role'], index]),
+  );
+  const seen = new Set<string>();
+  return results
+    .flatMap((result, position) => {
+      const key = [
+        result.evidence.sourceType,
+        result.evidence.sourceId,
+        result.evidence.path ?? '',
+        result.evidence.commitSha ?? '',
+      ].join('\0');
+      if (seen.has(key)) {
+        return [];
+      }
+      seen.add(key);
+      const role = timelineRole(result);
+      const path = safeRepositoryPath(result.evidence.path);
+      const ref =
+        result.evidence.commitSha !== undefined &&
+        /^[0-9a-f]{40,64}$/u.test(result.evidence.commitSha)
+          ? result.evidence.commitSha
+          : input.repositoryHead;
+      const repositoryHref =
+        repositoryUrl === undefined || path === undefined || !/^[0-9a-f]{40,64}$/u.test(ref)
+          ? undefined
+          : `${repositoryUrl}/blob/${ref}/${path.map(encodeURIComponent).join('/')}`;
+      const href = safeGitHubHref(result.evidence.remoteUrl) ?? repositoryHref;
+      return [
+        {
+          item: {
+            role,
+            ...(result.relationship === undefined ? {} : { relationship: result.relationship }),
+            sourceAuthority: ['issue', 'pull_request', 'comment'].includes(
+              result.evidence.sourceType,
+            )
+              ? ('github' as const)
+              : ('repository' as const),
+            status:
+              role === 'implementation' && result.relationship === 'supersedes'
+                ? ('superseded' as const)
+                : result.status,
+            evidence: result.evidence,
+            ...(href === undefined ? {} : { href }),
+          } satisfies EvidenceTimelineItem,
+          position,
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        (order.get(left.item.role) ?? order.size) - (order.get(right.item.role) ?? order.size) ||
+        left.position - right.position,
+    )
+    .slice(0, MAX_TIMELINE_ITEMS)
+    .map(({ item }) => item);
 }
 
 function normalizeRootIdentity(root: string): string {

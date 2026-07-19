@@ -4,8 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { DashboardBootstrap, RepositorySnapshot } from '@gatekeeper/contracts';
-import type { ReviewId } from '@gatekeeper/domain';
+import {
+  reviewOperationSchema,
+  type DashboardBootstrap,
+  type RepositorySnapshot,
+} from '@gatekeeper/contracts';
 import { createGitHubProvider, normalizeGitHubRemote } from '@gatekeeper/github-gh';
 import { reviewPullRequest } from '@gatekeeper/review-engine';
 import { describe, expect, it } from 'vitest';
@@ -89,7 +92,7 @@ describe('Ghost Change service integration', () => {
           createdAt: `2026-07-18T18:0${reviewSequence}:00.000Z`,
           policy: { version: 1 },
           repositoryId: context.repositoryId,
-          reviewId: `review_ghost_service_${reviewSequence}` as ReviewId,
+          reviewId: context.reviewId,
           ...(context.previousReviewId === undefined
             ? {}
             : { previousReviewId: context.previousReviewId }),
@@ -126,11 +129,66 @@ describe('Ghost Change service integration', () => {
         apiBaseUrl: `${first.baseUrl}/v1`,
         bearerToken: first.bearerToken,
       };
-      const dashboardReview = createReviewClient(fetch, () => Promise.resolve(bootstrap));
       const dashboardMemory = createMemoryClient(fetch, () => Promise.resolve(bootstrap));
-      const firstResult = await dashboardReview.reviewPullRequest(fixture.pullRequestNumber);
-      expect(firstResult.sync).toMatchObject({ partial: true, documents: { written: 9 } });
+      const startReview = async () => {
+        const response = await fetch(`${first.baseUrl}/v1/reviews/pull-request/start`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${first.bearerToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            schemaVersion: 1,
+            pullRequestNumber: fixture.pullRequestNumber,
+          }),
+        });
+        const started = reviewOperationSchema.parse(await response.json());
+        expect(response.status).toBe(202);
+        await expect
+          .poll(async () => {
+            const polled = await fetch(`${first.baseUrl}/v1/reviews/${started.reviewId}`, {
+              headers: { authorization: `Bearer ${first.bearerToken}` },
+            });
+            return reviewOperationSchema.parse(await polled.json()).status;
+          })
+          .toBe('completed');
+        const completed = await fetch(`${first.baseUrl}/v1/reviews/${started.reviewId}`, {
+          headers: { authorization: `Bearer ${first.bearerToken}` },
+        });
+        const operation = reviewOperationSchema.parse(await completed.json());
+        if (operation.status !== 'completed') {
+          throw new Error('Expected the Ghost Change review operation to complete.');
+        }
+        return operation;
+      };
+      const firstResult = await startReview();
       expect(firstResult.review.verdict).toBe('ESCALATE');
+      expect(firstResult.previousReview).toBeNull();
+      expect(firstResult.evidenceTimeline.map(({ role }) => role)).toEqual([
+        'proposal',
+        'implementation',
+        'incident',
+        'revert',
+        'decision',
+        'revived_change',
+      ]);
+      expect(firstResult.evidenceTimeline.map(({ sourceAuthority }) => sourceAuthority)).toEqual([
+        'github',
+        'github',
+        'github',
+        'github',
+        'repository',
+        'github',
+      ]);
+      expect(
+        firstResult.evidenceTimeline.find(({ role }) => role === 'implementation')?.status,
+      ).toBe('superseded');
+      expect(
+        firstResult.evidenceTimeline.every(({ href }) => href?.startsWith('https://github.com/')),
+      ).toBe(true);
+
+      const secondResult = await startReview();
+      expect(secondResult.previousReview?.reviewId).toBe(firstResult.review.reviewId);
 
       const memory = await dashboardMemory.search('pull_request:#12');
       expect(memory.slice(0, 6).map(({ evidence }) => evidence.sourceId)).toEqual([
@@ -143,7 +201,7 @@ describe('Ghost Change service integration', () => {
       ]);
 
       const draft = await mcpClient.reviewPullRequest(fixture.pullRequestNumber);
-      expect(draft.previousReviewId).toBe(firstResult.review.reviewId);
+      expect(draft.previousReviewId).toBe(secondResult.review.reviewId);
       expect(draft.evidenceCandidates.map(({ sourceId }) => sourceId)).toEqual(
         expect.arrayContaining([
           'issue:#4',

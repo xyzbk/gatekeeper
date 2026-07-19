@@ -139,6 +139,7 @@ interface SearchRow {
 
 interface LinkedSearchRow extends SearchRow {
   position: number;
+  relationship: NonNullable<MemorySearchResult['relationship']>;
 }
 
 interface RepositoryRow {
@@ -219,10 +220,16 @@ function repositoryRecord(row: RepositoryRow): RepositoryRecord {
   });
 }
 
-function searchResult(repositoryId: string, row: SearchRow, match: MemorySearchResult['match']) {
+function searchResult(
+  repositoryId: string,
+  row: SearchRow,
+  match: MemorySearchResult['match'],
+  relationship?: MemorySearchResult['relationship'],
+) {
   return memorySearchResultSchema.parse({
     documentId: row.documentId,
     match,
+    ...(relationship === undefined ? {} : { relationship }),
     trust: TRUST_LABEL,
     status: row.status,
     occurredAt: row.occurredAt,
@@ -834,7 +841,7 @@ export class SqliteProjectStore {
           `SELECT d.id AS documentId, d.source_type AS sourceType, d.source_id AS sourceId,
                   d.title, d.path, d.commit_sha AS commitSha, d.excerpt,
                   d.content_hash AS contentHash, d.status, d.occurred_at AS occurredAt,
-                  d.remote_url AS remoteUrl, l.position
+                  d.remote_url AS remoteUrl, l.position, l.type AS relationship
            FROM document_links AS l
            JOIN documents AS d ON d.id = l.to_document_id
            WHERE l.repository_id = ? AND l.from_document_id = ?
@@ -843,7 +850,7 @@ export class SqliteProjectStore {
         .all(parsed.repositoryId, exact.documentId);
       for (const row of linkedRows) {
         if (!seen.has(row.documentId)) {
-          results.push(searchResult(parsed.repositoryId, row, 'linked'));
+          results.push(searchResult(parsed.repositoryId, row, 'linked', row.relationship));
           seen.add(row.documentId);
           if (results.length === limit) {
             break;
@@ -958,6 +965,8 @@ export class SqliteProjectStore {
           status: 'completed',
           stage: 'completed',
           review: parsed,
+          previousReview: null,
+          evidenceTimeline: [],
           createdAt: operation.createdAt,
           updatedAt: parsed.createdAt,
         });

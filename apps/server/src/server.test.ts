@@ -512,6 +512,8 @@ describe('Gatekeeper local service', () => {
       status: 'completed',
       stage: 'completed',
       review: reviewResponse,
+      previousReview: null,
+      evidenceTimeline: [],
     };
     const completed = await server.inject({
       method: 'GET',
