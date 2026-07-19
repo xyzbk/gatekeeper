@@ -193,6 +193,17 @@ const pullRequestReview: ReviewRunContract = {
   },
 };
 
+const commitReviewResponse: ReviewRunContract = {
+  ...reviewResponse,
+  reviewId: 'review_api_commit',
+  target: {
+    kind: 'commit_range',
+    display: 'Commit cccccccccccc',
+    base: 'b'.repeat(40),
+    head: 'c'.repeat(40),
+  },
+};
+
 const githubSyncResult: GitHubSyncResult = {
   schemaVersion: 1,
   repositoryId: repositoryRecord.repositoryId,
@@ -254,9 +265,11 @@ async function buildTestServer(
     logger?: unknown;
     prepareReview?: (reviewId: string) => Promise<ReviewDraftContract | null>;
     projectMemory?: Partial<ProjectMemoryApi>;
+    reviewCommit?: (sha: string) => Promise<ReviewRunContract>;
     reviewPullRequest?: (pullRequestNumber: number) => Promise<ReviewRunContract>;
     reviewWorktree?: () => Promise<ReviewRunContract>;
     startPullRequestReview?: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
+    startCommitReview?: (sha: string) => Promise<ReviewOperationContract>;
     startWorktreeReview?: () => Promise<ReviewOperationContract>;
   } = {},
 ) {
@@ -290,9 +303,11 @@ async function buildTestServer(
       options.prepareReview ??
       ((reviewId) => Promise.resolve(reviewId === reviewResponse.reviewId ? reviewDraft : null)),
     reviewPullRequest: options.reviewPullRequest ?? (() => Promise.resolve(pullRequestReview)),
+    reviewCommit: options.reviewCommit ?? (() => Promise.resolve(commitReviewResponse)),
     reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
     startPullRequestReview:
       options.startPullRequestReview ?? (() => Promise.resolve(queuedReviewOperation)),
+    startCommitReview: options.startCommitReview ?? (() => Promise.resolve(queuedReviewOperation)),
     startWorktreeReview:
       options.startWorktreeReview ?? (() => Promise.resolve(queuedReviewOperation)),
     version: '0.1.0',
@@ -300,6 +315,54 @@ async function buildTestServer(
 }
 
 describe('Gatekeeper local service', () => {
+  it('reviews one strict immutable commit through the authenticated local API', async () => {
+    const reviewCommit = vi.fn(() => Promise.resolve(commitReviewResponse));
+    const server = await buildTestServer({ reviewCommit });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const valid = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/commit',
+      headers,
+      payload: { schemaVersion: 1, sha: 'c'.repeat(40) },
+    });
+    const invalid = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/commit',
+      headers,
+      payload: { schemaVersion: 1, sha: 'c'.repeat(12) },
+    });
+
+    expect(valid.statusCode).toBe(200);
+    expect(reviewRunSchema.parse(valid.json())).toEqual(commitReviewResponse);
+    expect(reviewCommit).toHaveBeenCalledWith('c'.repeat(40));
+    expect(invalid.statusCode).toBe(400);
+    expect(reviewCommit).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('queues one strict immutable commit review for the dashboard', async () => {
+    const queued = {
+      ...queuedReviewOperation,
+      reviewId: 'review_commit_operation',
+      target: commitReviewResponse.target,
+    } satisfies ReviewOperationContract;
+    const startCommitReview = vi.fn(() => Promise.resolve(queued));
+    const server = await buildTestServer({ startCommitReview });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/commit/start',
+      headers,
+      payload: { schemaVersion: 1, sha: 'c'.repeat(40) },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(reviewOperationSchema.parse(response.json())).toEqual(queued);
+    expect(startCommitReview).toHaveBeenCalledWith('c'.repeat(40));
+    await server.close();
+  });
   it('syncs the fixed GitHub repository and reviews one strict positive pull-request number', async () => {
     const syncGitHub = vi.fn(() => Promise.resolve(githubSyncResult));
     const reviewPullRequest = vi.fn(() => Promise.resolve(pullRequestReview));

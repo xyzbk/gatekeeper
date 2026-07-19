@@ -36,6 +36,16 @@ const review = {
   createdAt: '2026-07-18T12:00:00.000Z',
 } satisfies ReviewRunContract;
 
+const commitReview = {
+  ...review,
+  target: {
+    kind: 'commit_range' as const,
+    display: 'Commit cccccccccccc',
+    base: 'b'.repeat(40),
+    head: 'c'.repeat(40),
+  },
+} satisfies ReviewRunContract;
+
 describe('start command lifecycle', () => {
   it('starts one fixed repository and closes the foreground service on shutdown', async () => {
     const events: string[] = [];
@@ -63,6 +73,10 @@ describe('start command lifecycle', () => {
           return Promise.resolve({ ...review, repositoryId: context.repositoryId });
         },
         reviewPullRequest: () => Promise.reject(new Error('not exercised')),
+        reviewCommit: (root, sha, context) => {
+          events.push(`commit:${root}:${sha}`);
+          return Promise.resolve({ ...commitReview, repositoryId: context.repositoryId });
+        },
         startService: async (options) => {
           events.push('start');
           expect(options).toMatchObject({
@@ -75,6 +89,11 @@ describe('start command lifecycle', () => {
           await expect(
             options.reviewWorktree({ repositoryId: 'repository_start_test' as never }),
           ).resolves.toEqual(review);
+          await expect(
+            options.reviewCommit('c'.repeat(40), {
+              repositoryId: 'repository_start_test' as never,
+            }),
+          ).resolves.toEqual(commitReview);
           return { baseUrl: 'http://127.0.0.1:43127', close };
         },
         waitUntilShutdown: () => {
@@ -94,6 +113,7 @@ describe('start command lifecycle', () => {
       'tool:gh',
       'start',
       'review:D:\\work\\gatekeeper',
+      `commit:D:\\work\\gatekeeper:${'c'.repeat(40)}`,
       'wait',
       'close',
     ]);
@@ -119,6 +139,7 @@ describe('start command lifecycle', () => {
         inspectTool: (name) => Promise.resolve(name === 'git' ? git : gh),
         reviewWorktree: () => Promise.resolve(review),
         reviewPullRequest: () => Promise.reject(new Error('not exercised')),
+        reviewCommit: () => Promise.resolve(commitReview),
         startService: () => Promise.resolve({ baseUrl: 'http://127.0.0.1:43127', close }),
         waitUntilShutdown: () => Promise.reject(new Error('signal failure')),
         write: () => undefined,

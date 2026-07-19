@@ -129,6 +129,17 @@ const pullRequestReview: ReviewRunContract = {
   },
 };
 
+const commitReview: ReviewRunContract = {
+  ...review,
+  reviewId: 'review_commit',
+  target: {
+    kind: 'commit_range',
+    display: 'Commit cccccccccccc',
+    base: 'b'.repeat(40),
+    head: 'c'.repeat(40),
+  },
+};
+
 const historyBatch: GitHubHistoryBatch = {
   schemaVersion: 1,
   cursor: '2026-07-18T12:01:00.000Z',
@@ -241,6 +252,34 @@ describe('Project Memory CLI composition', () => {
     });
     expect(saveReview).toHaveBeenCalledWith(review);
     expect(close).toHaveBeenCalledTimes(3);
+  });
+
+  it('persists a commit review with history scoped to the selected SHA', async () => {
+    const close = vi.fn();
+    const latestReviewId = vi.fn(() => Promise.resolve('review_commit_previous'));
+    const saveReview = vi.fn(() => Promise.resolve());
+    const reviewCommit = vi.fn(() => Promise.resolve(commitReview));
+    const commands = createProjectMemoryCommands({
+      inspectRepository: () => Promise.resolve(snapshot),
+      loadPolicy: () => Promise.resolve({ path: null, source: 'default', policy: { version: 1 } }),
+      openSession: () =>
+        Promise.resolve({ memory: fakeMemory({ latestReviewId, saveReview }), close }),
+      reviewCommit,
+      reviewWorktree: () => Promise.resolve(review),
+    });
+
+    await expect(commands.reviewCommit('c'.repeat(40), '.')).resolves.toEqual(commitReview);
+
+    expect(latestReviewId).toHaveBeenCalledWith(repository.repositoryId, {
+      kind: 'commit_range',
+      display: 'Commit cccccccccccc',
+      head: 'c'.repeat(40),
+    });
+    expect(reviewCommit).toHaveBeenCalledWith(snapshot.root, 'c'.repeat(40), {
+      repositoryId: repository.repositoryId,
+      previousReviewId: 'review_commit_previous',
+    });
+    expect(saveReview).toHaveBeenCalledWith(commitReview);
   });
 
   it('syncs bounded GitHub history and persists one pull-request review read-only', async () => {

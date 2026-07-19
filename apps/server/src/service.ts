@@ -52,6 +52,7 @@ export interface StartGatekeeperServiceOptions {
     pullRequestNumber: number,
     context: PersistentReviewContext,
   ) => Promise<PersistentPullRequestReviewResult>;
+  reviewCommit?: (sha: string, context: PersistentReviewContext) => Promise<ReviewRunContract>;
   reviewWorktree: (context: PersistentReviewContext) => Promise<ReviewRunContract>;
   startedAt?: string;
   tools: {
@@ -223,6 +224,12 @@ export async function startGatekeeperService(
       });
       return result.review;
     };
+    const executeCommitReview = async (sha: string, context: PersistentReviewContext) => {
+      if (options.reviewCommit === undefined) {
+        throw new Error('Historical commit review is not configured.');
+      }
+      return options.reviewCommit(sha, context);
+    };
     const startReviewOperation = async (
       target: ReviewRunContract['target'],
       run: (
@@ -355,6 +362,19 @@ export async function startGatekeeperService(
         syncGitHub,
       },
       prepareReview: prepareStoredReview,
+      reviewCommit: async (sha) => {
+        const target = {
+          kind: 'commit_range' as const,
+          display: `Commit ${sha.slice(0, 12)}`,
+          head: sha,
+        };
+        const review = await executeCommitReview(
+          sha,
+          await createReviewContext(target, createReviewId()),
+        );
+        await memory.saveReview(review);
+        return review;
+      },
       reviewPullRequest: async (pullRequestNumber) => {
         const target = {
           kind: 'pull_request' as const,
@@ -390,6 +410,17 @@ export async function startGatekeeperService(
             historySync,
             review: await executePullRequestReview(pullRequestNumber, context),
           };
+        });
+      },
+      startCommitReview: (sha) => {
+        const target = {
+          kind: 'commit_range' as const,
+          display: `Commit ${sha.slice(0, 12)}`,
+          head: sha,
+        };
+        return startReviewOperation(target, async (context, setStage) => {
+          await setStage('evaluating_change');
+          return { historySync: null, review: await executeCommitReview(sha, context) };
         });
       },
       startWorktreeReview: () => {

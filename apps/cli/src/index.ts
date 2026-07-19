@@ -115,6 +115,19 @@ reviewCommand
   });
 
 reviewCommand
+  .command('commit')
+  .description('Review one immutable historical commit against its first parent.')
+  .argument('<sha>', 'full lowercase commit SHA')
+  .argument('[path]', 'local repository path', '.')
+  .addOption(outputFormatOption())
+  .action(async (sha: string, path: string, { format }: { format: OutputFormat }) => {
+    await runProjectMemoryCommand(
+      () => projectMemory.reviewCommit(sha, path),
+      (review) => formatWorktreeReview(review, format),
+    );
+  });
+
+reviewCommand
   .command('show')
   .description('Show one persisted review by ID.')
   .argument('<review-id>', 'persisted review ID')

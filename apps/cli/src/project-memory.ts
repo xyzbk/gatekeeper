@@ -7,6 +7,7 @@ import {
 } from '@gatekeeper/config';
 import {
   githubSyncLimitsSchema,
+  commitReviewInputSchema,
   memorySearchResponseSchema,
   repositoryStatusSchema,
   type GitHubSyncResult,
@@ -37,6 +38,7 @@ import {
 } from '@gatekeeper/project-memory';
 import { openSqliteProjectStore, SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
 
+import { runCommitReview, type CommitReviewContext } from './commit-review.js';
 import {
   runWorktreeReview,
   type OutputFormat,
@@ -85,6 +87,11 @@ interface ProjectMemoryCommandDependencies {
     pullRequestNumber: number,
     context: PullRequestReviewContext,
   ) => Promise<PullRequestReviewResult>;
+  reviewCommit?: (
+    repositoryPath: string,
+    sha: string,
+    context: CommitReviewContext,
+  ) => Promise<ReviewRunContract>;
 }
 
 export interface ProjectMemoryCommands {
@@ -94,6 +101,7 @@ export interface ProjectMemoryCommands {
   search(repositoryPath: string, query: string, limit?: number): Promise<MemorySearchResult[]>;
   syncGitHub(repositoryPath: string): Promise<GitHubSyncResult>;
   reviewPullRequest(pullRequestNumber: number, repositoryPath: string): Promise<ReviewRunContract>;
+  reviewCommit(sha: string, repositoryPath: string): Promise<ReviewRunContract>;
   reviewWorktree(repositoryPath: string): Promise<ReviewRunContract>;
   showReview(reviewId: string): Promise<ReviewRunContract>;
 }
@@ -120,6 +128,7 @@ const defaultDependencies: ProjectMemoryCommandDependencies = {
   openSession: openDefaultSession,
   reviewWorktree: (path, context) => runWorktreeReview(path, undefined, context),
   reviewPullRequest: (path, number, context) => runPullRequestReview(path, number, context),
+  reviewCommit: (path, sha, context) => runCommitReview(path, sha, undefined, context),
 };
 
 async function withSession<T>(
@@ -166,6 +175,10 @@ export function createProjectMemoryCommands(
     dependencies.reviewPullRequest ??
     ((path: string, number: number, context: PullRequestReviewContext) =>
       runPullRequestReview(path, number, context));
+  const selectedCommitReview =
+    dependencies.reviewCommit ??
+    ((path: string, sha: string, context: CommitReviewContext) =>
+      runCommitReview(path, sha, undefined, context));
   return {
     initialize: async (repositoryPath) => {
       const snapshot = await dependencies.inspectRepository(repositoryPath);
@@ -270,6 +283,28 @@ export function createProjectMemoryCommands(
         });
         await memory.saveReview(result.review);
         return result.review;
+      });
+    },
+    reviewCommit: async (sha, repositoryPath) => {
+      const input = commitReviewInputSchema.parse({ schemaVersion: 1, sha });
+      const snapshot = await dependencies.inspectRepository(repositoryPath);
+      return withSession(dependencies.openSession, async (memory) => {
+        const repository = await memory.registerRepository({
+          root: snapshot.root,
+          remote: snapshot.remote,
+        });
+        const target = {
+          kind: 'commit_range' as const,
+          display: `Commit ${input.sha.slice(0, 12)}`,
+          head: input.sha,
+        };
+        const previousReviewId = await memory.latestReviewId(repository.repositoryId, target);
+        const review = await selectedCommitReview(snapshot.root, input.sha, {
+          repositoryId: repository.repositoryId as RepositoryId,
+          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
+        });
+        await memory.saveReview(review);
+        return review;
       });
     },
     reviewWorktree: async (repositoryPath) => {

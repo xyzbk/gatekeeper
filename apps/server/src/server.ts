@@ -5,6 +5,8 @@ import fastifyStatic from '@fastify/static';
 import {
   dashboardBootstrapJsonSchema,
   dashboardBootstrapSchema,
+  commitReviewInputJsonSchema,
+  commitReviewInputSchema,
   emptyRequestJsonSchema,
   errorEnvelopeJsonSchema,
   errorEnvelopeSchema,
@@ -41,6 +43,7 @@ import {
   statusResponseSchema,
   type IndexResult,
   type IndexState,
+  type CommitReviewInput,
   type GitHubSyncResult,
   type MemorySearchInput,
   type MemorySearchResult,
@@ -86,8 +89,10 @@ export interface BuildGatekeeperServerOptions {
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
   prepareReview: (reviewId: string) => Promise<ReviewDraftContract | null>;
+  reviewCommit: (sha: string) => Promise<ReviewRunContract>;
   reviewPullRequest: (pullRequestNumber: number) => Promise<ReviewRunContract>;
   reviewWorktree: () => Promise<ReviewRunContract>;
+  startCommitReview: (sha: string) => Promise<ReviewOperationContract>;
   startPullRequestReview: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
   startWorktreeReview: () => Promise<ReviewOperationContract>;
   version: string;
@@ -193,6 +198,7 @@ export async function buildGatekeeperServer(
   server.addSchema(reviewLookupApiJsonSchema);
   server.addSchema(reviewDraftJsonSchema);
   server.addSchema(reviewCompletionInputJsonSchema);
+  server.addSchema(commitReviewInputJsonSchema);
   server.addSchema(pullRequestReviewInputJsonSchema);
   server.addSchema(repositoryRecordJsonSchema);
   server.addSchema(indexStateJsonSchema);
@@ -347,6 +353,50 @@ export async function buildGatekeeperServer(
     },
     async (_request, reply) =>
       reply.code(202).send(reviewOperationSchema.parse(await options.startWorktreeReview())),
+  );
+
+  server.post<{ Body: CommitReviewInput }>(
+    '/v1/reviews/commit',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:commit-review-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:review-run-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request) => {
+      const input = commitReviewInputSchema.parse(request.body);
+      return reviewRunSchema.parse(await options.reviewCommit(input.sha));
+    },
+  );
+
+  server.post<{ Body: CommitReviewInput }>(
+    '/v1/reviews/commit/start',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:commit-review-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          202: { $ref: 'gatekeeper:review-operation-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = commitReviewInputSchema.parse(request.body);
+      return reply
+        .code(202)
+        .send(reviewOperationSchema.parse(await options.startCommitReview(input.sha)));
+    },
   );
 
   server.post<{ Body: PullRequestReviewInput }>(

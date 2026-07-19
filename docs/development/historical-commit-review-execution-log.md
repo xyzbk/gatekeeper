@@ -26,3 +26,11 @@ Historical reviews compare a selected full commit object ID with its first paren
 - GREEN: real temporary-repository coverage proves normal, root, merge, rename, binary, deletion, current-ignore, malformed-ID, non-commit, and branch/HEAD/index/status preservation behavior. The deterministic engine adds only a target-kind guard and delegates all findings/verdict assembly to `reviewChangeSet`.
 - GREEN: `runCommitReview` loads the current repository policy, forwards its ignore patterns to immutable extraction, and uses the existing deterministic engine and review contract.
 - Verification: 5 focused test files / 36 tests passed; Git adapter, review engine, and CLI TypeScript project builds passed; Prettier and `git diff --check` passed.
+
+## Task 3 — persistence, CLI, and local API
+
+- RED: the Project Memory command test failed because `reviewCommit` was absent; the authenticated local API test then returned `404` because the commit routes did not exist.
+- GREEN: `gatekeeper review commit <full-sha> [path]` uses the existing local Project Memory session, persists its review, and scopes its previous-review lookup to the selected SHA's stable target display. Invalid input is rejected by the shared contract before Git extraction.
+- GREEN: the loopback API exposes `POST /v1/reviews/commit` and `/v1/reviews/commit/start` with the same strict schema. The dashboard operation uses only `evaluating_change` and `persisting_review`, carries `historySync: null`, and uses the existing durable operation/read/detail paths.
+- GREEN: CLI startup forwards the same local callback into the service. Test-only direct service compositions may omit that callback; their commit endpoint fails through the existing bounded local-review error path rather than silently reviewing another target.
+- Verification: 3 focused test files / 44 tests passed; CLI and server TypeScript project builds passed; Prettier and `git diff --check` passed.
