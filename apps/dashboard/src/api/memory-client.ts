@@ -1,7 +1,10 @@
 import {
+  commitExplorerResponseSchema,
   memorySearchResponseSchema,
   recentCommitEvidenceResponseSchema,
   repositoryRecordSchema,
+  type CommitExplorerInput,
+  type CommitExplorerResponse,
   type RecentCommitEvidence,
   type MemorySearchResult,
 } from '@gatekeeper/contracts';
@@ -9,8 +12,24 @@ import {
 import { createBootstrapLoader, type BootstrapLoader } from './status-client.js';
 
 export interface MemoryClient {
+  exploreCommits: (
+    input: CommitExplorerInput,
+    signal?: AbortSignal,
+  ) => Promise<CommitExplorerResponse>;
   recentCommits: (signal?: AbortSignal) => Promise<RecentCommitEvidence[]>;
   search: (query: string, signal?: AbortSignal) => Promise<MemorySearchResult[]>;
+}
+
+export type CommitExplorerClientErrorCode = 'BRANCH_UNAVAILABLE' | 'UNAVAILABLE';
+
+export class CommitExplorerClientError extends Error {
+  public constructor(
+    public readonly code: CommitExplorerClientErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CommitExplorerClientError';
+  }
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -26,6 +45,34 @@ export function createMemoryClient(
   loadBootstrap: BootstrapLoader = createBootstrapLoader(fetcher),
 ): MemoryClient {
   return {
+    exploreCommits: async (input, signal) => {
+      const bootstrap = await loadBootstrap(signal);
+      const response = await fetcher(`${bootstrap.apiBaseUrl}/commits/explore`, {
+        body: JSON.stringify(input),
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+          Authorization: `Bearer ${bootstrap.bearerToken}`,
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        ...(signal === undefined ? {} : { signal }),
+      });
+      if (response.status === 404) {
+        throw new CommitExplorerClientError(
+          'BRANCH_UNAVAILABLE',
+          'The selected local branch is unavailable.',
+        );
+      }
+      if (!response.ok) {
+        throw new CommitExplorerClientError('UNAVAILABLE', 'Local commits are unavailable.');
+      }
+      const parsed = commitExplorerResponseSchema.safeParse(await readJson(response));
+      if (!parsed.success) {
+        throw new Error('Local commits returned an invalid response.');
+      }
+      return parsed.data;
+    },
     recentCommits: async (signal) => {
       const bootstrap = await loadBootstrap(signal);
       const response = await fetcher(`${bootstrap.apiBaseUrl}/memory/commits`, {

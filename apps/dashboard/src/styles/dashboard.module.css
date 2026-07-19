@@ -725,6 +725,285 @@
   text-transform: uppercase;
 }
 
+.commitExplorerPage {
+  max-width: 1120px;
+}
+
+.commitExplorerHeader {
+  max-width: 720px;
+}
+
+.commitExplorerHeader h1 {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.commitExplorerHeader > p:last-child {
+  max-width: 68ch;
+  margin: 10px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.commitFilters {
+  margin-top: 32px;
+  padding: 18px 0 20px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.commitSourceFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.commitSourceFieldset legend,
+.commitFilterGrid label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink-tertiary);
+  font-size: 0.75rem;
+}
+
+.commitSourceToggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.commitSourceToggle label {
+  position: relative;
+  display: inline-flex;
+}
+
+.commitSourceToggle input {
+  position: absolute;
+  opacity: 0;
+}
+
+.commitSourceToggle label > span {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  line-height: 32px;
+}
+
+.commitSourceToggle input:checked + span {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.commitSourceToggle label:hover > span {
+  color: var(--ink);
+}
+
+.commitSourceToggle input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.commitFilterGrid {
+  display: grid;
+  grid-template-columns:
+    minmax(132px, 0.75fr) minmax(180px, 1.4fr) repeat(4, minmax(126px, 0.85fr))
+    auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.commitFilterGrid label {
+  min-width: 0;
+}
+
+.commitFilterGrid input,
+.commitFilterGrid select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.commitFilterGrid input {
+  padding: 0 10px;
+}
+
+.commitFilterGrid select {
+  padding: 0 8px;
+}
+
+.commitFilterGrid input::placeholder {
+  color: var(--ink-tertiary);
+}
+
+.commitFilterGrid input:focus,
+.commitFilterGrid select:focus {
+  border-color: var(--focus);
+}
+
+.commitGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.commitCard,
+.commitSkeleton {
+  min-width: 0;
+  min-height: 166px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.commitCard {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+}
+
+.commitCard:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.commitCard:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.commitCardHeader,
+.commitCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-tertiary);
+  font-size: 0.6875rem;
+}
+
+.commitCardHeader > span:first-child {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.commitCardTitle {
+  display: -webkit-box;
+  min-height: 42px;
+  margin: 15px 0 auto;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.commitCardFooter {
+  margin-top: 16px;
+}
+
+.commitCardFooter > span {
+  color: var(--ink-secondary);
+}
+
+.commitSkeleton {
+  display: grid;
+  align-content: space-between;
+  padding: 15px;
+}
+
+.commitSkeletonMeta {
+  width: 42%;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.commitSkeletonTitle {
+  width: 82%;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.commitSkeletonFooter {
+  width: 64%;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.commitExplorerEmpty,
+.commitExplorerError {
+  max-width: 680px;
+  margin-top: 24px;
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.commitExplorerEmpty h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.commitExplorerEmpty p,
+.commitExplorerError p {
+  margin: 7px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.commitExplorerError button {
+  margin-top: 18px;
+}
+
+.commitPagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.commitPagination span {
+  min-width: 60px;
+  color: var(--ink-tertiary);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 .storedReviewState {
   max-width: 720px;
   padding-top: 12px;
@@ -1351,8 +1630,13 @@
   }
 
   .overviewGrid,
-  .loadingGrid {
+  .loadingGrid,
+  .commitGrid {
     grid-template-columns: 1fr;
+  }
+
+  .commitFilterGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .pathsPanel,
@@ -1422,6 +1706,10 @@
     flex-direction: column;
   }
 
+  .commitFilterGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .promptSection {
     display: flex;
   }
@@ -1488,6 +1776,14 @@
     width: 100%;
   }
 
+  .commitFilterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .commitPagination {
+    justify-content: space-between;
+  }
+
   .field {
     grid-template-columns: 1fr;
     gap: 4px;
@@ -1537,7 +1833,8 @@
   }
 
   .primaryButton,
-  .secondaryButton {
+  .secondaryButton,
+  .commitCard {
     transition: none;
   }
 

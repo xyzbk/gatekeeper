@@ -5,6 +5,7 @@ import type { StatusClient } from '../api/status-client.js';
 import type { ReviewClient } from '../api/review-client.js';
 import { AppShell } from '../components/app-shell.js';
 import { OverviewRoute } from '../routes/overview-route.js';
+import { CommitExplorerRoute } from '../routes/commit-explorer-route.js';
 import { MemoryRoute } from '../routes/memory-route.js';
 import { ReviewDetailRoute } from '../routes/review-detail-route.js';
 import { PullRequestReviewRoute } from '../routes/pull-request-review-route.js';
@@ -17,6 +18,7 @@ interface DashboardAppProps {
   startWorktreeReview: ReviewClient['startWorktreeReview'];
   startPullRequestReview: ReviewClient['startPullRequestReview'];
   startCommitReview: ReviewClient['startCommitReview'];
+  exploreCommits: MemoryClient['exploreCommits'];
   recentCommits: MemoryClient['recentCommits'];
   searchMemory: MemoryClient['search'];
 }
@@ -38,6 +40,7 @@ export function DashboardApp({
   startWorktreeReview,
   startPullRequestReview,
   startCommitReview,
+  exploreCommits,
   recentCommits,
   searchMemory,
 }: DashboardAppProps) {
@@ -45,6 +48,15 @@ export function DashboardApp({
     <AppShell>
       <Routes>
         <Route element={<OverviewRoute loadStatus={loadStatus} />} path="/" />
+        <Route
+          element={
+            <CommitExplorerRoute
+              exploreCommits={exploreCommits}
+              startCommitReview={startCommitReview}
+            />
+          }
+          path="/commits"
+        />
         <Route
           element={
             <MemoryRoute

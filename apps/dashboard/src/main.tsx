@@ -39,6 +39,7 @@ createRoot(rootElement).render(
           startWorktreeReview={reviewClient.startWorktreeReview}
           startPullRequestReview={reviewClient.startPullRequestReview}
           startCommitReview={reviewClient.startCommitReview}
+          exploreCommits={memoryClient.exploreCommits}
           recentCommits={memoryClient.recentCommits}
           searchMemory={memoryClient.search}
         />

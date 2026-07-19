@@ -1,4 +1,5 @@
 import type {
+  CommitExplorerResponse,
   DashboardBootstrap,
   MemorySearchResponse,
   RecentCommitEvidenceResponse,
@@ -47,6 +48,28 @@ const recentResponse: RecentCommitEvidenceResponse = {
   ],
 };
 
+const explorerResponse: CommitExplorerResponse = {
+  schemaVersion: 1,
+  branches: ['master', 'feature/local-history'],
+  selection: {
+    schemaVersion: 1,
+    branch: 'master',
+    source: 'all_local',
+    reviewState: 'all',
+    sort: 'newest',
+  },
+  commits: [
+    {
+      sha: 'd'.repeat(40),
+      authoredAt: '2026-07-19T13:00:00.000Z',
+      title: 'Preserve historical review identity',
+      indexed: true,
+      reviewed: true,
+    },
+  ],
+  nextCursor: 24,
+};
+
 function jsonResponse(body: unknown, statusCode = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { 'Content-Type': 'application/json' },
@@ -55,6 +78,57 @@ function jsonResponse(body: unknown, statusCode = 200): Response {
 }
 
 describe('memory client', () => {
+  it('explores local commit metadata with the bootstrap token kept in headers', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(explorerResponse));
+    const { createMemoryClient } = await import('./memory-client.js');
+    const input = {
+      schemaVersion: 1 as const,
+      source: 'all_local' as const,
+      reviewState: 'all' as const,
+      sort: 'newest' as const,
+    };
+
+    await expect(
+      createMemoryClient(fetcher, () => Promise.resolve(bootstrap)).exploreCommits(input),
+    ).resolves.toEqual(explorerResponse);
+
+    expect(fetcher).toHaveBeenCalledWith('/v1/commits/explore', {
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+    expect(JSON.stringify(fetcher.mock.calls.map(([, options]) => options?.body))).not.toContain(
+      bearerToken,
+    );
+  });
+
+  it('exposes a controlled stale-branch error without reading the response body', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ private: 'detail' }, 404));
+    const { CommitExplorerClientError, createMemoryClient } = await import('./memory-client.js');
+
+    await expect(
+      createMemoryClient(fetcher, () => Promise.resolve(bootstrap)).exploreCommits({
+        schemaVersion: 1,
+        branch: 'deleted-branch',
+        source: 'all_local',
+        reviewState: 'all',
+        sort: 'newest',
+      }),
+    ).rejects.toEqual(
+      new CommitExplorerClientError(
+        'BRANCH_UNAVAILABLE',
+        'The selected local branch is unavailable.',
+      ),
+    );
+  });
+
   it('reads the bounded recent commit evidence with the local bearer token', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(recentResponse));
     const { createMemoryClient } = await import('./memory-client.js');

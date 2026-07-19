@@ -3,6 +3,8 @@
 import '@testing-library/jest-dom/vitest';
 
 import type {
+  CommitExplorerInput,
+  CommitExplorerResponse,
   MemorySearchResult,
   RecentCommitEvidence,
   ReviewLookupContract,
@@ -107,7 +109,22 @@ const recentCommits: RecentCommitEvidence[] = [
   },
 ];
 
+const localCommits: CommitExplorerResponse = {
+  schemaVersion: 1,
+  branches: ['master'],
+  selection: {
+    schemaVersion: 1,
+    branch: 'master',
+    source: 'all_local',
+    reviewState: 'all',
+    sort: 'newest',
+  },
+  commits: [],
+  nextCursor: null,
+};
+
 interface RenderOptions {
+  exploreCommits?: (input: CommitExplorerInput) => Promise<CommitExplorerResponse>;
   getReview?: (reviewId: string) => Promise<ReviewLookupContract>;
   initialEntry?: string;
   loadStatus?: () => Promise<StatusResponse>;
@@ -129,6 +146,7 @@ async function renderDashboard(options: RenderOptions = {}) {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[options.initialEntry ?? '/']}>
         <DashboardApp
+          exploreCommits={options.exploreCommits ?? (() => Promise.resolve(localCommits))}
           getReview={options.getReview ?? (() => Promise.resolve(review))}
           loadStatus={options.loadStatus ?? (() => Promise.resolve(status))}
           searchMemory={options.searchMemory ?? (() => Promise.resolve([memoryResult]))}
@@ -179,6 +197,15 @@ describe('dashboard application shell', () => {
     await renderDashboard({ initialEntry: '/reviews/pull-request' });
     expect(screen.getByRole('heading', { name: 'Review a GitHub pull request' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Pull request reviews' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('supports direct entry to the local Commit Explorer', async () => {
+    await renderDashboard({ initialEntry: '/commits' });
+    expect(await screen.findByRole('heading', { name: 'Browse local commits' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Local commits' })).toHaveAttribute(
       'aria-current',
       'page',
     );

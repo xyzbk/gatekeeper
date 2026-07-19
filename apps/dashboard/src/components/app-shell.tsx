@@ -46,6 +46,15 @@ export function AppShell({ children }: AppShellProps) {
               Pull requests
             </NavLink>
             <NavLink
+              aria-label="Local commits"
+              className={({ isActive }) =>
+                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+              }
+              to="/commits"
+            >
+              Commits
+            </NavLink>
+            <NavLink
               aria-label="Project Memory"
               className={({ isActive }) =>
                 isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
