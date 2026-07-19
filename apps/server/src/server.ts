@@ -31,6 +31,10 @@ import {
   reviewDraftJsonSchema,
   reviewDraftSchema,
   reviewIdParamsJsonSchema,
+  reviewLookupApiJsonSchema,
+  reviewLookupSchema,
+  reviewOperationApiJsonSchema,
+  reviewOperationSchema,
   reviewRunApiJsonSchema,
   reviewRunSchema,
   statusResponseJsonSchema,
@@ -44,6 +48,7 @@ import {
   type PullRequestReviewInput,
   type ReviewCompletionInput,
   type ReviewDraftContract,
+  type ReviewOperationContract,
   type ReviewRunContract,
   type StatusResponse,
 } from '@gatekeeper/contracts';
@@ -82,6 +87,8 @@ export interface BuildGatekeeperServerOptions {
   prepareReview: (reviewId: string) => Promise<ReviewDraftContract | null>;
   reviewPullRequest: (pullRequestNumber: number) => Promise<ReviewRunContract>;
   reviewWorktree: () => Promise<ReviewRunContract>;
+  startPullRequestReview: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
+  startWorktreeReview: () => Promise<ReviewOperationContract>;
   version: string;
 }
 
@@ -89,6 +96,7 @@ export interface ProjectMemoryApi {
   repository: RepositoryRecord;
   getIndexState: () => Promise<IndexState | null>;
   getReview: (reviewId: string) => Promise<ReviewRunContract | null>;
+  getReviewOperation: (reviewId: string) => Promise<ReviewOperationContract | null>;
   indexRepository: () => Promise<IndexResult>;
   searchMemory: (input: MemorySearchInput) => Promise<MemorySearchResult[]>;
   syncGitHub: () => Promise<GitHubSyncResult>;
@@ -180,6 +188,8 @@ export async function buildGatekeeperServer(
   server.addSchema(dashboardBootstrapJsonSchema);
   server.addSchema(emptyRequestJsonSchema);
   server.addSchema(reviewRunApiJsonSchema);
+  server.addSchema(reviewOperationApiJsonSchema);
+  server.addSchema(reviewLookupApiJsonSchema);
   server.addSchema(reviewDraftJsonSchema);
   server.addSchema(reviewCompletionInputJsonSchema);
   server.addSchema(pullRequestReviewInputJsonSchema);
@@ -319,6 +329,25 @@ export async function buildGatekeeperServer(
     async () => reviewRunSchema.parse(await options.reviewWorktree()),
   );
 
+  server.post(
+    '/v1/reviews/worktree/start',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:empty-request#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          202: { $ref: 'gatekeeper:review-operation-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (_request, reply) =>
+      reply.code(202).send(reviewOperationSchema.parse(await options.startWorktreeReview())),
+  );
+
   server.post<{ Body: PullRequestReviewInput }>(
     '/v1/reviews/pull-request',
     {
@@ -338,6 +367,34 @@ export async function buildGatekeeperServer(
     async (request) => {
       const input = pullRequestReviewInputSchema.parse(request.body);
       return reviewRunSchema.parse(await options.reviewPullRequest(input.pullRequestNumber));
+    },
+  );
+
+  server.post<{ Body: PullRequestReviewInput }>(
+    '/v1/reviews/pull-request/start',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:pull-request-review-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          202: { $ref: 'gatekeeper:review-operation-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+          503: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = pullRequestReviewInputSchema.parse(request.body);
+      return reply
+        .code(202)
+        .send(
+          reviewOperationSchema.parse(
+            await options.startPullRequestReview(input.pullRequestNumber),
+          ),
+        );
     },
   );
 
@@ -560,7 +617,7 @@ export async function buildGatekeeperServer(
         params: { $ref: 'gatekeeper:review-id-params-v1#' },
         querystring: { $ref: 'gatekeeper:empty-request#' },
         response: {
-          200: { $ref: 'gatekeeper:review-run-v1#' },
+          200: { $ref: 'gatekeeper:review-lookup-v1#' },
           400: { $ref: 'gatekeeper:error-envelope#' },
           401: { $ref: 'gatekeeper:error-envelope#' },
           403: { $ref: 'gatekeeper:error-envelope#' },
@@ -570,12 +627,16 @@ export async function buildGatekeeperServer(
       },
     },
     async (request, reply) => {
-      const review = await options.projectMemory.getReview(request.params.reviewId);
+      const operation = await options.projectMemory.getReviewOperation(request.params.reviewId);
+      const review =
+        operation === null
+          ? await options.projectMemory.getReview(request.params.reviewId)
+          : operation;
       return review === null
         ? reply
             .code(404)
             .send(createError('NOT_FOUND', 'The requested local resource was not found.'))
-        : reviewRunSchema.parse(review);
+        : reviewLookupSchema.parse(review);
     },
   );
 

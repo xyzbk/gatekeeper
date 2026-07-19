@@ -35,6 +35,7 @@ export interface WorktreeReviewDependencies {
 export interface WorktreeReviewContext {
   repositoryId: RepositoryId;
   previousReviewId?: ReviewId;
+  reviewId?: ReviewId;
 }
 
 export interface PolicyValidationDependencies {
@@ -78,7 +79,7 @@ export async function runWorktreeReview(
     createdAt: dependencies.now(),
     policy: loadedPolicy.policy,
     repositoryId: context?.repositoryId ?? dependencies.createRepositoryId(repository.root),
-    reviewId: dependencies.createReviewId(),
+    reviewId: context?.reviewId ?? dependencies.createReviewId(),
     ...(context?.previousReviewId === undefined
       ? {}
       : { previousReviewId: context.previousReviewId }),

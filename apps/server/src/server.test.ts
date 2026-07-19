@@ -12,11 +12,12 @@ import type {
   RepositoryRecord,
   ReviewCompletionInput,
   ReviewDraftContract,
+  ReviewOperationContract,
   ReviewRunContract,
   StatusResponse,
 } from '@gatekeeper/contracts';
-import { reviewRunSchema } from '@gatekeeper/contracts';
-import { GitHubProviderError } from '@gatekeeper/github-gh';
+import { reviewLookupSchema, reviewOperationSchema, reviewRunSchema } from '@gatekeeper/contracts';
+import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectMemoryApi } from './server.js';
@@ -93,6 +94,17 @@ const repositoryRecord: RepositoryRecord = {
   remote: repository.remote,
   createdAt: '2026-07-18T11:00:00.000Z',
   updatedAt: '2026-07-18T11:00:00.000Z',
+};
+
+const queuedReviewOperation: ReviewOperationContract = {
+  schemaVersion: 1,
+  reviewId: reviewResponse.reviewId,
+  repositoryId: reviewResponse.repositoryId,
+  target: reviewResponse.target,
+  status: 'queued',
+  stage: 'queued',
+  createdAt: reviewResponse.createdAt,
+  updatedAt: reviewResponse.createdAt,
 };
 
 const indexState: IndexState = {
@@ -243,6 +255,8 @@ async function buildTestServer(
     projectMemory?: Partial<ProjectMemoryApi>;
     reviewPullRequest?: (pullRequestNumber: number) => Promise<ReviewRunContract>;
     reviewWorktree?: () => Promise<ReviewRunContract>;
+    startPullRequestReview?: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
+    startWorktreeReview?: () => Promise<ReviewOperationContract>;
   } = {},
 ) {
   const [{ buildGatekeeperServer }, dashboardRoot] = await Promise.all([
@@ -264,6 +278,7 @@ async function buildTestServer(
       getIndexState: () => Promise.resolve(indexState),
       getReview: (reviewId) =>
         Promise.resolve(reviewId === reviewResponse.reviewId ? reviewResponse : null),
+      getReviewOperation: () => Promise.resolve(null),
       indexRepository: () => Promise.resolve(indexResult),
       searchMemory: () => Promise.resolve([memoryResult]),
       syncGitHub: () => Promise.resolve(githubSyncResult),
@@ -274,6 +289,10 @@ async function buildTestServer(
       ((reviewId) => Promise.resolve(reviewId === reviewResponse.reviewId ? reviewDraft : null)),
     reviewPullRequest: options.reviewPullRequest ?? (() => Promise.resolve(pullRequestReview)),
     reviewWorktree: options.reviewWorktree ?? (() => Promise.resolve(reviewResponse)),
+    startPullRequestReview:
+      options.startPullRequestReview ?? (() => Promise.resolve(queuedReviewOperation)),
+    startWorktreeReview:
+      options.startWorktreeReview ?? (() => Promise.resolve(queuedReviewOperation)),
     version: '0.1.0',
   });
 }
@@ -458,6 +477,70 @@ describe('Gatekeeper local service', () => {
     expect(authorized.statusCode).toBe(200);
     expect(authorized.json()).toEqual(reviewResponse);
     expect(reviewWorktree).toHaveBeenCalledOnce();
+  });
+
+  it('starts strict dashboard operations and polls the same review deep link', async () => {
+    let operation: ReviewOperationContract = queuedReviewOperation;
+    const startWorktreeReview = vi.fn(() => Promise.resolve(queuedReviewOperation));
+    const startPullRequestReview = vi.fn(() => Promise.resolve(queuedReviewOperation));
+    const server = await buildTestServer({
+      projectMemory: { getReviewOperation: () => Promise.resolve(operation) },
+      startPullRequestReview,
+      startWorktreeReview,
+    });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const unauthorized = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree/start',
+      headers: { host },
+      payload: {},
+    });
+    const started = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/worktree/start',
+      headers,
+      payload: {},
+    });
+    const polled = await server.inject({
+      method: 'GET',
+      url: `/v1/reviews/${reviewResponse.reviewId}`,
+      headers,
+    });
+    operation = {
+      ...queuedReviewOperation,
+      status: 'completed',
+      stage: 'completed',
+      review: reviewResponse,
+    };
+    const completed = await server.inject({
+      method: 'GET',
+      url: `/v1/reviews/${reviewResponse.reviewId}`,
+      headers,
+    });
+    const pullRequest = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request/start',
+      headers,
+      payload: { schemaVersion: 1, pullRequestNumber: 12 },
+    });
+    const invalidPullRequest = await server.inject({
+      method: 'POST',
+      url: '/v1/reviews/pull-request/start',
+      headers,
+      payload: { schemaVersion: 1, pullRequestNumber: 0 },
+    });
+    await server.close();
+
+    expect(unauthorized.statusCode).toBe(401);
+    expect(started.statusCode).toBe(202);
+    expect(started.json()).toEqual(queuedReviewOperation);
+    expect(polled.json()).toEqual(queuedReviewOperation);
+    expect(completed.json()).toEqual(operation);
+    expect(pullRequest.statusCode).toBe(202);
+    expect(invalidPullRequest.statusCode).toBe(400);
+    expect(startWorktreeReview).toHaveBeenCalledOnce();
+    expect(startPullRequestReview).toHaveBeenCalledWith(12);
   });
 
   it('rejects review path selectors and non-empty bodies before composition runs', async () => {
@@ -844,6 +927,8 @@ describe('Gatekeeper local service', () => {
     expect(server.getSchema('gatekeeper:dashboard-bootstrap-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:error-envelope')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-run-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:review-operation-v1')).toBeDefined();
+    expect(server.getSchema('gatekeeper:review-lookup-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-draft-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:review-completion-input-v1')).toBeDefined();
     expect(server.getSchema('gatekeeper:pull-request-review-input-v1')).toBeDefined();
@@ -978,6 +1063,281 @@ describe('Gatekeeper local service', () => {
       expect(persisted.json()).toEqual(firstReview);
       expect(secondReview.previousReviewId).toBe(firstReview.reviewId);
       expect(reviewWorktree).toHaveBeenCalledTimes(2);
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('persists real dashboard progress and completes under the preallocated review identity', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-progress-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let releaseReview: (() => void) | undefined;
+    const hold = new Promise<void>((resolve) => {
+      releaseReview = resolve;
+    });
+    const reviewWorktree = vi.fn(async (context: PersistentReviewContext) => {
+      await hold;
+      return {
+        ...reviewResponse,
+        reviewId: context.reviewId,
+        repositoryId: context.repositoryId,
+        ...(context.previousReviewId === undefined
+          ? {}
+          : { previousReviewId: context.previousReviewId }),
+      };
+    });
+
+    try {
+      const service = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const started = await service.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree/start',
+        headers,
+        payload: {},
+      });
+      const queued = reviewOperationSchema.parse(started.json());
+
+      expect(started.statusCode).toBe(202);
+      expect(queued).toMatchObject({ status: 'queued', stage: 'queued' });
+      await expect
+        .poll(async () => {
+          const response = await service.server.inject({
+            method: 'GET',
+            url: `/v1/reviews/${queued.reviewId}`,
+            headers,
+          });
+          return reviewLookupSchema.parse(response.json());
+        })
+        .toMatchObject({ status: 'running', stage: 'evaluating_change' });
+
+      releaseReview?.();
+      await expect
+        .poll(async () => {
+          const response = await service.server.inject({
+            method: 'GET',
+            url: `/v1/reviews/${queued.reviewId}`,
+            headers,
+          });
+          return reviewLookupSchema.parse(response.json());
+        })
+        .toMatchObject({
+          status: 'completed',
+          stage: 'completed',
+          review: { reviewId: queued.reviewId, repositoryId: queued.repositoryId },
+        });
+      expect(reviewWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewId: queued.reviewId, repositoryId: queued.repositoryId }),
+      );
+      await service.close();
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('reports pull-request history synchronization before evaluating the change', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-pr-progress-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let releaseSync: (() => void) | undefined;
+    let releaseReview: (() => void) | undefined;
+    const holdSync = new Promise<void>((resolve) => {
+      releaseSync = resolve;
+    });
+    const holdReview = new Promise<void>((resolve) => {
+      releaseReview = resolve;
+    });
+    const githubProvider: GitHubProvider = {
+      preflight: () =>
+        Promise.resolve({ schemaVersion: 1, host: 'github.com', authenticated: true }),
+      getPullRequest: () => Promise.reject(new Error('not called by service sync')),
+      getPullRequestDiff: () => Promise.reject(new Error('not called by service sync')),
+      listHistoricalDocuments: async () => {
+        await holdSync;
+        return {
+          schemaVersion: 1,
+          records: [],
+          failures: [],
+          cursor: '2026-07-18T12:00:00Z',
+          partial: false,
+        };
+      },
+    };
+    const reviewPullRequest = vi.fn(
+      async (pullRequestNumber: number, context: PersistentReviewContext) => {
+        await holdReview;
+        return {
+          pullRequest: { ...pullRequestRecord, number: pullRequestNumber },
+          remote: githubRemote,
+          review: {
+            ...pullRequestReview,
+            reviewId: context.reviewId,
+            repositoryId: context.repositoryId,
+          },
+        };
+      },
+    );
+
+    try {
+      const service = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        githubProvider,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest,
+        reviewWorktree: () => Promise.resolve(reviewResponse),
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const started = reviewOperationSchema.parse(
+        (
+          await service.server.inject({
+            method: 'POST',
+            url: '/v1/reviews/pull-request/start',
+            headers,
+            payload: { schemaVersion: 1, pullRequestNumber: 12 },
+          })
+        ).json(),
+      );
+      const poll = async () =>
+        reviewLookupSchema.parse(
+          (
+            await service.server.inject({
+              method: 'GET',
+              url: `/v1/reviews/${started.reviewId}`,
+              headers,
+            })
+          ).json(),
+        );
+
+      await expect.poll(poll).toMatchObject({
+        status: 'running',
+        stage: 'syncing_history',
+      });
+      releaseSync?.();
+      await expect.poll(poll).toMatchObject({
+        status: 'running',
+        stage: 'evaluating_change',
+      });
+      releaseReview?.();
+      await expect.poll(poll).toMatchObject({ status: 'completed', stage: 'completed' });
+      expect(reviewPullRequest).toHaveBeenCalledWith(
+        12,
+        expect.objectContaining({ reviewId: started.reviewId }),
+      );
+      await service.close();
+    } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('turns a dashboard operation interrupted by restart into a bounded failure', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-progress-restart-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    const reviewWorktree = () => new Promise<ReviewRunContract>(() => undefined);
+
+    try {
+      const first = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-17T00:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const firstHeaders = {
+        host: new URL(first.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const started = reviewOperationSchema.parse(
+        (
+          await first.server.inject({
+            method: 'POST',
+            url: '/v1/reviews/worktree/start',
+            headers: firstHeaders,
+            payload: {},
+          })
+        ).json(),
+      );
+      await first.close();
+
+      const second = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-17T01:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const failed = await second.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${started.reviewId}`,
+        headers: {
+          host: new URL(second.baseUrl).host,
+          authorization: `Bearer ${bearerToken}`,
+        },
+      });
+      await second.close();
+
+      expect(failed.statusCode).toBe(200);
+      expect(failed.json()).toEqual(
+        expect.objectContaining({
+          status: 'failed',
+          stage: 'failed',
+          error: {
+            code: 'REVIEW_FAILED',
+            message: 'The review was interrupted when the local service stopped.',
+            repair: 'Start a new review from the dashboard.',
+          },
+        }),
+      );
+      expect(JSON.stringify(failed.json())).not.toContain(repository.root);
     } finally {
       await rm(appData, { force: true, recursive: true });
     }

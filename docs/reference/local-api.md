@@ -105,6 +105,10 @@ The service persists the review transaction before responding. Re-reviewing the 
 
 The shortened example omits optional metrics and uses an empty findings array only for readability; consumers must use the contract rather than copy this example as a complete semantic result.
 
+### `POST /v1/reviews/worktree/start`
+
+Starts the same persisted worktree review for the dashboard without holding the HTTP request open. The request requirements are identical to the synchronous worktree endpoint. The `202` response is a strict ReviewOperation v1 with a preallocated review ID and `queued` status. The dashboard polls that ID through `GET /v1/reviews/:reviewId`.
+
 ### `POST /v1/reviews/pull-request`
 
 Runs the same deterministic reviewer for one pull request belonging to the fixed service repository:
@@ -117,6 +121,10 @@ Runs the same deterministic reviewer for one pull request belonging to the fixed
 ```
 
 The pull-request number must be a positive integer. Additional fields—including paths, remotes, repository selectors, tokens, or publication settings—are rejected. The service reads bounded metadata and file changes through authenticated `gh`, verifies the normalized remote still matches the service-start snapshot, records GitHub check state and suspicious instruction-like text as inert evidence, persists the strict ReviewRun v1, and indexes the current pull request in Project Memory before responding. A later review of the same pull-request number receives the prior review ID, including after a service restart.
+
+### `POST /v1/reviews/pull-request/start`
+
+Starts the dashboard pull-request review and returns a strict queued ReviewOperation v1 with `202`. The foreground process first synchronizes bounded GitHub history, then evaluates the change and persists the ReviewRun under the same preallocated ID. This is a caught in-process operation rather than a durable worker queue; if the service stops while it is queued or running, startup converts that operation to a bounded failed state that can be retried.
 
 ### `POST /v1/repositories`
 
@@ -157,7 +165,7 @@ The query is 1–256 characters and the optional limit is 1–50. Results are bo
 
 ### `GET /v1/reviews/:reviewId`
 
-Reads one persisted strict ReviewRun v1. Missing review IDs return `NOT_FOUND`. Reviews remain available after the foreground service restarts because they live in machine-local Project Memory.
+Reads one strict ReviewOperation v1 when the ID belongs to a dashboard operation, including after completion; otherwise it reads the legacy strict ReviewRun v1. Operations progress through `queued`, `running`, `failed`, or `completed`, with bounded stages that are safe to display. The completed operation embeds the persisted ReviewRun using the same review ID. Missing review IDs return `NOT_FOUND`. Reviews and operation state remain available after the foreground service restarts because they live in machine-local Project Memory.
 
 ### `GET /v1/reviews/:reviewId/draft`
 

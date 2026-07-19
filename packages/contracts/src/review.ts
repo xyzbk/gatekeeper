@@ -237,8 +237,16 @@ export const reviewOperationApiJsonSchema = {
   ...z.toJSONSchema(reviewOperationSchema, { target: 'draft-7' }),
 };
 
+export const reviewLookupSchema = z.union([reviewOperationSchema, reviewRunSchema]);
+
+export const reviewLookupApiJsonSchema = {
+  $id: 'gatekeeper:review-lookup-v1',
+  ...z.toJSONSchema(reviewLookupSchema, { target: 'draft-7' }),
+};
+
 export type ReviewRunContract = z.infer<typeof reviewRunSchema>;
 export type ReviewDraftContract = z.infer<typeof reviewDraftSchema>;
 export type ReviewCompletionFinding = z.infer<typeof reviewCompletionFindingSchema>;
 export type ReviewCompletionInput = z.infer<typeof reviewCompletionInputSchema>;
 export type ReviewOperationContract = z.infer<typeof reviewOperationSchema>;
+export type ReviewLookupContract = z.infer<typeof reviewLookupSchema>;

@@ -86,11 +86,13 @@ describe('runWorktreeReview', () => {
       {
         repositoryId: 'repository_persisted' as RepositoryId,
         previousReviewId: 'review_previous' as ReviewId,
+        reviewId: 'review_preallocated' as ReviewId,
       },
     );
 
     expect(result.repositoryId).toBe('repository_persisted');
     expect(result.previousReviewId).toBe('review_previous');
+    expect(result.reviewId).toBe('review_preallocated');
   });
 });
 

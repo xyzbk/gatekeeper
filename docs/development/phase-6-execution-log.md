@@ -41,6 +41,22 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - A review-operation ID collision cannot move state between repositories; the upsert returns zero changes and fails closed.
 - A corrupt operation blocks unsafe recovery with a stable `CORRUPT_DATA` error. It is never parsed leniently or returned to the dashboard.
 
+### Pollable review execution
+
+- RED: authenticated dashboard start-route tests returned `404` because no asynchronous worktree or pull-request entry points existed.
+- GREEN: both strict start routes return `202` with a queued operation, while the existing synchronous routes retain their ReviewRun responses for CLI and MCP compatibility.
+- RED: focused composition tests showed the preallocated operation ID was discarded by both CLI review functions in favour of their fallback ID factories.
+- GREEN: worktree and pull-request composition accept the service-owned ID while preserving the original fallback for direct CLI calls.
+- GREEN: service tests held the underlying work at explicit boundaries and observed worktree `queued`/`evaluating_change`/`completed` and pull-request `syncing_history`/`evaluating_change`/`completed` transitions with matching final identities.
+- GREEN: a restart test persisted a running operation, reopened the service, and observed a bounded failed state rather than an indefinitely running review.
+
+### Findings and corrections
+
+- The first route test exposed an integration boundary: the test server had an operation reader, but the real service adapter did not yet forward it. The service now exposes the same Project Memory method, and the deep-link route checks operation state before the legacy review row.
+- The asynchronous pull-request path reuses the existing GitHub synchronization and review functions. It does not duplicate provider logic or introduce a background-worker abstraction.
+- The detached operation owns a terminal catch so failures cannot become unhandled promise rejections. User-visible failures remain generic and never include repository content, provider output, paths, tokens, or raw exception text.
+- The first combined quality command used unsupported `&&` syntax in the available Windows PowerShell and was rejected before any command ran. The acceptance commands were rerun independently; lint then caught three unsafe test-only `response.json()` returns, which were corrected by parsing the shared lookup contract.
+
 ## Scope ledger
 
 Deferred by the Phase 6 stop gate: settings, policy editors, collaboration, analytics, user accounts, remote hosting, permanent decision writes, decorative charts, and Phase 7 packaging/submission work.

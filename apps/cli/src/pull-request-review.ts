@@ -21,6 +21,7 @@ import { reviewPullRequest } from '@gatekeeper/review-engine';
 export interface PullRequestReviewContext {
   repositoryId: RepositoryId;
   previousReviewId?: ReviewId;
+  reviewId?: ReviewId;
 }
 
 export interface PullRequestReviewResult {
@@ -83,7 +84,7 @@ export async function runPullRequestReview(
     createdAt: dependencies.now(),
     policy: loadedPolicy.policy,
     repositoryId: context.repositoryId,
-    reviewId: dependencies.createReviewId(),
+    reviewId: context.reviewId ?? dependencies.createReviewId(),
     ...(context.previousReviewId === undefined
       ? {}
       : { previousReviewId: context.previousReviewId }),

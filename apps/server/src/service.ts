@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 
@@ -10,6 +10,7 @@ import {
 } from '@gatekeeper/config';
 import {
   githubSyncLimitsSchema,
+  reviewOperationSchema,
   serviceMetadataSchema,
   statusResponseSchema,
   type GitHubRemote,
@@ -17,6 +18,7 @@ import {
   type PullRequestRecord,
   type RepositorySnapshot,
   type MemorySearchInput,
+  type ReviewOperationContract,
   type ReviewRunContract,
   type StatusResponse,
   type ToolAvailability,
@@ -60,6 +62,7 @@ export interface StartGatekeeperServiceOptions {
 export interface PersistentReviewContext {
   repositoryId: RepositoryId;
   previousReviewId?: ReviewId;
+  reviewId: ReviewId;
 }
 
 export interface PersistentPullRequestReviewResult {
@@ -118,6 +121,129 @@ export async function startGatekeeperService(
       root: options.repository.root,
       remote: options.repository.remote,
     });
+    await memory.failInterruptedReviewOperations(startedAt);
+    const createReviewId = () => `review_${randomUUID().replaceAll('-', '')}` as ReviewId;
+    const createReviewContext = async (
+      target: ReviewRunContract['target'],
+      reviewId: ReviewId,
+    ): Promise<PersistentReviewContext> => {
+      const previousReviewId = await memory.latestReviewId(
+        registeredRepository.repositoryId,
+        target,
+      );
+      return {
+        repositoryId: registeredRepository.repositoryId as RepositoryId,
+        reviewId,
+        ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
+      };
+    };
+    const syncGitHub = async () => {
+      const remote = fixedGitHubRemote();
+      await github.preflight(remote);
+      const cursor = await memory.getRemoteSyncCursor(registeredRepository.repositoryId, 'github');
+      const batch = await github.listHistoricalDocuments(
+        remote,
+        githubSyncLimitsSchema.parse({}),
+        cursor,
+      );
+      return memory.indexRemoteDocuments({
+        repositoryId: registeredRepository.repositoryId,
+        provider: 'github',
+        batch,
+      });
+    };
+    const executePullRequestReview = async (
+      pullRequestNumber: number,
+      context: PersistentReviewContext,
+    ) => {
+      const result = await options.reviewPullRequest(pullRequestNumber, context);
+      if (result.remote.url !== fixedGitHubRemote().url) {
+        throw new GitHubProviderError(
+          'INVALID_REMOTE',
+          'The repository remote changed after the local service started.',
+          'Restart Gatekeeper after confirming the repository origin.',
+        );
+      }
+      await memory.indexRemoteDocuments({
+        repositoryId: registeredRepository.repositoryId,
+        provider: 'github',
+        batch: {
+          schemaVersion: 1,
+          records: [pullRequestToRemoteRecord(result.pullRequest)],
+          failures: [],
+          cursor: null,
+          partial: false,
+        },
+      });
+      return result.review;
+    };
+    const startReviewOperation = async (
+      target: ReviewRunContract['target'],
+      run: (
+        context: PersistentReviewContext,
+        setStage: (
+          stage: 'syncing_history' | 'evaluating_change' | 'persisting_review',
+        ) => Promise<void>,
+      ) => Promise<ReviewRunContract>,
+    ): Promise<ReviewOperationContract> => {
+      const reviewId = createReviewId();
+      const createdAt = new Date().toISOString();
+      const queued = reviewOperationSchema.parse({
+        schemaVersion: 1,
+        reviewId,
+        repositoryId: registeredRepository.repositoryId,
+        target,
+        status: 'queued',
+        stage: 'queued',
+        createdAt,
+        updatedAt: createdAt,
+      });
+      await memory.saveReviewOperation(queued);
+
+      void (async () => {
+        const context = await createReviewContext(target, reviewId);
+        const setStage = async (
+          stage: 'syncing_history' | 'evaluating_change' | 'persisting_review',
+        ) => {
+          await memory.saveReviewOperation(
+            reviewOperationSchema.parse({
+              ...queued,
+              status: 'running',
+              stage,
+              updatedAt: new Date().toISOString(),
+            }),
+          );
+        };
+        try {
+          const review = await run(context, setStage);
+          if (
+            review.reviewId !== reviewId ||
+            review.repositoryId !== registeredRepository.repositoryId ||
+            review.target.kind !== target.kind ||
+            review.target.display !== target.display
+          ) {
+            throw new Error('Review operation result identity does not match.');
+          }
+          await setStage('persisting_review');
+          await memory.saveReview(review);
+        } catch {
+          await memory.saveReviewOperation(
+            reviewOperationSchema.parse({
+              ...queued,
+              status: 'failed',
+              stage: 'failed',
+              error: {
+                code: 'REVIEW_FAILED',
+                message: 'Gatekeeper could not complete the local review.',
+                repair: 'Confirm the repository and local tools are ready, then retry.',
+              },
+              updatedAt: new Date().toISOString(),
+            }),
+          );
+        }
+      })().catch(() => undefined);
+      return queued;
+    };
     const prepareStoredReview = async (reviewId: string) => {
       const review = await memory.getReview(reviewId);
       if (review === null || review.repositoryId !== registeredRepository.repositoryId) {
@@ -161,6 +287,7 @@ export async function startGatekeeperService(
         repository: registeredRepository,
         getIndexState: () => memory.getIndexState(registeredRepository.repositoryId),
         getReview: (reviewId) => memory.getReview(reviewId),
+        getReviewOperation: (reviewId) => memory.getReviewOperation(reviewId),
         indexRepository: async () => {
           const loadedPolicy = await loadRepositoryPolicy(options.repository.root);
           return memory.indexLocalRepository({
@@ -169,24 +296,7 @@ export async function startGatekeeperService(
           });
         },
         searchMemory: (input: MemorySearchInput) => memory.search(input),
-        syncGitHub: async () => {
-          const remote = fixedGitHubRemote();
-          await github.preflight(remote);
-          const cursor = await memory.getRemoteSyncCursor(
-            registeredRepository.repositoryId,
-            'github',
-          );
-          const batch = await github.listHistoricalDocuments(
-            remote,
-            githubSyncLimitsSchema.parse({}),
-            cursor,
-          );
-          return memory.indexRemoteDocuments({
-            repositoryId: registeredRepository.repositoryId,
-            provider: 'github',
-            batch,
-          });
-        },
+        syncGitHub,
       },
       prepareReview: prepareStoredReview,
       reviewPullRequest: async (pullRequestNumber) => {
@@ -195,47 +305,40 @@ export async function startGatekeeperService(
           display: `Pull request #${pullRequestNumber}`,
           pullRequestNumber,
         };
-        const previousReviewId = await memory.latestReviewId(
-          registeredRepository.repositoryId,
-          target,
+        const review = await executePullRequestReview(
+          pullRequestNumber,
+          await createReviewContext(target, createReviewId()),
         );
-        const result = await options.reviewPullRequest(pullRequestNumber, {
-          repositoryId: registeredRepository.repositoryId as RepositoryId,
-          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
-        });
-        if (result.remote.url !== fixedGitHubRemote().url) {
-          throw new GitHubProviderError(
-            'INVALID_REMOTE',
-            'The repository remote changed after the local service started.',
-            'Restart Gatekeeper after confirming the repository origin.',
-          );
-        }
-        await memory.indexRemoteDocuments({
-          repositoryId: registeredRepository.repositoryId,
-          provider: 'github',
-          batch: {
-            schemaVersion: 1,
-            records: [pullRequestToRemoteRecord(result.pullRequest)],
-            failures: [],
-            cursor: null,
-            partial: false,
-          },
-        });
-        await memory.saveReview(result.review);
-        return result.review;
+        await memory.saveReview(review);
+        return review;
       },
       reviewWorktree: async () => {
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
-        const previousReviewId = await memory.latestReviewId(
-          registeredRepository.repositoryId,
-          target,
+        const review = await options.reviewWorktree(
+          await createReviewContext(target, createReviewId()),
         );
-        const review = await options.reviewWorktree({
-          repositoryId: registeredRepository.repositoryId as RepositoryId,
-          ...(previousReviewId === null ? {} : { previousReviewId: previousReviewId as ReviewId }),
-        });
         await memory.saveReview(review);
         return review;
+      },
+      startPullRequestReview: (pullRequestNumber) => {
+        const target = {
+          kind: 'pull_request' as const,
+          display: `Pull request #${pullRequestNumber}`,
+          pullRequestNumber,
+        };
+        return startReviewOperation(target, async (context, setStage) => {
+          await setStage('syncing_history');
+          await syncGitHub();
+          await setStage('evaluating_change');
+          return executePullRequestReview(pullRequestNumber, context);
+        });
+      },
+      startWorktreeReview: () => {
+        const target = { kind: 'worktree' as const, display: 'Current worktree' };
+        return startReviewOperation(target, async (context, setStage) => {
+          await setStage('evaluating_change');
+          return options.reviewWorktree(context);
+        });
       },
       version: options.version,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
