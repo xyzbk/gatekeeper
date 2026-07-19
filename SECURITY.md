@@ -20,6 +20,8 @@ Include the affected version/commit, reproduction steps with synthetic data, imp
 - Added-line inspection is bounded to 500 lines per file and 2,000 characters per line.
 - Raw source and raw diffs never cross into CLI, HTTP, dashboard, logs, or ReviewRun persistence candidates.
 - Default tests use no network or credentials.
+- `gatekeeper start --deterministic-only` refuses model-assisted completion before parsing or persisting it; deterministic review and Project Memory remain local.
+- The judge demo uses a committed fixture transport and disposable local state. It does not invoke live `gh`, a hosted model endpoint, or a GitHub write path.
 
 ## Phase 2 review boundary
 

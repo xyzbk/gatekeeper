@@ -46,6 +46,22 @@ pnpm demo
 
 `pnpm demo:smoke` verifies six golden outcomes and exits: clean bug fix (`FAST_PATH`), missing test (`REQUIRE_CHANGES`), protected path (`BLOCK`), authentication risk (`ESCALATE`), Redis revival (`ESCALATE`), and prompt injection (`ESCALATE`). `pnpm eval` regenerates [the checked-in outcome report](docs/release/golden-evaluation.md) from the committed Ghost fixture/provider and deterministic review functions. `pnpm demo` starts the real loopback service with the built dashboard and a disposable local Ghost Change repository; open the printed URL, then use Pull request review to inspect the linked Redis history. It never invokes the live `gh` executable or a model endpoint, and Ctrl+C removes only its temporary demo files.
 
+## Judge test
+
+Use the frozen-lockfile sequence in [clean install and uninstall](docs/release/clean-install-uninstall.md). The judge path is local after dependencies are installed: `pnpm demo:smoke`, `pnpm eval`, and `pnpm model-data:dry-run` need no GitHub credential or model key.
+
+## Supported platforms
+
+Windows is the verified Phase 7 desktop platform. Ubuntu has existing non-browser CI coverage; macOS and a browser release run were not independently verified for this submission. See [clean install and uninstall](docs/release/clean-install-uninstall.md) for exact requirements and state locations.
+
+## Prior work
+
+The product specification and Phase 0 contract baseline predate the later Build Week slices. The implemented workflow and release evidence are traceable in this repository; see the [Devpost project draft](docs/release/devpost-project.md) for the exact disclosure.
+
+## GPT-5.6 and Devpost
+
+GPT-5.6 in Codex assisted the implementation process; Gatekeeper’s enforcement remains deterministic and contract-validated. The prepared [Devpost draft](docs/release/devpost-project.md) and [video narration](docs/release/demo-video-script.md) require user approval before any external upload, sharing, or submission.
+
 `review worktree` loads `.gatekeeper/policies.yaml` when present and otherwise uses an empty version-1 policy. `policy validate` intentionally requires the file. A completed review exits successfully even when its verdict is `BLOCK`; Phase 2 reports decisions but does not enforce repository mutation.
 
 `gh` remains optional for the offline workflow. Doctor reports its absence as a warning and verifies the native SQLite driver, app-data writability, WAL mode, and FTS5 without authenticating or making network calls. Live `sync github` and `review pr` require an installed, authenticated GitHub CLI; default tests and the Ghost Change fixture do not.

@@ -83,6 +83,13 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 Pull-request CLI, fixed-repository API, MCP, and dashboard composition are implemented. The dashboard creates external anchors only for parsed `https://github.com/...` evidence URLs and renders all other values as text. GitHub publication, checks, comments, labels, merges, closes, and Actions remain deferred.
 
+## Phase 7 release controls
+
+- Deterministic-only startup rejects the completion endpoint before it interprets submitted model findings. It does not disable deterministic review, Project Memory, dashboard reads, or bounded local indexing.
+- `pnpm model-data:dry-run` exercises the fixture-backed provider and review-draft path with zero model calls, then reports counts and source pointer metadata only—never source bodies or excerpts.
+- `pnpm demo` and `pnpm demo:smoke` use a committed Ghost fixture, a disposable local Git repository, and a loopback service. They do not invoke the live GitHub CLI, external network, model endpoints, or GitHub write operations.
+- User-authorized video, Devpost, repository sharing, and feedback-session actions remain outside automated release work.
+
 ## Logging
 
 Doctor prints only tool availability, versions, and the app-data path. The local service disables Fastify's request-header logging and emits its own bounded operational records. Future phases must preserve the same exclusions for source, diffs, excerpts, tokens, secrets, and private repository content.

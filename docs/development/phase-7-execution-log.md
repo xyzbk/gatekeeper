@@ -34,6 +34,13 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - Correction: direct server composition needed the existing TypeScript project-reference pattern extended to `apps/server`; no package or runtime dependency was added. The evaluator initially produced a valid but unaligned Markdown table, so it now emits stable column widths and passes formatting immediately after regeneration.
 - Environment limitation: the desktop terminal backend could observe `pnpm demo` reaching its loopback URL but could not send Ctrl+C to its foreground process. The process was stopped without source changes; focused lifecycle tests call the same close path and prove owned-root cleanup.
 
+### Release documentation and clean install
+
+- RED: the judge-test, supported-platform, prior-work, GPT-5.6, and Devpost documentation scan found only the pre-existing submission checklist references.
+- GREEN: README now gives concise judge, platform, prior-work, AI disclosure, Devpost, and video links; the drafts keep every external publication/sharing/submission action behind explicit user authorization.
+- GREEN: a fresh detached Windows checkout at the committed judge-demo revision passed `pnpm install --frozen-lockfile`, `pnpm build`, and `pnpm demo:smoke`. It installed the locked 400-package workspace from the local package cache, made no lockfile change, and produced all six golden verdicts.
+- Environment limitation: after Git removed the detached worktree registration, this host policy blocked recursive deletion of its untracked dependency cache. No Gatekeeper source, target repository, service state, or remote system was changed; the host-local temporary directory can be removed outside this session.
+
 ## External authorization boundary
 
 The user authorized Phase 7 engineering work. They have not authorized publishing a video, sharing repository access, creating or submitting Devpost content, or transmitting a feedback session identifier. Phase 7 prepares these artifacts but does not perform those external actions.
