@@ -50,6 +50,7 @@ function recordingPersistence(
     },
     applyRemoteSync: (batch) => store.applyRemoteSync(batch),
     getSyncCursor: (repositoryId, provider) => store.getSyncCursor(repositoryId, provider),
+    recentCommits: (repositoryId) => store.recentCommits(repositoryId),
     search: (input) => store.search(input),
     saveReview: (review) => store.saveReview(review),
     saveReviewOperation: (operation) => store.saveReviewOperation(operation),
@@ -219,6 +220,31 @@ describe('Project Memory', () => {
     await expect(
       memory.findRepository({ root: `${root}-missing`, remote: null }),
     ).resolves.toBeNull();
+    store.close();
+  });
+
+  it('returns only the newest ten indexed commits for its repository', async () => {
+    const root = await temporaryRoot();
+    const store = openStore(join(root, 'memory.db'));
+    const state = fakeGit(root, {
+      commits: Array.from({ length: 12 }, (_, index) => ({
+        sha: index.toString(16).repeat(40),
+        authoredAt: `2026-07-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+        title: `Commit ${index + 1}`,
+        message: '',
+      })),
+    });
+    const memory = memoryWith(state, store);
+    await memory.migrate();
+    const repository = await memory.registerRepository({ root, remote: state.snapshot.remote });
+    await memory.indexLocalRepository({ repositoryId: repository.repositoryId });
+
+    await expect(memory.recentCommits(repository.repositoryId)).resolves.toEqual(
+      state.commits
+        .slice(2)
+        .reverse()
+        .map(({ sha, authoredAt, title }) => ({ sha, authoredAt, title })),
+    );
     store.close();
   });
 

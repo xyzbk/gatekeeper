@@ -8,6 +8,7 @@ import type {
   IndexResult,
   IndexState,
   MemorySearchResult,
+  RecentCommitEvidence,
   PullRequestRecord,
   RepositoryRecord,
   ReviewCompletionInput,
@@ -16,7 +17,12 @@ import type {
   ReviewRunContract,
   StatusResponse,
 } from '@gatekeeper/contracts';
-import { reviewLookupSchema, reviewOperationSchema, reviewRunSchema } from '@gatekeeper/contracts';
+import {
+  recentCommitEvidenceResponseSchema,
+  reviewLookupSchema,
+  reviewOperationSchema,
+  reviewRunSchema,
+} from '@gatekeeper/contracts';
 import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -138,6 +144,14 @@ const memoryResult: MemorySearchResult = {
     excerpt: 'Redis is not required for the local cache.',
   },
 };
+
+const recentCommits: RecentCommitEvidence[] = [
+  {
+    sha: 'c'.repeat(40),
+    authoredAt: '2026-07-19T12:00:00.000Z',
+    title: 'Add historical commit review',
+  },
+];
 
 const reviewDraft: ReviewDraftContract = {
   schemaVersion: 1,
@@ -295,6 +309,7 @@ async function buildTestServer(
         Promise.resolve(reviewId === reviewResponse.reviewId ? reviewResponse : null),
       getReviewOperation: () => Promise.resolve(null),
       indexRepository: () => Promise.resolve(indexResult),
+      recentCommits: () => Promise.resolve(recentCommits),
       searchMemory: () => Promise.resolve([memoryResult]),
       syncGitHub: () => Promise.resolve(githubSyncResult),
       ...options.projectMemory,
@@ -315,6 +330,26 @@ async function buildTestServer(
 }
 
 describe('Gatekeeper local service', () => {
+  it('returns bounded recent commit evidence for the fixed local repository', async () => {
+    const recentCommitRecords = vi.fn(() => Promise.resolve(recentCommits));
+    const server = await buildTestServer({ projectMemory: { recentCommits: recentCommitRecords } });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/v1/memory/commits',
+      headers,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(recentCommitEvidenceResponseSchema.parse(response.json())).toEqual({
+      schemaVersion: 1,
+      commits: recentCommits,
+    });
+    expect(recentCommitRecords).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
   it('reviews one strict immutable commit through the authenticated local API', async () => {
     const reviewCommit = vi.fn(() => Promise.resolve(commitReviewResponse));
     const server = await buildTestServer({ reviewCommit });

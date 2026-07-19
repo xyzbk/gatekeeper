@@ -21,6 +21,8 @@ import {
   memorySearchInputSchema,
   memorySearchResponseJsonSchema,
   memorySearchResponseSchema,
+  recentCommitEvidenceResponseJsonSchema,
+  recentCommitEvidenceResponseSchema,
   repositoryIdParamsJsonSchema,
   repositoryRecordJsonSchema,
   repositoryRecordSchema,
@@ -47,6 +49,7 @@ import {
   type GitHubSyncResult,
   type MemorySearchInput,
   type MemorySearchResult,
+  type RecentCommitEvidence,
   type RepositoryRecord,
   type PullRequestReviewInput,
   type ReviewCompletionInput,
@@ -104,6 +107,7 @@ export interface ProjectMemoryApi {
   getReview: (reviewId: string) => Promise<ReviewRunContract | null>;
   getReviewOperation: (reviewId: string) => Promise<ReviewOperationContract | null>;
   indexRepository: () => Promise<IndexResult>;
+  recentCommits: () => Promise<RecentCommitEvidence[]>;
   searchMemory: (input: MemorySearchInput) => Promise<MemorySearchResult[]>;
   syncGitHub: () => Promise<GitHubSyncResult>;
 }
@@ -206,6 +210,7 @@ export async function buildGatekeeperServer(
   server.addSchema(repositoryStatusJsonSchema);
   server.addSchema(memorySearchInputJsonSchema);
   server.addSchema(memorySearchResponseJsonSchema);
+  server.addSchema(recentCommitEvidenceResponseJsonSchema);
   server.addSchema(repositoryIdParamsJsonSchema);
   server.addSchema(reviewIdParamsJsonSchema);
 
@@ -605,6 +610,27 @@ export async function buildGatekeeperServer(
         results: await options.projectMemory.searchMemory(input),
       });
     },
+  );
+
+  server.get(
+    '/v1/memory/commits',
+    {
+      schema: {
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:recent-commit-evidence-response-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async () =>
+      recentCommitEvidenceResponseSchema.parse({
+        schemaVersion: 1,
+        commits: await options.projectMemory.recentCommits(),
+      }),
   );
 
   server.get<{ Params: { reviewId: string } }>(

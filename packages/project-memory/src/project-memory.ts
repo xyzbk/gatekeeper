@@ -12,6 +12,7 @@ import {
   type IndexState,
   type MemorySearchInput,
   type MemorySearchResult,
+  type RecentCommitEvidence,
   type RepositoryRecord,
   type RepositorySnapshot,
   type ReviewOperationContract,
@@ -115,6 +116,7 @@ export interface ProjectMemoryPersistence {
   applyIndex(batch: ProjectMemoryIndexBatch): IndexResult;
   applyRemoteSync(batch: ProjectMemoryRemoteSyncBatch): GitHubSyncResult;
   getSyncCursor(repositoryId: string, provider: 'github'): string | null;
+  recentCommits(repositoryId: string): RecentCommitEvidence[];
   search(input: { repositoryId: string; query: string; limit?: number }): MemorySearchResult[];
   saveReview(review: ReviewRunContract): void;
   saveReviewOperation(operation: ReviewOperationContract): void;
@@ -156,6 +158,7 @@ export interface ProjectMemory {
   indexLocalRepository(input: LocalIndexInput): Promise<IndexResult>;
   indexRemoteDocuments(input: RemoteIndexInput): Promise<GitHubSyncResult>;
   getRemoteSyncCursor(repositoryId: string, provider: 'github'): Promise<string | null>;
+  recentCommits(repositoryId: string): Promise<RecentCommitEvidence[]>;
   search(input: MemorySearchInput): Promise<MemorySearchResult[]>;
   saveReview(review: ReviewRunContract): Promise<void>;
   saveReviewOperation(operation: ReviewOperationContract): Promise<void>;
@@ -721,6 +724,7 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
     getIndexState: (id) => Promise.resolve(options.persistence.getIndexState(id)),
     getRemoteSyncCursor: (id, provider) =>
       Promise.resolve(options.persistence.getSyncCursor(id, provider)),
+    recentCommits: (id) => Promise.resolve(options.persistence.recentCommits(id)),
     indexLocalRepository: async (input) => {
       const repository = options.persistence.getRepository(input.repositoryId);
       if (repository === null) {

@@ -358,6 +358,7 @@ export async function startGatekeeperService(
             ignorePatterns: loadedPolicy.policy.paths?.ignore ?? [],
           });
         },
+        recentCommits: () => memory.recentCommits(registeredRepository.repositoryId),
         searchMemory: (input: MemorySearchInput) => memory.search(input),
         syncGitHub,
       },

@@ -34,3 +34,10 @@ Historical reviews compare a selected full commit object ID with its first paren
 - GREEN: the loopback API exposes `POST /v1/reviews/commit` and `/v1/reviews/commit/start` with the same strict schema. The dashboard operation uses only `evaluating_change` and `persisting_review`, carries `historySync: null`, and uses the existing durable operation/read/detail paths.
 - GREEN: CLI startup forwards the same local callback into the service. Test-only direct service compositions may omit that callback; their commit endpoint fails through the existing bounded local-review error path rather than silently reviewing another target.
 - Verification: 3 focused test files / 44 tests passed; CLI and server TypeScript project builds passed; Prettier and `git diff --check` passed.
+
+## Task 4 — recent commit evidence
+
+- RED: storage and Project Memory tests failed because neither the SQLite store nor the memory facade exposed recent commits. The authenticated `GET /v1/memory/commits` test then returned `404` because the local service route was absent.
+- GREEN: one prepared SQLite query against the existing `commits` table orders by authored time and SHA, limits results to ten, and returns only SHA/date/title. No table, migration, cursor, cache, commit body, or raw diff was added.
+- GREEN: Project Memory and the fixed-repository loopback API return the same strict bounded response. The API is bearer-protected by the existing `/v1` hook and accepts no query parameters.
+- Verification: 3 focused test files / 67 tests passed; store, Project Memory, and server TypeScript project builds passed; Prettier and `git diff --check` passed.

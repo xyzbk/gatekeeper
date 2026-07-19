@@ -8,6 +8,7 @@ import {
   indexStateSchema,
   memorySearchInputSchema,
   memorySearchResultSchema,
+  recentCommitEvidenceSchema,
   repositoryRecordSchema,
   reviewOperationSchema,
   reviewRunSchema,
@@ -16,6 +17,7 @@ import {
   type GitHubHistoryFailure,
   type GitHubSyncResult,
   type MemorySearchResult,
+  type RecentCommitEvidence,
   type RepositoryRecord,
   type ReviewOperationContract,
   type ReviewRunContract,
@@ -373,6 +375,19 @@ export class SqliteProjectStore {
       )
       .get(repositoryId);
     return row === undefined ? null : indexStateSchema.parse({ schemaVersion: 1, ...row });
+  }
+
+  public recentCommits(repositoryId: string): RecentCommitEvidence[] {
+    return this.#database
+      .prepare<unknown[], Pick<CommitRow, 'sha' | 'authoredAt' | 'title'>>(
+        `SELECT sha, authored_at AS authoredAt, title
+         FROM commits
+         WHERE repository_id = ?
+         ORDER BY authored_at DESC, sha DESC
+         LIMIT 10`,
+      )
+      .all(repositoryId)
+      .map((row) => recentCommitEvidenceSchema.parse(row));
   }
 
   public applyIndex(batch: SqliteIndexBatch): IndexResult {

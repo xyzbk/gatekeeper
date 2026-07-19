@@ -110,6 +110,37 @@ describe('SQLite Project Memory store', () => {
     );
   });
 
+  it('returns at most ten newest commit records for one repository', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root,
+      normalizedRoot: root,
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const commits = Array.from({ length: 12 }, (_, index) => ({
+      sha: index.toString(16).repeat(40),
+      authoredAt: `2026-07-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+      title: `Commit ${index + 1}`,
+      message: `Bounded message ${index + 1}`,
+    }));
+    store.applyIndex(createBatch({ commits }));
+
+    expect(store.recentCommits('repository_fixture')).toEqual(
+      commits
+        .slice(2)
+        .reverse()
+        .map(({ sha, authoredAt, title }) => ({ sha, authoredAt, title })),
+    );
+    expect(store.recentCommits('repository_other')).toEqual([]);
+  });
+
   it('upserts remote documents and ordered links without deleting local memory', async () => {
     const root = await temporaryRoot();
     const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
