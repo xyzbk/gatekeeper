@@ -36,8 +36,8 @@ createRoot(rootElement).render(
         <DashboardApp
           getReview={reviewClient.getReview}
           loadStatus={statusClient.getStatus}
-          reviewWorktree={reviewClient.reviewWorktree}
-          reviewPullRequest={reviewClient.reviewPullRequest}
+          startWorktreeReview={reviewClient.startWorktreeReview}
+          startPullRequestReview={reviewClient.startPullRequestReview}
           searchMemory={memoryClient.search}
         />
       </BrowserRouter>

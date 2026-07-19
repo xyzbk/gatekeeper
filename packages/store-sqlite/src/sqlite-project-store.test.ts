@@ -692,6 +692,7 @@ describe('SQLite Project Memory store', () => {
       stage: 'completed',
       review,
       previousReview: null,
+      historySync: null,
       evidenceTimeline: [],
       updatedAt: review.createdAt,
     });

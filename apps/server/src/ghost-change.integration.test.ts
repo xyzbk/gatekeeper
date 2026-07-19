@@ -163,6 +163,10 @@ describe('Ghost Change service integration', () => {
       };
       const firstResult = await startReview();
       expect(firstResult.review.verdict).toBe('ESCALATE');
+      expect(firstResult.historySync).toMatchObject({
+        partial: true,
+        documents: { written: 9 },
+      });
       expect(firstResult.previousReview).toBeNull();
       expect(firstResult.evidenceTimeline.map(({ role }) => role)).toEqual([
         'proposal',

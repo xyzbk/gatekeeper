@@ -74,6 +74,25 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - The first root lint run for this slice caught one stale test-only `ReviewId` import left after switching the Ghost runner to the service-preallocated ID. It was removed before verification.
 - Fresh root gate: lint and typecheck passed; 39 files and 256 tests passed; the production dashboard build completed.
 
+### Dashboard remediation loop
+
+- RED: 3 of 4 focused client tests failed because the dashboard client had no start methods and parsed queued operations as invalid ReviewRuns.
+- GREEN: the client starts one worktree or pull-request operation, performs no duplicate repository/GitHub-sync request, forwards abort signals, and parses the shared lookup union.
+- RED: the first inspector test could not resolve the new visual owner; after the component existed, focused assertions exposed split comparison text and clipboard test setup rather than product failures. Both tests were corrected to exercise semantic output and the browser clipboard boundary accurately.
+- RED: the legacy detail route treated queued and failed operation objects as completed reviews and crashed while reading missing metrics.
+- GREEN: the detail route now narrows queued, running, failed, completed, and legacy ReviewRun branches; only queued/running branches poll, and completed or failed branches stop automatically.
+- GREEN: 37 dashboard tests cover immediate deep-link navigation, real stages, offline and persisted failures, all verdicts and authorities, semantic timeline order, safe external/internal links, native excerpts, plain-text hostile HTML, partial history, grouped remediation, clipboard success/failure, re-review, stable comparison, legacy routes, and URL-driven memory search.
+
+### Findings and corrections
+
+- The old pull-request client synchronized history and then called the synchronous review route. The new start endpoint already owns that sequence, so the dashboard now makes exactly one authenticated start request and cannot accidentally duplicate GitHub synchronization.
+- Completed pull-request operations retain the existing bounded `GitHubSyncResult` as nullable `historySync`. This preserves truthful partial-history UI without adding a dashboard request, sync store, or new endpoint; worktree and legacy operations use `null`.
+- One attempted test-suite compression inserted malformed patch text into the test helper. Direct inspection caught it before a test or commit; the test file was recreated cleanly and no product code was affected.
+- The fresh Web Interface Guidelines audit found two existing `:focus` selectors on the changed surface, a missing search `autocomplete`, and a vague placeholder without an ellipsis. They now use `:focus-visible`, `autocomplete="off"`, and an example placeholder; stable IDs and paths also opt out of translation.
+- Impeccable static detection, including GPT-specific provider tells, returned zero findings for the dashboard source and HTML entry point.
+- The inspector preserves the approved OpenAI/Codex-inspired graphite tokens and IBM Plex Sans. New sections use one restrained hierarchy, semantic boundaries, one timeline rail, and no charts, gradients, icon pack, animation library, nested dashboard cards, or invented metrics.
+- Fresh root gate: lint, typecheck, formatting, and diff checks passed; 41 files and 253 tests passed; the production dashboard build completed. The verified slice removes 254 more lines than it adds while replacing the synchronous dashboard path with the persisted remediation loop.
+
 ## Scope ledger
 
 Deferred by the Phase 6 stop gate: settings, policy editors, collaboration, analytics, user accounts, remote hosting, permanent decision writes, decorative charts, and Phase 7 packaging/submission work.

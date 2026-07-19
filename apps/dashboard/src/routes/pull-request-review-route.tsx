@@ -1,60 +1,31 @@
 import type { FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import type { ReviewClient } from '../api/review-client.js';
 import styles from '../styles/dashboard.module.css';
-import { ReviewResult } from './review-route.js';
 
 export function PullRequestReviewRoute({
-  reviewPullRequest,
+  startPullRequestReview,
 }: {
-  reviewPullRequest: ReviewClient['reviewPullRequest'];
+  startPullRequestReview: ReviewClient['startPullRequestReview'];
 }) {
-  const reviewMutation = useMutation({
-    mutationFn: (pullRequestNumber: number) => reviewPullRequest(pullRequestNumber),
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialNumber = searchParams.get('number') ?? '';
+  const review = useMutation({
+    mutationFn: (pullRequestNumber: number) => startPullRequestReview(pullRequestNumber),
+    onSuccess: (operation) => navigate(`/reviews/${operation.reviewId}`),
   });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get('pullRequestNumber');
     const pullRequestNumber = typeof value === 'string' ? Number(value) : Number.NaN;
-    if (!Number.isSafeInteger(pullRequestNumber) || pullRequestNumber <= 0) {
-      return;
+    if (Number.isSafeInteger(pullRequestNumber) && pullRequestNumber > 0) {
+      review.mutate(pullRequestNumber);
     }
-    reviewMutation.mutate(pullRequestNumber);
   };
-
-  if (reviewMutation.isSuccess) {
-    return (
-      <ReviewResult
-        action={
-          <div className={styles.reviewActions}>
-            <Link
-              className={styles.secondaryButton}
-              to={`/reviews/${reviewMutation.data.review.reviewId}`}
-            >
-              Open stored review
-            </Link>
-            <button
-              className={styles.secondaryButton}
-              onClick={() => reviewMutation.mutate(reviewMutation.variables)}
-              type="button"
-            >
-              Run again
-            </button>
-          </div>
-        }
-        context="Pull request review complete"
-        review={reviewMutation.data.review}
-        {...(reviewMutation.data.sync.partial
-          ? {
-              status: `History sync was partial: ${reviewMutation.data.sync.failures.length} remote record could not be normalized. Valid history remains available.`,
-            }
-          : {})}
-      />
-    );
-  }
 
   return (
     <section className={styles.reviewReady}>
@@ -71,6 +42,7 @@ export function PullRequestReviewRoute({
         <div>
           <input
             autoComplete="off"
+            defaultValue={initialNumber}
             id="pull-request-number"
             inputMode="numeric"
             min={1}
@@ -79,30 +51,28 @@ export function PullRequestReviewRoute({
             step={1}
             type="number"
           />
-          <button
-            className={styles.primaryButton}
-            disabled={reviewMutation.isPending}
-            type="submit"
-          >
-            {reviewMutation.isPending ? 'Review in progress' : 'Sync & review pull request'}
+          <button className={styles.primaryButton} disabled={review.isPending} type="submit">
+            {review.isPending ? 'Starting review' : 'Review pull request'}
           </button>
         </div>
       </form>
-      {reviewMutation.isPending ? (
-        <div aria-label="Reviewing pull request…" className={styles.reviewProgress} role="status">
-          <div className={`${styles.skeleton} ${styles.reviewSkeletonTitle}`} />
-          <div className={`${styles.skeleton} ${styles.reviewSkeletonLine}`} />
-          <div className={`${styles.skeleton} ${styles.reviewSkeletonPanel}`} />
-          <span>Synchronizing bounded history and reviewing the pull request…</span>
-        </div>
+      {review.isPending ? (
+        <p className={styles.reviewNotice} role="status">
+          Creating a durable review and opening its progress route…
+        </p>
       ) : null}
-      {reviewMutation.isError ? (
+      {review.isError ? (
         <div className={styles.pullRequestError} role="alert">
-          <p>Gatekeeper could not complete the pull-request review.</p>
+          <p>Gatekeeper could not start the pull-request review.</p>
           <p>Confirm `gh` is installed and authenticated for the fixed repository, then retry.</p>
           <button
-            className={styles.primaryButton}
-            onClick={() => reviewMutation.mutate(reviewMutation.variables)}
+            className={styles.secondaryButton}
+            disabled={review.variables === undefined}
+            onClick={() => {
+              if (review.variables !== undefined) {
+                review.mutate(review.variables);
+              }
+            }}
             type="button"
           >
             Retry pull-request review

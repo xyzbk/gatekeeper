@@ -219,6 +219,7 @@ describe('review operation contracts', () => {
         stage: 'completed',
         review,
         previousReview: null,
+        historySync: null,
         evidenceTimeline: [
           evidenceTimelineItemSchema.parse({
             role: 'decision',
@@ -241,6 +242,7 @@ describe('review operation contracts', () => {
         status: 'completed',
         review,
         previousReview: null,
+        historySync: null,
         evidenceTimeline: [expect.objectContaining({ role: 'decision' })],
       }),
     );
@@ -305,6 +307,7 @@ describe('review operation contracts', () => {
         stage: 'completed',
         review,
         previousReview: null,
+        historySync: null,
         evidenceTimeline: [],
         unexpected: true,
       }),
@@ -358,6 +361,7 @@ describe('review operation contracts', () => {
       stage: 'completed',
       review,
       previousReview,
+      historySync: null,
       evidenceTimeline: [
         {
           role: 'implementation',

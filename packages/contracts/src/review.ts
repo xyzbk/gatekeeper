@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 
 import { changedFileSummarySchema } from './change.js';
+import { githubSyncResultSchema } from './github.js';
 
 const identifierSchema = z.string().trim().min(1);
 
@@ -190,6 +191,7 @@ export const reviewOperationSchema = z
         stage: z.literal('completed'),
         review: reviewRunSchema,
         previousReview: reviewRunSchema.nullable(),
+        historySync: githubSyncResultSchema.nullable().default(null),
         evidenceTimeline: z.array(evidenceTimelineItemSchema).max(50),
       })
       .strict(),

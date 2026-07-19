@@ -53,7 +53,7 @@ After `pnpm build`, trusted Codex projects discover the local server through `.c
 - `apps/cli`: offline Doctor, policy validation, Project Memory/GitHub sync commands, worktree/PR review, and the foreground `start [path]` lifecycle.
 - `apps/server`: loopback-only Fastify service with secure bootstrap and fixed-repository review, GitHub, and memory APIs.
 - `apps/mcp-server`: protocol-clean stdio adapter exposing seven strict fixed-repository tools to Codex.
-- `apps/dashboard`: authenticated React/Vite repository overview, worktree/PR Review Inspector, persisted review routes, and Project Memory search.
+- `apps/dashboard`: authenticated React/Vite repository overview, pollable worktree/PR Review Inspector, evidence timeline, remediation and re-review comparison, persisted review routes, and Project Memory search.
 
 The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdict.schema.json), generated from the Zod contract and checked for drift by tests. The canonical policy example is [gatekeeper.policy.example.yaml](gatekeeper.policy.example.yaml).
 

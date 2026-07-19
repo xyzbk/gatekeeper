@@ -14,8 +14,8 @@ import styles from '../styles/dashboard.module.css';
 interface DashboardAppProps {
   getReview: ReviewClient['getReview'];
   loadStatus: StatusClient['getStatus'];
-  reviewWorktree: ReviewClient['reviewWorktree'];
-  reviewPullRequest: ReviewClient['reviewPullRequest'];
+  startWorktreeReview: ReviewClient['startWorktreeReview'];
+  startPullRequestReview: ReviewClient['startPullRequestReview'];
   searchMemory: MemoryClient['search'];
 }
 
@@ -33,8 +33,8 @@ function NotFoundRoute() {
 export function DashboardApp({
   getReview,
   loadStatus,
-  reviewWorktree,
-  reviewPullRequest,
+  startWorktreeReview,
+  startPullRequestReview,
   searchMemory,
 }: DashboardAppProps) {
   return (
@@ -42,12 +42,24 @@ export function DashboardApp({
       <Routes>
         <Route element={<OverviewRoute loadStatus={loadStatus} />} path="/" />
         <Route element={<MemoryRoute searchMemory={searchMemory} />} path="/memory" />
-        <Route element={<ReviewRoute reviewWorktree={reviewWorktree} />} path="/reviews/worktree" />
         <Route
-          element={<PullRequestReviewRoute reviewPullRequest={reviewPullRequest} />}
+          element={<ReviewRoute startWorktreeReview={startWorktreeReview} />}
+          path="/reviews/worktree"
+        />
+        <Route
+          element={<PullRequestReviewRoute startPullRequestReview={startPullRequestReview} />}
           path="/reviews/pull-request"
         />
-        <Route element={<ReviewDetailRoute getReview={getReview} />} path="/reviews/:reviewId" />
+        <Route
+          element={
+            <ReviewDetailRoute
+              getReview={getReview}
+              startPullRequestReview={startPullRequestReview}
+              startWorktreeReview={startWorktreeReview}
+            />
+          }
+          path="/reviews/:reviewId"
+        />
         <Route element={<NotFoundRoute />} path="*" />
       </Routes>
     </AppShell>

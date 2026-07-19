@@ -14,6 +14,7 @@ import {
   serviceMetadataSchema,
   statusResponseSchema,
   type GitHubRemote,
+  type GitHubSyncResult,
   type ReviewCompletionInput,
   type PullRequestRecord,
   type RepositorySnapshot,
@@ -228,7 +229,7 @@ export async function startGatekeeperService(
         setStage: (
           stage: 'syncing_history' | 'evaluating_change' | 'persisting_review',
         ) => Promise<void>,
-      ) => Promise<ReviewRunContract>,
+      ) => Promise<{ historySync: GitHubSyncResult | null; review: ReviewRunContract }>,
     ): Promise<ReviewOperationContract> => {
       const reviewId = createReviewId();
       const createdAt = new Date().toISOString();
@@ -259,7 +260,7 @@ export async function startGatekeeperService(
           );
         };
         try {
-          const review = await run(context, setStage);
+          const { historySync, review } = await run(context, setStage);
           if (
             review.reviewId !== reviewId ||
             review.repositoryId !== registeredRepository.repositoryId ||
@@ -270,6 +271,15 @@ export async function startGatekeeperService(
           }
           await setStage('persisting_review');
           await memory.saveReview(review);
+          if (historySync !== null) {
+            const completed = await memory.getReviewOperation(reviewId);
+            if (completed === null || completed.status !== 'completed') {
+              throw new Error('Review operation did not complete after persistence.');
+            }
+            await memory.saveReviewOperation(
+              reviewOperationSchema.parse({ ...completed, historySync }),
+            );
+          }
         } catch {
           await memory.saveReviewOperation(
             reviewOperationSchema.parse({
@@ -372,16 +382,19 @@ export async function startGatekeeperService(
         };
         return startReviewOperation(target, async (context, setStage) => {
           await setStage('syncing_history');
-          await syncGitHub();
+          const historySync = await syncGitHub();
           await setStage('evaluating_change');
-          return executePullRequestReview(pullRequestNumber, context);
+          return {
+            historySync,
+            review: await executePullRequestReview(pullRequestNumber, context),
+          };
         });
       },
       startWorktreeReview: () => {
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
         return startReviewOperation(target, async (context, setStage) => {
           await setStage('evaluating_change');
-          return options.reviewWorktree(context);
+          return { historySync: null, review: await options.reviewWorktree(context) };
         });
       },
       version: options.version,

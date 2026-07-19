@@ -966,6 +966,7 @@ export class SqliteProjectStore {
           stage: 'completed',
           review: parsed,
           previousReview: null,
+          historySync: null,
           evidenceTimeline: [],
           createdAt: operation.createdAt,
           updatedAt: parsed.createdAt,
