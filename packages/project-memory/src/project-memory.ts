@@ -13,6 +13,7 @@ import {
   type MemorySearchResult,
   type RepositoryRecord,
   type RepositorySnapshot,
+  type ReviewOperationContract,
   type ReviewRunContract,
   type TrackedFileRecord,
 } from '@gatekeeper/contracts';
@@ -114,7 +115,10 @@ export interface ProjectMemoryPersistence {
   getSyncCursor(repositoryId: string, provider: 'github'): string | null;
   search(input: { repositoryId: string; query: string; limit?: number }): MemorySearchResult[];
   saveReview(review: ReviewRunContract): void;
+  saveReviewOperation(operation: ReviewOperationContract): void;
   getReview(reviewId: string): ReviewRunContract | null;
+  getReviewOperation(reviewId: string): ReviewOperationContract | null;
+  failInterruptedReviewOperations(updatedAt: string): number;
   latestReviewId(repositoryId: string, target: ReviewRunContract['target']): string | null;
 }
 
@@ -152,7 +156,10 @@ export interface ProjectMemory {
   getRemoteSyncCursor(repositoryId: string, provider: 'github'): Promise<string | null>;
   search(input: MemorySearchInput): Promise<MemorySearchResult[]>;
   saveReview(review: ReviewRunContract): Promise<void>;
+  saveReviewOperation(operation: ReviewOperationContract): Promise<void>;
   getReview(reviewId: string): Promise<ReviewRunContract | null>;
+  getReviewOperation(reviewId: string): Promise<ReviewOperationContract | null>;
+  failInterruptedReviewOperations(updatedAt: string): Promise<number>;
   latestReviewId(repositoryId: string, target: ReviewRunContract['target']): Promise<string | null>;
 }
 
@@ -657,7 +664,15 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
       options.persistence.saveReview(review);
       return Promise.resolve();
     },
+    saveReviewOperation: (operation) => {
+      options.persistence.saveReviewOperation(operation);
+      return Promise.resolve();
+    },
     getReview: (reviewId) => Promise.resolve(options.persistence.getReview(reviewId)),
+    getReviewOperation: (reviewId) =>
+      Promise.resolve(options.persistence.getReviewOperation(reviewId)),
+    failInterruptedReviewOperations: (updatedAt) =>
+      Promise.resolve(options.persistence.failInterruptedReviewOperations(updatedAt)),
     latestReviewId: (repository, target) =>
       Promise.resolve(options.persistence.latestReviewId(repository, target)),
   };

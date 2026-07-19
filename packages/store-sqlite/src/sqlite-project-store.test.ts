@@ -103,6 +103,7 @@ describe('SQLite Project Memory store', () => {
         'findings',
         'index_state',
         'repositories',
+        'review_operations',
         'review_runs',
         'sync_cursors',
       ]),
@@ -637,6 +638,162 @@ describe('SQLite Project Memory store', () => {
     reopened.migrate();
     expect(reopened.getReview(review.reviewId)).toEqual(review);
     reopened.close();
+  });
+
+  it('persists review operation progress and completes it with the review transaction', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    const queued = {
+      schemaVersion: 1 as const,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      status: 'queued' as const,
+      stage: 'queued' as const,
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    };
+
+    store.saveReviewOperation(queued);
+    expect(store.getReviewOperation(review.reviewId)).toEqual(queued);
+
+    const running = {
+      ...queued,
+      status: 'running' as const,
+      stage: 'evaluating_change' as const,
+      updatedAt: '2026-07-18T18:01:00.000Z',
+    };
+    store.saveReviewOperation(running);
+    expect(store.getReviewOperation(review.reviewId)).toEqual(running);
+
+    store.saveReview(review);
+    expect(store.getReviewOperation(review.reviewId)).toEqual({
+      ...running,
+      status: 'completed',
+      stage: 'completed',
+      review,
+      updatedAt: review.createdAt,
+    });
+
+    store.close();
+    const reopened = openStore({ databasePath });
+    reopened.migrate();
+    expect(reopened.getReviewOperation(review.reviewId)).toEqual(
+      expect.objectContaining({ status: 'completed', review }),
+    );
+  });
+
+  it('fails interrupted operations safely and protects operation ownership', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    const registration = {
+      schemaVersion: 1 as const,
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    };
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+    });
+    store.registerRepository({
+      ...registration,
+      repositoryId: 'repository_other',
+      root: 'D:/work/other',
+      normalizedRoot: 'd:/work/other',
+    });
+    const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    const queued = {
+      schemaVersion: 1 as const,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      status: 'queued' as const,
+      stage: 'queued' as const,
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    };
+    store.saveReviewOperation(queued);
+
+    expect(() =>
+      store.saveReviewOperation({ ...queued, repositoryId: 'repository_other' }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'REVIEW_OPERATION_WRITE_FAILED',
+        message: 'Project Memory could not persist the review operation.',
+      }),
+    );
+    expect(store.failInterruptedReviewOperations('2026-07-18T19:00:00.000Z')).toBe(1);
+    expect(store.getReviewOperation(review.reviewId)).toEqual(
+      expect.objectContaining({
+        repositoryId: 'repository_fixture',
+        status: 'failed',
+        stage: 'failed',
+        error: {
+          code: 'REVIEW_FAILED',
+          message: 'The review was interrupted when the local service stopped.',
+          repair: 'Start a new review from the dashboard.',
+        },
+      }),
+    );
+  });
+
+  it('fails closed when persisted review operation JSON is corrupt', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    store.saveReviewOperation({
+      schemaVersion: 1,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      status: 'queued',
+      stage: 'queued',
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    });
+    store.close();
+
+    const database = new Database(databasePath);
+    database
+      .prepare('update review_operations set operation_json = ? where review_id = ?')
+      .run('{', review.reviewId);
+    database.close();
+
+    const reopened = openStore({ databasePath });
+    reopened.migrate();
+    expect(() => reopened.getReviewOperation(review.reviewId)).toThrowError(
+      'The stored review operation is corrupt and cannot be read safely.',
+    );
   });
 
   it('rolls back and sanitizes a failed review transaction', async () => {

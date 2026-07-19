@@ -13,6 +13,7 @@ import {
   type SqliteIndexBatch,
   type SqliteProjectStore,
 } from '@gatekeeper/store-sqlite';
+import { createReviewRunFixture } from '@gatekeeper/testkit';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -49,7 +50,11 @@ function recordingPersistence(
     getSyncCursor: (repositoryId, provider) => store.getSyncCursor(repositoryId, provider),
     search: (input) => store.search(input),
     saveReview: (review) => store.saveReview(review),
+    saveReviewOperation: (operation) => store.saveReviewOperation(operation),
     getReview: (reviewId) => store.getReview(reviewId),
+    getReviewOperation: (reviewId) => store.getReviewOperation(reviewId),
+    failInterruptedReviewOperations: (updatedAt) =>
+      store.failInterruptedReviewOperations(updatedAt),
     latestReviewId: (repositoryId, target) => store.latestReviewId(repositoryId, target),
   };
 }
@@ -495,5 +500,34 @@ describe('Project Memory', () => {
       }),
     ).not.toHaveLength(0);
     store.close();
+  });
+
+  it('forwards persisted review operation lifecycle without changing review behavior', async () => {
+    const root = await temporaryRoot();
+    const state = fakeGit(root);
+    const store = openStore(join(root, 'memory.db'));
+    const memory = memoryWith(state, store);
+    await memory.migrate();
+    const repository = await memory.registerRepository({ root, remote: state.snapshot.remote });
+    const review = { ...createReviewRunFixture(), repositoryId: repository.repositoryId };
+    const operation = {
+      schemaVersion: 1 as const,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      status: 'queued' as const,
+      stage: 'queued' as const,
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    };
+
+    await memory.saveReviewOperation(operation);
+    await expect(memory.getReviewOperation(review.reviewId)).resolves.toEqual(operation);
+    await expect(memory.failInterruptedReviewOperations('2026-07-18T19:00:00.000Z')).resolves.toBe(
+      1,
+    );
+    await expect(memory.getReviewOperation(review.reviewId)).resolves.toEqual(
+      expect.objectContaining({ status: 'failed', stage: 'failed' }),
+    );
   });
 });

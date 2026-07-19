@@ -175,3 +175,89 @@ describe('review completion contracts', () => {
     expect(draft.previousReviewId).toBe('review_previous');
   });
 });
+
+describe('review operation contracts', () => {
+  it('accepts strict queued, running, failed, and completed operation states', async () => {
+    const [{ reviewOperationSchema }, { createReviewRunFixture }] = await Promise.all([
+      import('./review.js'),
+      import('@gatekeeper/testkit'),
+    ]);
+    const review = createReviewRunFixture();
+    const base = {
+      schemaVersion: 1 as const,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    };
+
+    expect(reviewOperationSchema.parse({ ...base, status: 'queued', stage: 'queued' })).toEqual(
+      expect.objectContaining({ status: 'queued', stage: 'queued' }),
+    );
+    expect(
+      reviewOperationSchema.parse({
+        ...base,
+        status: 'running',
+        stage: 'evaluating_change',
+      }),
+    ).toEqual(expect.objectContaining({ status: 'running', stage: 'evaluating_change' }));
+    expect(
+      reviewOperationSchema.parse({
+        ...base,
+        status: 'failed',
+        stage: 'failed',
+        error: {
+          code: 'REVIEW_FAILED',
+          message: 'The review did not complete.',
+          repair: 'Confirm the repository is accessible, then retry.',
+        },
+      }),
+    ).toEqual(expect.objectContaining({ status: 'failed', stage: 'failed' }));
+    expect(
+      reviewOperationSchema.parse({
+        ...base,
+        status: 'completed',
+        stage: 'completed',
+        review,
+      }),
+    ).toEqual(expect.objectContaining({ status: 'completed', review }));
+  });
+
+  it('rejects mismatched branches, oversized failure copy, and unknown fields', async () => {
+    const [{ reviewOperationSchema }, { createReviewRunFixture }] = await Promise.all([
+      import('./review.js'),
+      import('@gatekeeper/testkit'),
+    ]);
+    const review = createReviewRunFixture();
+    const base = {
+      schemaVersion: 1,
+      reviewId: review.reviewId,
+      repositoryId: review.repositoryId,
+      target: review.target,
+      createdAt: review.createdAt,
+      updatedAt: review.createdAt,
+    };
+
+    expect(() =>
+      reviewOperationSchema.parse({ ...base, status: 'queued', stage: 'completed' }),
+    ).toThrow();
+    expect(() =>
+      reviewOperationSchema.parse({
+        ...base,
+        status: 'failed',
+        stage: 'failed',
+        error: { code: 'REVIEW_FAILED', message: 'x'.repeat(301) },
+      }),
+    ).toThrow();
+    expect(() =>
+      reviewOperationSchema.parse({
+        ...base,
+        status: 'completed',
+        stage: 'completed',
+        review,
+        unexpected: true,
+      }),
+    ).toThrow();
+  });
+});

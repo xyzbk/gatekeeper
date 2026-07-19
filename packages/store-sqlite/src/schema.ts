@@ -158,6 +158,22 @@ export const reviewRuns = sqliteTable(
   ],
 );
 
+export const reviewOperations = sqliteTable(
+  'review_operations',
+  {
+    reviewId: text('review_id').primaryKey(),
+    repositoryId: text('repository_id')
+      .notNull()
+      .references(() => repositories.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    operationJson: text('operation_json').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('review_operations_repository_status_idx').on(table.repositoryId, table.status),
+  ],
+);
+
 export const findings = sqliteTable(
   'findings',
   {

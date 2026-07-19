@@ -106,6 +106,70 @@ export const reviewRunSchema = z
   })
   .strict();
 
+const reviewOperationBaseShape = {
+  schemaVersion: z.literal(1),
+  reviewId: identifierSchema,
+  repositoryId: identifierSchema,
+  target: reviewTargetSchema,
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+};
+
+export const reviewOperationSchema = z
+  .discriminatedUnion('status', [
+    z
+      .object({
+        ...reviewOperationBaseShape,
+        status: z.literal('queued'),
+        stage: z.literal('queued'),
+      })
+      .strict(),
+    z
+      .object({
+        ...reviewOperationBaseShape,
+        status: z.literal('running'),
+        stage: z.enum(['syncing_history', 'evaluating_change', 'persisting_review']),
+      })
+      .strict(),
+    z
+      .object({
+        ...reviewOperationBaseShape,
+        status: z.literal('failed'),
+        stage: z.literal('failed'),
+        error: z
+          .object({
+            code: z.literal('REVIEW_FAILED'),
+            message: z.string().trim().min(1).max(300),
+            repair: z.string().trim().min(1).max(500).optional(),
+          })
+          .strict(),
+      })
+      .strict(),
+    z
+      .object({
+        ...reviewOperationBaseShape,
+        status: z.literal('completed'),
+        stage: z.literal('completed'),
+        review: reviewRunSchema,
+      })
+      .strict(),
+  ])
+  .superRefine((operation, context) => {
+    if (
+      operation.status === 'completed' &&
+      (operation.review.reviewId !== operation.reviewId ||
+        operation.review.repositoryId !== operation.repositoryId ||
+        operation.review.target.kind !== operation.target.kind ||
+        operation.review.target.display !== operation.target.display)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Completed operation identity must match its review.',
+        path: ['review'],
+      });
+    }
+  });
+
 export const reviewCompletionFindingSchema = findingSchema
   .omit({ enforcement: true, policyId: true })
   .extend({
@@ -168,7 +232,13 @@ export const reviewCompletionInputJsonSchema = {
   ...z.toJSONSchema(reviewCompletionInputSchema, { target: 'draft-7' }),
 };
 
+export const reviewOperationApiJsonSchema = {
+  $id: 'gatekeeper:review-operation-v1',
+  ...z.toJSONSchema(reviewOperationSchema, { target: 'draft-7' }),
+};
+
 export type ReviewRunContract = z.infer<typeof reviewRunSchema>;
 export type ReviewDraftContract = z.infer<typeof reviewDraftSchema>;
 export type ReviewCompletionFinding = z.infer<typeof reviewCompletionFindingSchema>;
 export type ReviewCompletionInput = z.infer<typeof reviewCompletionInputSchema>;
+export type ReviewOperationContract = z.infer<typeof reviewOperationSchema>;

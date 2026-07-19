@@ -15,6 +15,13 @@
       "when": 1784427600000,
       "tag": "0001_github_history",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784437200000,
+      "tag": "0002_review_operations",
+      "breakpoints": true
     }
   ]
 }

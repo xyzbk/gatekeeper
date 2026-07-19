@@ -9,6 +9,7 @@ import {
   memorySearchInputSchema,
   memorySearchResultSchema,
   repositoryRecordSchema,
+  reviewOperationSchema,
   reviewRunSchema,
   type IndexResult,
   type IndexState,
@@ -16,6 +17,7 @@ import {
   type GitHubSyncResult,
   type MemorySearchResult,
   type RepositoryRecord,
+  type ReviewOperationContract,
   type ReviewRunContract,
 } from '@gatekeeper/contracts';
 import Database from 'better-sqlite3';
@@ -33,6 +35,7 @@ export type SqliteProjectStoreErrorCode =
   | 'INVALID_REMOTE_BATCH'
   | 'INDEX_WRITE_FAILED'
   | 'MIGRATION_FAILED'
+  | 'REVIEW_OPERATION_WRITE_FAILED'
   | 'REVIEW_WRITE_FAILED'
   | 'REMOTE_SYNC_WRITE_FAILED'
   | 'REPOSITORY_CONFLICT';
@@ -939,6 +942,45 @@ export class SqliteProjectStore {
             .run(parsed.reviewId, finding.id, position, JSON.stringify(evidence));
         }
       }
+      const operationRow = this.#database
+        .prepare<unknown[], { operationJson: string; repositoryId: string }>(
+          `SELECT repository_id AS repositoryId, operation_json AS operationJson
+           FROM review_operations WHERE review_id = ?`,
+        )
+        .get(parsed.reviewId);
+      if (operationRow !== undefined) {
+        const operation = reviewOperationSchema.parse(JSON.parse(operationRow.operationJson));
+        const completed = reviewOperationSchema.parse({
+          schemaVersion: 1,
+          reviewId: operation.reviewId,
+          repositoryId: operation.repositoryId,
+          target: operation.target,
+          status: 'completed',
+          stage: 'completed',
+          review: parsed,
+          createdAt: operation.createdAt,
+          updatedAt: parsed.createdAt,
+        });
+        const writeOperation = this.#database
+          .prepare(
+            `UPDATE review_operations
+             SET status = ?, operation_json = ?, updated_at = ?
+             WHERE review_id = ? AND repository_id = ?`,
+          )
+          .run(
+            completed.status,
+            JSON.stringify(completed),
+            completed.updatedAt,
+            completed.reviewId,
+            parsed.repositoryId,
+          );
+        if (writeOperation.changes !== 1 || operationRow.repositoryId !== parsed.repositoryId) {
+          throw new SqliteProjectStoreError(
+            'REVIEW_WRITE_FAILED',
+            'Project Memory could not persist the review transaction.',
+          );
+        }
+      }
     });
     try {
       save.immediate();
@@ -949,6 +991,117 @@ export class SqliteProjectStore {
       throw new SqliteProjectStoreError(
         'REVIEW_WRITE_FAILED',
         'Project Memory could not persist the review transaction.',
+        { cause: error },
+      );
+    }
+  }
+
+  public saveReviewOperation(operation: ReviewOperationContract): void {
+    const parsed = reviewOperationSchema.parse(operation);
+    try {
+      const write = this.#database
+        .prepare(
+          `INSERT INTO review_operations (
+             review_id, repository_id, status, operation_json, updated_at
+           ) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(review_id) DO UPDATE SET
+             status = excluded.status,
+             operation_json = excluded.operation_json,
+             updated_at = excluded.updated_at
+           WHERE review_operations.repository_id = excluded.repository_id`,
+        )
+        .run(
+          parsed.reviewId,
+          parsed.repositoryId,
+          parsed.status,
+          JSON.stringify(parsed),
+          parsed.updatedAt,
+        );
+      if (write.changes !== 1) {
+        throw new SqliteProjectStoreError(
+          'REVIEW_OPERATION_WRITE_FAILED',
+          'Project Memory could not persist the review operation.',
+        );
+      }
+    } catch (error) {
+      if (error instanceof SqliteProjectStoreError) {
+        throw error;
+      }
+      throw new SqliteProjectStoreError(
+        'REVIEW_OPERATION_WRITE_FAILED',
+        'Project Memory could not persist the review operation.',
+        { cause: error },
+      );
+    }
+  }
+
+  public getReviewOperation(reviewId: string): ReviewOperationContract | null {
+    const row = this.#database
+      .prepare<unknown[], { operationJson: string }>(
+        'SELECT operation_json AS operationJson FROM review_operations WHERE review_id = ?',
+      )
+      .get(reviewId);
+    if (row === undefined) {
+      return null;
+    }
+    try {
+      return reviewOperationSchema.parse(JSON.parse(row.operationJson));
+    } catch (error) {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'The stored review operation is corrupt and cannot be read safely.',
+        { cause: error },
+      );
+    }
+  }
+
+  public failInterruptedReviewOperations(updatedAt: string): number {
+    const fail = this.#database.transaction(() => {
+      const rows = this.#database
+        .prepare<unknown[], { operationJson: string }>(
+          `SELECT operation_json AS operationJson FROM review_operations
+           WHERE status IN ('queued', 'running')`,
+        )
+        .all();
+      for (const row of rows) {
+        const operation = reviewOperationSchema.parse(JSON.parse(row.operationJson));
+        const failed = reviewOperationSchema.parse({
+          schemaVersion: 1,
+          reviewId: operation.reviewId,
+          repositoryId: operation.repositoryId,
+          target: operation.target,
+          status: 'failed',
+          stage: 'failed',
+          error: {
+            code: 'REVIEW_FAILED',
+            message: 'The review was interrupted when the local service stopped.',
+            repair: 'Start a new review from the dashboard.',
+          },
+          createdAt: operation.createdAt,
+          updatedAt,
+        });
+        this.#database
+          .prepare(
+            `UPDATE review_operations
+             SET status = ?, operation_json = ?, updated_at = ?
+             WHERE review_id = ? AND repository_id = ?`,
+          )
+          .run(
+            failed.status,
+            JSON.stringify(failed),
+            failed.updatedAt,
+            failed.reviewId,
+            failed.repositoryId,
+          );
+      }
+      return rows.length;
+    });
+    try {
+      return fail.immediate();
+    } catch (error) {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Stored review operation state is corrupt and cannot be recovered safely.',
         { cause: error },
       );
     }
