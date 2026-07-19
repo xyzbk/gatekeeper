@@ -79,6 +79,13 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Local index batches manage only local source types; they cannot delete GitHub evidence. Ordered remote relationships resolve only within the registered repository.
 - The demo seeder is outside the production adapter and defaults to a zero-request dry-run. Its explicit apply executor validates one exact target, preflights fixed branch names, acts only on stable scenario markers, uses executable-plus-argument arrays, and has no merge, delete, reset, or unrelated-object update operation. No live apply is part of automated acceptance.
 
+## Foundation hardening controls
+
+- One machine-local owner lock permits only one foreground Gatekeeper service. A live owner cannot have its metadata removed by a second start attempt; an abandoned lock is reclaimed only after its recorded process is absent.
+- Project Memory remains tied to the configured root and normalized remote. A changed remote fails closed rather than reusing or mixing a prior project's memory, while status reads live Git state for freshness.
+- Dashboard-started reviews admit one active local operation at a time. Shutdown stops new starts, records each active operation as a bounded terminal failure when possible, and prevents a resumed old task from writing a review afterward.
+- If an operation's terminal write itself fails, the foreground service retains that bounded failure in memory so polling does not misleadingly remain queued or running. It is discarded only when the service stops; no source, diff, token, or exception content is exposed.
+
 ## Deferred boundaries
 
 Pull-request CLI, fixed-repository API, MCP, and dashboard composition are implemented. The dashboard creates external anchors only for parsed `https://github.com/...` evidence URLs and renders all other values as text. GitHub publication, checks, comments, labels, merges, closes, and Actions remain deferred.

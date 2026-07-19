@@ -75,6 +75,13 @@ const contentSecurityPolicy = [
   "object-src 'none'",
 ].join('; ');
 
+export class ReviewOperationUnavailableError extends Error {
+  constructor() {
+    super('A local Gatekeeper review is already running.');
+    this.name = 'ReviewOperationUnavailableError';
+  }
+}
+
 interface GatekeeperLoggerOptions {
   level: string;
   stream?: Writable;
@@ -234,6 +241,17 @@ export async function buildGatekeeperServer(
   });
 
   server.setErrorHandler((error, request, reply) => {
+    if (error instanceof ReviewOperationUnavailableError) {
+      return reply
+        .code(503)
+        .send(
+          createError(
+            'ENVIRONMENT_ERROR',
+            error.message,
+            'Wait for the current review to finish, then retry.',
+          ),
+        );
+    }
     if (
       error instanceof GitHubProviderError &&
       (error.code === 'AUTH_REQUIRED' ||
@@ -334,6 +352,7 @@ export async function buildGatekeeperServer(
           400: { $ref: 'gatekeeper:error-envelope#' },
           401: { $ref: 'gatekeeper:error-envelope#' },
           403: { $ref: 'gatekeeper:error-envelope#' },
+          503: { $ref: 'gatekeeper:error-envelope#' },
           500: { $ref: 'gatekeeper:error-envelope#' },
         },
       },
@@ -352,6 +371,7 @@ export async function buildGatekeeperServer(
           400: { $ref: 'gatekeeper:error-envelope#' },
           401: { $ref: 'gatekeeper:error-envelope#' },
           403: { $ref: 'gatekeeper:error-envelope#' },
+          503: { $ref: 'gatekeeper:error-envelope#' },
           500: { $ref: 'gatekeeper:error-envelope#' },
         },
       },

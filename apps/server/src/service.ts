@@ -42,7 +42,11 @@ import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
 
-import { buildGatekeeperServer, type BuildGatekeeperServerOptions } from './server.js';
+import {
+  buildGatekeeperServer,
+  ReviewOperationUnavailableError,
+  type BuildGatekeeperServerOptions,
+} from './server.js';
 
 export interface StartGatekeeperServiceOptions {
   bearerToken?: string;
@@ -219,6 +223,9 @@ export async function startGatekeeperService(
       remote: options.repository.remote,
     });
     await memory.failInterruptedReviewOperations(startedAt);
+    let acceptingReviewOperations = true;
+    const activeReviewOperations = new Map<ReviewId, ReviewOperationContract>();
+    const transientReviewOperations = new Map<string, ReviewOperationContract>();
     const createReviewId = () => `review_${randomUUID().replaceAll('-', '')}` as ReviewId;
     const createReviewContext = async (
       target: ReviewRunContract['target'],
@@ -252,6 +259,10 @@ export async function startGatekeeperService(
     const getComposedReviewOperation = async (
       reviewId: string,
     ): Promise<ReviewOperationContract | null> => {
+      const transientOperation = transientReviewOperations.get(reviewId);
+      if (transientOperation !== undefined) {
+        return transientOperation;
+      }
       const operation = await memory.getReviewOperation(reviewId);
       if (operation === null || operation.status !== 'completed') {
         return operation;
@@ -339,6 +350,9 @@ export async function startGatekeeperService(
         ) => Promise<void>,
       ) => Promise<{ historySync: GitHubSyncResult | null; review: ReviewRunContract }>,
     ): Promise<ReviewOperationContract> => {
+      if (!acceptingReviewOperations || activeReviewOperations.size > 0) {
+        throw new ReviewOperationUnavailableError();
+      }
       const reviewId = createReviewId();
       const createdAt = new Date().toISOString();
       const queued = reviewOperationSchema.parse({
@@ -351,24 +365,61 @@ export async function startGatekeeperService(
         createdAt,
         updatedAt: createdAt,
       });
-      await memory.saveReviewOperation(queued);
+      activeReviewOperations.set(reviewId, queued);
+      try {
+        await memory.saveReviewOperation(queued);
+      } catch (error) {
+        activeReviewOperations.delete(reviewId);
+        throw error;
+      }
+      if (!acceptingReviewOperations) {
+        activeReviewOperations.delete(reviewId);
+        throw new ReviewOperationUnavailableError();
+      }
+
+      const saveFailedOperation = async () => {
+        const failed = reviewOperationSchema.parse({
+          ...queued,
+          status: 'failed',
+          stage: 'failed',
+          error: {
+            code: 'REVIEW_FAILED',
+            message: 'Gatekeeper could not complete the local review.',
+            repair: 'Confirm the repository and local tools are ready, then retry.',
+          },
+          updatedAt: new Date().toISOString(),
+        });
+        transientReviewOperations.set(reviewId, failed);
+        try {
+          await memory.saveReviewOperation(failed);
+          transientReviewOperations.delete(reviewId);
+        } catch {
+          // The in-memory terminal record keeps the failure observable until this service stops.
+        }
+      };
 
       void (async () => {
-        const context = await createReviewContext(target, reviewId);
-        const setStage = async (
-          stage: 'syncing_history' | 'evaluating_change' | 'persisting_review',
-        ) => {
-          await memory.saveReviewOperation(
-            reviewOperationSchema.parse({
-              ...queued,
-              status: 'running',
-              stage,
-              updatedAt: new Date().toISOString(),
-            }),
-          );
-        };
         try {
+          const context = await createReviewContext(target, reviewId);
+          const setStage = async (
+            stage: 'syncing_history' | 'evaluating_change' | 'persisting_review',
+          ) => {
+            if (!acceptingReviewOperations) {
+              return;
+            }
+            await memory.saveReviewOperation(
+              reviewOperationSchema.parse({
+                ...queued,
+                status: 'running',
+                stage,
+                updatedAt: new Date().toISOString(),
+              }),
+            );
+          };
           const { historySync, review } = await run(context, setStage);
+          if (!acceptingReviewOperations) {
+            return;
+          }
           if (
             review.reviewId !== reviewId ||
             review.repositoryId !== registeredRepository.repositoryId ||
@@ -378,7 +429,13 @@ export async function startGatekeeperService(
             throw new Error('Review operation result identity does not match.');
           }
           await setStage('persisting_review');
+          if (!acceptingReviewOperations) {
+            return;
+          }
           await memory.saveReview(review);
+          if (!acceptingReviewOperations) {
+            return;
+          }
           if (historySync !== null) {
             const completed = await memory.getReviewOperation(reviewId);
             if (completed === null || completed.status !== 'completed') {
@@ -389,21 +446,13 @@ export async function startGatekeeperService(
             );
           }
         } catch {
-          await memory.saveReviewOperation(
-            reviewOperationSchema.parse({
-              ...queued,
-              status: 'failed',
-              stage: 'failed',
-              error: {
-                code: 'REVIEW_FAILED',
-                message: 'Gatekeeper could not complete the local review.',
-                repair: 'Confirm the repository and local tools are ready, then retry.',
-              },
-              updatedAt: new Date().toISOString(),
-            }),
-          );
+          if (acceptingReviewOperations) {
+            await saveFailedOperation();
+          }
+        } finally {
+          activeReviewOperations.delete(reviewId);
         }
-      })().catch(() => undefined);
+      })();
       return queued;
     };
     const prepareStoredReview = async (reviewId: string) => {
@@ -575,6 +624,29 @@ export async function startGatekeeperService(
       server: activeServer,
       status,
       close: async () => {
+        acceptingReviewOperations = false;
+        await Promise.all([...activeReviewOperations.keys()].map((reviewId) => {
+          const operation = activeReviewOperations.get(reviewId);
+          if (operation === undefined) {
+            return Promise.resolve();
+          }
+          const failed = reviewOperationSchema.parse({
+            ...operation,
+            status: 'failed',
+            stage: 'failed',
+            error: {
+              code: 'REVIEW_FAILED',
+              message: 'Gatekeeper stopped before the local review completed.',
+              repair: 'Start a new review from the dashboard.',
+            },
+            updatedAt: new Date().toISOString(),
+          });
+          transientReviewOperations.set(reviewId, failed);
+          return memory.saveReviewOperation(failed).then(
+            () => transientReviewOperations.delete(reviewId),
+            () => undefined,
+          );
+        }));
         try {
           await activeServer.close();
         } finally {

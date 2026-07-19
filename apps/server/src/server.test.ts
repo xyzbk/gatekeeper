@@ -25,6 +25,7 @@ import {
   statusResponseSchema,
 } from '@gatekeeper/contracts';
 import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
+import * as projectMemoryModule from '@gatekeeper/project-memory';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectMemoryApi } from './server.js';
@@ -1555,6 +1556,163 @@ describe('Gatekeeper local service', () => {
     }
   });
 
+  it('rejects a second review while a local operation is still running', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-operation-limit-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let releaseReview: (() => void) | undefined;
+    const holdReview = new Promise<void>((resolve) => {
+      releaseReview = resolve;
+    });
+    const reviewWorktree = async (context: PersistentReviewContext) => {
+      await holdReview;
+      return { ...reviewResponse, reviewId: context.reviewId, repositoryId: context.repositoryId };
+    };
+
+    let service: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
+    try {
+      service = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-19T20:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const first = await service.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree/start',
+        headers,
+        payload: {},
+      });
+      const second = await service.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree/start',
+        headers,
+        payload: {},
+      });
+
+      expect(first.statusCode).toBe(202);
+      expect(second.statusCode).toBe(503);
+      expect(second.json()).toEqual({
+        error: {
+          code: 'ENVIRONMENT_ERROR',
+          message: 'A local Gatekeeper review is already running.',
+          repair: 'Wait for the current review to finish, then retry.',
+        },
+      });
+      releaseReview?.();
+      await expect
+        .poll(async () =>
+          reviewLookupSchema.parse(
+            (
+              await service.server.inject({
+                method: 'GET',
+                url: `/v1/reviews/${reviewOperationSchema.parse(first.json()).reviewId}`,
+                headers,
+              })
+            ).json(),
+          ),
+        )
+        .toMatchObject({ status: 'completed' });
+    } finally {
+      releaseReview?.();
+      await service?.close().catch(() => undefined);
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('keeps a failure readable when its terminal persistence write fails', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-operation-persistence-failure-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const originalCreateProjectMemory = projectMemoryModule.createProjectMemory;
+    const createProjectMemory = vi
+      .spyOn(projectMemoryModule, 'createProjectMemory')
+      .mockImplementation((options) => {
+        const memory = originalCreateProjectMemory(options);
+        return {
+          ...memory,
+          saveReviewOperation: async (operation) => {
+            if (operation.status === 'failed') {
+              throw new Error('expected terminal write failure');
+            }
+            await memory.saveReviewOperation(operation);
+          },
+        };
+      });
+    const { startGatekeeperService } = await import('./service.js');
+    let service: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
+
+    try {
+      service = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree: () => Promise.reject(new Error('expected review failure')),
+        startedAt: '2026-07-19T20:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const started = reviewOperationSchema.parse(
+        (
+          await service.server.inject({
+            method: 'POST',
+            url: '/v1/reviews/worktree/start',
+            headers,
+            payload: {},
+          })
+        ).json(),
+      );
+
+      await expect
+        .poll(async () =>
+          reviewLookupSchema.parse(
+            (
+              await service.server.inject({
+                method: 'GET',
+                url: `/v1/reviews/${started.reviewId}`,
+                headers,
+              })
+            ).json(),
+          ),
+        )
+        .toMatchObject({
+          status: 'failed',
+          stage: 'failed',
+          error: { code: 'REVIEW_FAILED' },
+        });
+    } finally {
+      createProjectMemory.mockRestore();
+      await service?.close().catch(() => undefined);
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
   it('turns a dashboard operation interrupted by restart into a bounded failure', async () => {
     const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-progress-restart-'));
     const paths = {
@@ -1624,13 +1782,106 @@ describe('Gatekeeper local service', () => {
           stage: 'failed',
           error: {
             code: 'REVIEW_FAILED',
-            message: 'The review was interrupted when the local service stopped.',
+            message: 'Gatekeeper stopped before the local review completed.',
             repair: 'Start a new review from the dashboard.',
           },
         }),
       );
       expect(JSON.stringify(failed.json())).not.toContain(repository.root);
     } finally {
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('keeps a stopped review terminal when its old task resumes', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-progress-stopped-task-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    let releaseReview: (() => void) | undefined;
+    const holdReview = new Promise<void>((resolve) => {
+      releaseReview = resolve;
+    });
+    const reviewWorktree = vi.fn(async (context: PersistentReviewContext) => {
+      await holdReview;
+      return { ...reviewResponse, reviewId: context.reviewId, repositoryId: context.repositoryId };
+    });
+    let first: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
+    let second: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
+
+    try {
+      first = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-19T20:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      const firstHeaders = {
+        host: new URL(first.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const started = reviewOperationSchema.parse(
+        (
+          await first.server.inject({
+            method: 'POST',
+            url: '/v1/reviews/worktree/start',
+            headers: firstHeaders,
+            payload: {},
+          })
+        ).json(),
+      );
+      await expect.poll(() => reviewWorktree.mock.calls.length).toBe(1);
+      await first.close();
+
+      second = await startGatekeeperService({
+        bearerToken,
+        dashboardRoot,
+        logger: false,
+        paths,
+        repository,
+        reviewPullRequest: unexercisedPullRequestReview,
+        reviewWorktree,
+        startedAt: '2026-07-19T21:00:00.000Z',
+        tools: statusResponse.tools,
+        version: '0.1.0',
+      });
+      releaseReview?.();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const persisted = await second.server.inject({
+        method: 'GET',
+        url: `/v1/reviews/${started.reviewId}`,
+        headers: {
+          host: new URL(second.baseUrl).host,
+          authorization: `Bearer ${bearerToken}`,
+        },
+      });
+
+      expect(persisted.statusCode).toBe(200);
+      expect(persisted.json()).toEqual(
+        expect.objectContaining({
+          status: 'failed',
+          stage: 'failed',
+          error: {
+            code: 'REVIEW_FAILED',
+            message: 'Gatekeeper stopped before the local review completed.',
+            repair: 'Start a new review from the dashboard.',
+          },
+        }),
+      );
+    } finally {
+      releaseReview?.();
+      await second?.close().catch(() => undefined);
+      await first?.close().catch(() => undefined);
       await rm(appData, { force: true, recursive: true });
     }
   });
