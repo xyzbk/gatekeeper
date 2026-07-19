@@ -509,9 +509,9 @@ Phase 7 is limited to security regression hardening, deterministic release contr
 ### Completion evidence
 
 - Deterministic-only startup, model-data dry run, the disposable fixture-only judge service, six-outcome golden evaluation, and the checked-in report are implemented and committed as Phase 7 release controls.
-- A fresh detached Windows checkout passed frozen-lockfile install, build, and the judge smoke matrix. The final Windows release matrix passed frozen-lockfile install, lint, typecheck, 44-file/259-test suite, production build, Chromium acceptance, judge smoke, evaluation regeneration, model-data dry run, formatting, high-severity dependency audit, and diff check.
-- The targeted 84-check attack suite covers prompt injection, path/symlink containment, Git argument arrays, secret denial/redaction, poisoned remote content, Host/Origin and token protection, stale data boundaries, deterministic `BLOCK` authority, and deterministic-only refusal. No release-blocking defect was found.
-- Ponytail found no redundant Phase 7 dependency, evaluator framework, launcher layer, or post-hackathon surface. The codebase is frozen after commit `docs: complete phase 7 release hardening`.
+- A fresh detached Windows checkout passed frozen-lockfile install, build, and the judge smoke matrix. The final Windows release matrix passed frozen-lockfile install, lint, typecheck, 47-file/262-test suite, production build, Chromium acceptance, fixture generation, judge smoke, evaluation regeneration, model-data dry run, formatting, high-severity dependency audit, and diff check.
+- The targeted 84-check attack suite covers prompt injection, path/symlink containment, Git argument arrays, secret denial/redaction, poisoned remote content, Host/Origin and token protection, stale data boundaries, deterministic `BLOCK` authority, and deterministic-only refusal. A post-freeze direct process audit then found unbounded release-helper and local-probe subprocesses; all four affected paths now have the existing 30-second limit, with focused regression coverage and a successful fixture/judge rerun.
+- Ponytail found no redundant Phase 7 dependency, evaluator framework, launcher layer, or post-hackathon surface. The codebase is re-frozen after the documented post-freeze correction.
 
 ### Remaining user-authorized submission steps
 
@@ -519,4 +519,4 @@ Phase 7 is limited to security regression hardening, deterministic release contr
 
 ### Code-freeze boundary
 
-All planned hackathon phases are complete. Only release-blocking bug fixes, documentation corrections, approved video edits, and user-authorized submission validation may follow; no new product feature should begin.
+All planned hackathon phases are complete. The one post-freeze release-blocking process-safety correction is complete. Only future release-blocking bug fixes, documentation corrections, approved video edits, and user-authorized submission validation may follow; no new product feature should begin.

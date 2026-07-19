@@ -50,7 +50,7 @@ pnpm demo
 
 Use the frozen-lockfile sequence in [clean install and uninstall](docs/release/clean-install-uninstall.md). The judge path is local after dependencies are installed: `pnpm demo:smoke`, `pnpm eval`, and `pnpm model-data:dry-run` need no GitHub credential or model key.
 
-Phase 7's final attack, browser, reproducibility, formatting, and high-severity dependency gates passed on Windows. The remaining video, feedback, repository-sharing, Devpost, and submission steps need explicit user authorization; see the [submission checklist](docs/release/submission-checklist.md).
+Phase 7's final attack, browser, reproducibility, formatting, and high-severity dependency gates passed on Windows. A post-freeze process-safety correction bounded every release-helper and local-probe subprocess with the existing 30-second limit. The remaining video, feedback, repository-sharing, Devpost, and submission steps need explicit user authorization; see the [submission checklist](docs/release/submission-checklist.md).
 
 ## Supported platforms
 

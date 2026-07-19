@@ -56,8 +56,11 @@ async function runToolCommand(
   arguments_: readonly string[],
 ): Promise<ToolCommandResult> {
   const result = await execa(executable, arguments_, {
+    maxBuffer: 1_024 * 1_024,
     reject: false,
+    shell: false,
     stdin: 'ignore',
+    timeout: 30_000,
   });
 
   return {

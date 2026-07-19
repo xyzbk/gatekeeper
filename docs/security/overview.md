@@ -11,7 +11,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - `BLOCK` is assembled only from `DETERMINISTIC` plus `hard` enforcement.
 - Evidence excerpts are capped at 2,000 characters by contract.
 - YAML policy errors report concrete field paths.
-- Doctor uses native process spawning with an executable and argument array; it performs no authentication or network request.
+- Doctor uses native process spawning with an executable and argument array, output ignored, and a 30-second timeout; it performs no authentication or network request.
 - App state resolves to a per-user OS data location outside repositories.
 - CI actions are pinned to immutable commit SHAs and receives read-only repository contents permission.
 
@@ -19,7 +19,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 - The requested repository path is canonicalized and must be a directory.
 - Git's reported top level must contain the requested path; an unrelated root is rejected.
-- Git commands use `execa` argument arrays and never use shell interpolation.
+- Git commands use `execa` argument arrays, shell-disabled execution, bounded output, and 30-second timeouts; they never use shell interpolation.
 - Git output is parsed into a strict shared `RepositorySnapshot` contract.
 - Adapter errors do not echo subprocess stdout or stderr, preventing accidental source, path, or secret disclosure.
 - Health and status are different strict contracts; the health shape has no repository or path fields.
@@ -88,6 +88,7 @@ Pull-request CLI, fixed-repository API, MCP, and dashboard composition are imple
 - Deterministic-only startup rejects the completion endpoint before it interprets submitted model findings. It does not disable deterministic review, Project Memory, dashboard reads, or bounded local indexing.
 - `pnpm model-data:dry-run` exercises the fixture-backed provider and review-draft path with zero model calls, then reports counts and source pointer metadata only—never source bodies or excerpts.
 - `pnpm demo` and `pnpm demo:smoke` use a committed Ghost fixture, a disposable local Git repository, and a loopback service. They do not invoke the live GitHub CLI, external network, model endpoints, or GitHub write operations.
+- Release helpers and local capability probes follow the same subprocess boundary: executable-plus-argument calls, a 30-second timeout, and a 1 MiB cap whenever output is read.
 - User-authorized video, Devpost, repository sharing, and feedback-session actions remain outside automated release work.
 
 ## Logging

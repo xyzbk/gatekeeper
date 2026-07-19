@@ -39,7 +39,11 @@ function defaultCommandExists(command: string): Promise<boolean> {
   const executable = process.platform === 'win32' ? 'where.exe' : 'which';
 
   return new Promise((resolve) => {
-    const child = spawn(executable, [command], { stdio: 'ignore', windowsHide: true });
+    const child = spawn(executable, [command], {
+      stdio: 'ignore',
+      timeout: 30_000,
+      windowsHide: true,
+    });
     child.once('error', () => resolve(false));
     child.once('exit', (code) => resolve(code === 0));
   });

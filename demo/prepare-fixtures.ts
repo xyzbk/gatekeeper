@@ -41,6 +41,7 @@ async function runGit(root: string, arguments_: readonly string[]): Promise<void
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 1_024 * 1_024,
+    timeout: 30_000,
     windowsHide: true,
   });
 }
