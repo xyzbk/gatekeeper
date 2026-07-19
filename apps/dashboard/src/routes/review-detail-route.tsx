@@ -95,7 +95,11 @@ function FailedReview({
   operation: Extract<ReviewOperationContract, { status: 'failed' }>;
 }) {
   const retryPath =
-    operation.target.kind === 'pull_request' ? '/reviews/pull-request' : '/reviews/worktree';
+    operation.target.kind === 'pull_request'
+      ? '/reviews/pull-request'
+      : operation.target.kind === 'commit_range'
+        ? '/memory'
+        : '/reviews/worktree';
   return (
     <section className={styles.reviewError}>
       <p className={styles.contextLabel}>Review Inspector</p>
@@ -136,9 +140,11 @@ function completedOperation(
 export function ReviewDetailRoute({
   getReview,
   startPullRequestReview,
+  startCommitReview,
   startWorktreeReview,
 }: {
   getReview: ReviewClient['getReview'];
+  startCommitReview: ReviewClient['startCommitReview'];
   startPullRequestReview: ReviewClient['startPullRequestReview'];
   startWorktreeReview: ReviewClient['startWorktreeReview'];
 }) {
@@ -168,6 +174,9 @@ export function ReviewDetailRoute({
       }
       if (operation.target.kind === 'worktree') {
         return startWorktreeReview();
+      }
+      if (operation.target.kind === 'commit_range' && operation.target.head !== undefined) {
+        return startCommitReview(operation.target.head);
       }
       throw new Error('This review target cannot be restarted from the dashboard.');
     },

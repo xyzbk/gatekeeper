@@ -38,6 +38,8 @@ createRoot(rootElement).render(
           loadStatus={statusClient.getStatus}
           startWorktreeReview={reviewClient.startWorktreeReview}
           startPullRequestReview={reviewClient.startPullRequestReview}
+          startCommitReview={reviewClient.startCommitReview}
+          recentCommits={memoryClient.recentCommits}
           searchMemory={memoryClient.search}
         />
       </BrowserRouter>

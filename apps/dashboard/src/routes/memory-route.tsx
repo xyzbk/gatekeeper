@@ -1,10 +1,11 @@
 import type { FormEvent } from 'react';
 import { useState } from 'react';
-import type { MemorySearchResult } from '@gatekeeper/contracts';
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router';
+import type { MemorySearchResult, RecentCommitEvidence } from '@gatekeeper/contracts';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import type { MemoryClient } from '../api/memory-client.js';
+import type { ReviewClient } from '../api/review-client.js';
 import styles from '../styles/dashboard.module.css';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -72,8 +73,81 @@ function SearchResults({ query, results }: { query: string; results: MemorySearc
   );
 }
 
-export function MemoryRoute({ searchMemory }: { searchMemory: MemoryClient['search'] }) {
+function RecentCommitHistory({
+  commits,
+  onReview,
+  pendingSha,
+}: {
+  commits: RecentCommitEvidence[];
+  onReview: (sha: string) => void;
+  pendingSha: string | undefined;
+}) {
+  if (commits.length === 0) {
+    return (
+      <section className={styles.memoryEmpty}>
+        <h2>No indexed commits yet.</h2>
+        <p>Index this repository to add its latest local commit evidence.</p>
+      </section>
+    );
+  }
+  return (
+    <section aria-labelledby="recent-commits" className={styles.memoryResults}>
+      <div className={styles.memoryResultsHeader}>
+        <h2 id="recent-commits">Recent commit evidence</h2>
+        <span>{commits.length}</span>
+      </div>
+      <p className={styles.memoryHistoryNote}>
+        Last 10 indexed commits. Titles are untrusted repository text.
+      </p>
+      <div className={styles.memoryTableWrap}>
+        <table className={styles.memoryTable}>
+          <caption>Historical commits use a first-parent review.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Commit</th>
+              <th scope="col">SHA</th>
+              <th scope="col">Authored</th>
+              <th scope="col">
+                <span className={styles.srOnly}>Action</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {commits.map((commit) => (
+              <tr key={commit.sha}>
+                <td>{commit.title}</td>
+                <td className={styles.mono}>{commit.sha.slice(0, 12)}</td>
+                <td>{dateFormatter.format(new Date(commit.authoredAt))}</td>
+                <td>
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={pendingSha !== undefined}
+                    onClick={() => onReview(commit.sha)}
+                    type="button"
+                  >
+                    {pendingSha === commit.sha ? 'Starting…' : 'Review commit'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function MemoryRoute({
+  recentCommits,
+  searchMemory,
+  startCommitReview,
+}: {
+  recentCommits: MemoryClient['recentCommits'];
+  searchMemory: MemoryClient['search'];
+  startCommitReview: ReviewClient['startCommitReview'];
+}) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlQuery = searchParams.get('query')?.trim() ?? '';
   const [query, setQuery] = useState(urlQuery);
   const [submittedQuery, setSubmittedQuery] = useState(urlQuery);
@@ -83,6 +157,16 @@ export function MemoryRoute({ searchMemory }: { searchMemory: MemoryClient['sear
     queryKey: ['memory-search', submittedQuery],
     retry: false,
   });
+  const historyQuery = useQuery({
+    enabled: submittedQuery.length === 0,
+    queryFn: () => recentCommits(),
+    queryKey: ['memory-recent-commits'],
+    retry: false,
+  });
+  const reviewCommit = useMutation({
+    mutationFn: (sha: string) => startCommitReview(sha),
+    onSuccess: (operation) => navigate(`/reviews/${operation.reviewId}`),
+  });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +175,11 @@ export function MemoryRoute({ searchMemory }: { searchMemory: MemoryClient['sear
       setSubmittedQuery(value);
       setSearchParams({ query: value }, { replace: true });
     }
+  };
+  const clearSearch = () => {
+    setQuery('');
+    setSubmittedQuery('');
+    setSearchParams({}, { replace: true });
   };
 
   return (
@@ -121,6 +210,11 @@ export function MemoryRoute({ searchMemory }: { searchMemory: MemoryClient['sear
           </button>
         </div>
       </form>
+      {submittedQuery.length > 0 ? (
+        <button className={styles.secondaryButton} onClick={clearSearch} type="button">
+          Clear search
+        </button>
+      ) : null}
       {searchQuery.isFetching ? (
         <div aria-label="Searching project memory…" className={styles.memoryProgress} role="status">
           <div className={`${styles.skeleton} ${styles.memorySkeletonPath}`} />
@@ -143,6 +237,35 @@ export function MemoryRoute({ searchMemory }: { searchMemory: MemoryClient['sear
       ) : null}
       {searchQuery.isSuccess && submittedQuery.length > 0 ? (
         <SearchResults query={submittedQuery} results={searchQuery.data} />
+      ) : null}
+      {reviewCommit.isError ? (
+        <p className={styles.memoryError} role="alert">
+          Gatekeeper could not start the historical review.
+        </p>
+      ) : null}
+      {submittedQuery.length === 0 && historyQuery.isPending ? (
+        <div className={styles.memoryProgress} role="status">
+          Loading recent commit evidence…
+        </div>
+      ) : null}
+      {submittedQuery.length === 0 && historyQuery.isError ? (
+        <div className={styles.memoryError} role="alert">
+          <p>Recent commit evidence could not be loaded.</p>
+          <button
+            className={styles.secondaryButton}
+            onClick={() => void historyQuery.refetch()}
+            type="button"
+          >
+            Retry history
+          </button>
+        </div>
+      ) : null}
+      {submittedQuery.length === 0 && historyQuery.isSuccess ? (
+        <RecentCommitHistory
+          commits={historyQuery.data}
+          onReview={(sha) => reviewCommit.mutate(sha)}
+          pendingSha={reviewCommit.isPending ? reviewCommit.variables : undefined}
+        />
       ) : null}
     </section>
   );

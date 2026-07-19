@@ -9,6 +9,7 @@ import { createBootstrapLoader, type BootstrapLoader } from './status-client.js'
 
 export interface ReviewClient {
   getReview: (reviewId: string, signal?: AbortSignal) => Promise<ReviewLookupContract>;
+  startCommitReview: (sha: string, signal?: AbortSignal) => Promise<ReviewOperationContract>;
   startPullRequestReview: (
     pullRequestNumber: number,
     signal?: AbortSignal,
@@ -109,6 +110,12 @@ export function createReviewClient(
         JSON.stringify({ schemaVersion: 1, pullRequestNumber }),
         signal,
       );
+    },
+    startCommitReview: (sha, signal) => {
+      if (!/^[0-9a-f]{40,64}$/.test(sha)) {
+        return Promise.reject(new TypeError('Commit SHA must be a full lowercase Git object ID.'));
+      }
+      return start('/reviews/commit/start', JSON.stringify({ schemaVersion: 1, sha }), signal);
     },
     startWorktreeReview: (signal) => start('/reviews/worktree/start', '{}', signal),
   };

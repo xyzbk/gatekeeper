@@ -16,6 +16,8 @@ interface DashboardAppProps {
   loadStatus: StatusClient['getStatus'];
   startWorktreeReview: ReviewClient['startWorktreeReview'];
   startPullRequestReview: ReviewClient['startPullRequestReview'];
+  startCommitReview: ReviewClient['startCommitReview'];
+  recentCommits: MemoryClient['recentCommits'];
   searchMemory: MemoryClient['search'];
 }
 
@@ -35,13 +37,24 @@ export function DashboardApp({
   loadStatus,
   startWorktreeReview,
   startPullRequestReview,
+  startCommitReview,
+  recentCommits,
   searchMemory,
 }: DashboardAppProps) {
   return (
     <AppShell>
       <Routes>
         <Route element={<OverviewRoute loadStatus={loadStatus} />} path="/" />
-        <Route element={<MemoryRoute searchMemory={searchMemory} />} path="/memory" />
+        <Route
+          element={
+            <MemoryRoute
+              recentCommits={recentCommits}
+              searchMemory={searchMemory}
+              startCommitReview={startCommitReview}
+            />
+          }
+          path="/memory"
+        />
         <Route
           element={<ReviewRoute startWorktreeReview={startWorktreeReview} />}
           path="/reviews/worktree"
@@ -54,6 +67,7 @@ export function DashboardApp({
           element={
             <ReviewDetailRoute
               getReview={getReview}
+              startCommitReview={startCommitReview}
               startPullRequestReview={startPullRequestReview}
               startWorktreeReview={startWorktreeReview}
             />

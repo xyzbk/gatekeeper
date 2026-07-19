@@ -41,3 +41,11 @@ Historical reviews compare a selected full commit object ID with its first paren
 - GREEN: one prepared SQLite query against the existing `commits` table orders by authored time and SHA, limits results to ten, and returns only SHA/date/title. No table, migration, cursor, cache, commit body, or raw diff was added.
 - GREEN: Project Memory and the fixed-repository loopback API return the same strict bounded response. The API is bearer-protected by the existing `/v1` hook and accepts no query parameters.
 - Verification: 3 focused test files / 67 tests passed; store, Project Memory, and server TypeScript project builds passed; Prettier and `git diff --check` passed.
+
+## Task 5 — Memory history grid
+
+- RED: dashboard client tests failed because neither recent-commit fetch nor commit-operation start existed. The route tests then exposed two integration errors: disabled history queries retain cache data, and a direct TanStack mutation function receives a context argument.
+- GREEN: Memory uses separate query states: no submitted query displays a semantic ten-row recent-commit table; a submitted query replaces it with search results; `Clear search` restores it. Commit titles render as text with explicit untrusted/first-parent scope.
+- GREEN: `Review commit` starts the existing persisted operation and navigates to the existing Review Inspector. Re-review supports commit targets; a failed commit operation returns to Memory.
+- Correction: render history only while the submitted query is empty, and wrap the mutation client call so only the SHA reaches the transport boundary.
+- Verification: 4 focused dashboard test files / 21 tests passed; dashboard typecheck/build, Prettier, and `git diff --check` passed.

@@ -1,12 +1,15 @@
 import {
   memorySearchResponseSchema,
+  recentCommitEvidenceResponseSchema,
   repositoryRecordSchema,
+  type RecentCommitEvidence,
   type MemorySearchResult,
 } from '@gatekeeper/contracts';
 
 import { createBootstrapLoader, type BootstrapLoader } from './status-client.js';
 
 export interface MemoryClient {
+  recentCommits: (signal?: AbortSignal) => Promise<RecentCommitEvidence[]>;
   search: (query: string, signal?: AbortSignal) => Promise<MemorySearchResult[]>;
 }
 
@@ -23,6 +26,24 @@ export function createMemoryClient(
   loadBootstrap: BootstrapLoader = createBootstrapLoader(fetcher),
 ): MemoryClient {
   return {
+    recentCommits: async (signal) => {
+      const bootstrap = await loadBootstrap(signal);
+      const response = await fetcher(`${bootstrap.apiBaseUrl}/memory/commits`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Authorization: `Bearer ${bootstrap.bearerToken}` },
+        method: 'GET',
+        ...(signal === undefined ? {} : { signal }),
+      });
+      if (!response.ok) {
+        throw new Error('Project Memory is unavailable.');
+      }
+      const parsed = recentCommitEvidenceResponseSchema.safeParse(await readJson(response));
+      if (!parsed.success) {
+        throw new Error('Project Memory returned an invalid recent commit response.');
+      }
+      return parsed.data.commits;
+    },
     search: async (query, signal) => {
       const bootstrap = await loadBootstrap(signal);
       const headers = {

@@ -58,6 +58,8 @@ function renderRoute(
   getReview: (reviewId: string, signal?: AbortSignal) => Promise<ReviewLookupContract>,
   startPullRequestReview: (pullRequestNumber: number) => Promise<ReviewOperationContract> = () =>
     Promise.resolve(queued),
+  startCommitReview: (sha: string) => Promise<ReviewOperationContract> = () =>
+    Promise.resolve(queued),
   startWorktreeReview: () => Promise<ReviewOperationContract> = () => Promise.resolve(queued),
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -69,6 +71,7 @@ function renderRoute(
             element={
               <ReviewDetailRoute
                 getReview={getReview}
+                startCommitReview={startCommitReview}
                 startPullRequestReview={startPullRequestReview}
                 startWorktreeReview={startWorktreeReview}
               />

@@ -1,6 +1,7 @@
 import type {
   DashboardBootstrap,
   MemorySearchResponse,
+  RecentCommitEvidenceResponse,
   RepositoryRecord,
 } from '@gatekeeper/contracts';
 import { describe, expect, it, vi } from 'vitest';
@@ -35,6 +36,17 @@ const response: MemorySearchResponse = {
   ],
 };
 
+const recentResponse: RecentCommitEvidenceResponse = {
+  schemaVersion: 1,
+  commits: [
+    {
+      sha: 'c'.repeat(40),
+      authoredAt: '2026-07-19T12:00:00.000Z',
+      title: 'Add historical commit review',
+    },
+  ],
+};
+
 function jsonResponse(body: unknown, statusCode = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { 'Content-Type': 'application/json' },
@@ -43,6 +55,22 @@ function jsonResponse(body: unknown, statusCode = 200): Response {
 }
 
 describe('memory client', () => {
+  it('reads the bounded recent commit evidence with the local bearer token', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(recentResponse));
+    const { createMemoryClient } = await import('./memory-client.js');
+
+    await expect(
+      createMemoryClient(fetcher, () => Promise.resolve(bootstrap)).recentCommits(),
+    ).resolves.toEqual(recentResponse.commits);
+
+    expect(fetcher).toHaveBeenCalledWith('/v1/memory/commits', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Authorization: `Bearer ${bearerToken}` },
+      method: 'GET',
+    });
+  });
+
   it('resolves the fixed repository and searches with the token only in headers', async () => {
     const fetcher = vi
       .fn<typeof fetch>()

@@ -113,6 +113,37 @@ describe('review client', () => {
     });
   });
 
+  it('starts one strict historical commit operation', async () => {
+    const commitOperation: ReviewOperationContract = {
+      ...queued,
+      target: {
+        kind: 'commit_range',
+        display: 'Commit cccccccccccc',
+        base: 'b'.repeat(40),
+        head: 'c'.repeat(40),
+      },
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(bootstrap))
+      .mockResolvedValueOnce(jsonResponse(commitOperation, 202));
+    const { createReviewClient } = await import('./review-client.js');
+
+    await expect(createReviewClient(fetcher).startCommitReview('c'.repeat(40))).resolves.toEqual(
+      commitOperation,
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(2, '/v1/reviews/commit/start', {
+      body: JSON.stringify({ schemaVersion: 1, sha: 'c'.repeat(40) }),
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+  });
+
   it('polls queued and completed operation lookups with abort support', async () => {
     const controller = new AbortController();
     const fetcher = vi

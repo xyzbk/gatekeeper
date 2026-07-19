@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 
 import type {
   MemorySearchResult,
+  RecentCommitEvidence,
   ReviewLookupContract,
   ReviewOperationContract,
   ReviewRunContract,
@@ -98,11 +99,21 @@ const memoryResult: MemorySearchResult = {
   },
 };
 
+const recentCommits: RecentCommitEvidence[] = [
+  {
+    sha: 'c'.repeat(40),
+    authoredAt: '2026-07-19T12:00:00.000Z',
+    title: 'Add historical commit review',
+  },
+];
+
 interface RenderOptions {
   getReview?: (reviewId: string) => Promise<ReviewLookupContract>;
   initialEntry?: string;
   loadStatus?: () => Promise<StatusResponse>;
   searchMemory?: (query: string) => Promise<MemorySearchResult[]>;
+  recentCommits?: () => Promise<RecentCommitEvidence[]>;
+  startCommitReview?: (sha: string) => Promise<ReviewOperationContract>;
   startPullRequestReview?: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
   startWorktreeReview?: () => Promise<ReviewOperationContract>;
 }
@@ -121,6 +132,8 @@ async function renderDashboard(options: RenderOptions = {}) {
           getReview={options.getReview ?? (() => Promise.resolve(review))}
           loadStatus={options.loadStatus ?? (() => Promise.resolve(status))}
           searchMemory={options.searchMemory ?? (() => Promise.resolve([memoryResult]))}
+          recentCommits={options.recentCommits ?? (() => Promise.resolve(recentCommits))}
+          startCommitReview={options.startCommitReview ?? (() => Promise.resolve(queued))}
           startPullRequestReview={
             options.startPullRequestReview ?? (() => Promise.resolve(pullRequestOperation))
           }
@@ -177,12 +190,22 @@ describe('Project Memory search', () => {
     const searchMemory = vi.fn(() => Promise.resolve([memoryResult]));
     const user = userEvent.setup();
     await renderDashboard({ initialEntry: '/memory', searchMemory });
+    expect(await screen.findByText('Add historical commit review')).toBeVisible();
     expect(searchMemory).not.toHaveBeenCalled();
     await user.type(screen.getByRole('searchbox', { name: 'Evidence query' }), 'redis cache');
     await user.click(screen.getByRole('button', { name: 'Search memory' }));
     expect(await screen.findByText(memoryResult.evidence.excerpt ?? '')).toBeVisible();
     expect(screen.getByText('Relationship: supersedes')).toBeVisible();
     expect(searchMemory).toHaveBeenCalledWith('redis cache');
+    expect(screen.queryByText('Add historical commit review')).not.toBeInTheDocument();
+  });
+
+  it('starts a historical commit review from the recent evidence grid', async () => {
+    const startCommitReview = vi.fn(() => Promise.resolve(queued));
+    const user = userEvent.setup();
+    await renderDashboard({ initialEntry: '/memory', startCommitReview });
+    await user.click(await screen.findByRole('button', { name: 'Review commit' }));
+    expect(startCommitReview).toHaveBeenCalledWith('c'.repeat(40));
   });
 
   it('auto-runs only an explicit timeline query from the URL', async () => {
