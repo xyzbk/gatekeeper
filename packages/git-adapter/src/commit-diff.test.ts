@@ -40,6 +40,15 @@ async function createRepository(): Promise<string> {
   return root;
 }
 
+async function repositoryState(root: string): Promise<string[]> {
+  return [
+    await runGit(root, ['symbolic-ref', '--short', 'HEAD']),
+    await runGit(root, ['rev-parse', 'HEAD']),
+    await runGit(root, ['write-tree']),
+    await runGit(root, ['status', '--porcelain=v1']),
+  ];
+}
+
 describe('historical commit change extraction', () => {
   it('extracts a selected commit against its first parent without changing the repository', async () => {
     const root = await createRepository();
@@ -47,12 +56,7 @@ describe('historical commit change extraction', () => {
     const base = await commitAll(root, 'create app');
     await writeRepositoryFile(root, 'src/app.ts', 'export const value = 2;\n');
     const head = await commitAll(root, 'update app');
-    const before = await Promise.all([
-      runGit(root, ['symbolic-ref', '--short', 'HEAD']),
-      runGit(root, ['rev-parse', 'HEAD']),
-      runGit(root, ['write-tree']),
-      runGit(root, ['status', '--porcelain=v1']),
-    ]);
+    const before = await repositoryState(root);
     const { createGitProvider } = await import('./git-provider.js');
 
     const changeSet = await createGitProvider().getCommitDiff(root, head);
@@ -74,19 +78,12 @@ describe('historical commit change extraction', () => {
         addedLines: ['export const value = 2;'],
       },
     ]);
-    expect(
-      await Promise.all([
-        runGit(root, ['symbolic-ref', '--short', 'HEAD']),
-        runGit(root, ['rev-parse', 'HEAD']),
-        runGit(root, ['write-tree']),
-        runGit(root, ['status', '--porcelain=v1']),
-      ]),
-    ).toEqual(before);
+    await expect(repositoryState(root)).resolves.toEqual(before);
   });
 
   it('rejects malformed commit IDs before running Git', async () => {
     const { createGitProvider } = await import('./git-provider.js');
-    const runGit = async () => {
+    const runGit = () => {
       throw new Error('Git must not run for malformed input.');
     };
 

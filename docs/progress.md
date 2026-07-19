@@ -523,8 +523,13 @@ All planned hackathon phases are complete. The one post-freeze release-blocking 
 
 ## User-authorized post-freeze extension — historical commit review
 
-Status: in progress on 2026-07-19.
+Status: COMPLETE on 2026-07-19.
 
 The user explicitly authorized one bounded extension after code freeze: review one immutable historical commit through the existing deterministic pipeline and show the ten newest indexed commits beneath the Memory evidence query. It remains a single fixed-repository local service. Project selection, commit browsing, pagination, GitHub writes, model verdicts, database migrations, and new dependencies remain out of scope.
 
-The authoritative execution checklist is `docs/superpowers/plans/2026-07-19-historical-commit-review.md`; RED/GREEN evidence and corrections are recorded in `docs/development/historical-commit-review-execution-log.md`. Code freeze will be re-established only after the full extension acceptance gate passes.
+The authoritative execution checklist is `docs/superpowers/plans/2026-07-19-historical-commit-review.md`; RED/GREEN evidence and corrections are recorded in `docs/development/historical-commit-review-execution-log.md`.
+
+- Commits: `c0d3b9e`, `95a6e86`, `8d59520`, `c6d1ee5`, `7500120`, `90ede0e`, and the documentation completion commit.
+- Full completion matrix: frozen-lockfile install; lint; typecheck; 49-file/283-test suite; build; two Playwright Chromium stories; demo smoke; evaluation; model-data dry run with zero model calls; formatting; high-severity audit; and diff check all pass on 2026-07-19.
+- The real twelve-commit browser acceptance proves ten-row bounded history, search replacement, clear restoration, deterministic first-parent `REQUIRE_CHANGES`, restart-safe deep link/re-review comparison, and unchanged target repository state.
+- Code freeze is re-established. Future work is limited to release-blocking fixes, documentation corrections, approved video edits, and user-authorized submission validation; no deferred product surface may start without explicit authorization.

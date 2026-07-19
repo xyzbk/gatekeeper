@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  loadRepositoryPolicy,
-  type LoadedRepositoryPolicy,
-  type GatekeeperPolicy,
-} from '@gatekeeper/config';
+import { loadRepositoryPolicy, type LoadedRepositoryPolicy } from '@gatekeeper/config';
 import type { ChangeSet, RepositorySnapshot, ReviewRunContract } from '@gatekeeper/contracts';
 import type { RepositoryId, ReviewId } from '@gatekeeper/domain';
 import { createGitProvider, type WorktreeDiffOptions } from '@gatekeeper/git-adapter';
@@ -50,7 +46,7 @@ export async function runCommitReview(
   return reviewCommit({
     changeSet,
     createdAt: dependencies.now(),
-    policy: loadedPolicy.policy as GatekeeperPolicy,
+    policy: loadedPolicy.policy,
     repositoryId: context?.repositoryId ?? dependencies.createRepositoryId(repository.root),
     reviewId: context?.reviewId ?? dependencies.createReviewId(),
     ...(context?.previousReviewId === undefined
