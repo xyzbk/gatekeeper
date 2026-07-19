@@ -699,6 +699,18 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
         normalizedRoot,
         normalizedRemote,
       );
+      if (
+        existing !== null &&
+        normalizeRootIdentity(existing.root) === normalizedRoot &&
+        normalizeRemoteIdentity(existing.remote) !== normalizedRemote
+      ) {
+        return Promise.reject(
+          new ProjectMemoryError(
+            'REPOSITORY_MISMATCH',
+            'The repository remote changed at this local root. Start with the original repository or repair local Project Memory explicitly.',
+          ),
+        );
+      }
       const timestamp = now();
       return Promise.resolve(
         options.persistence.registerRepository({
@@ -738,6 +750,12 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
         throw new ProjectMemoryError(
           'REPOSITORY_MISMATCH',
           'The registered repository no longer matches its Git root.',
+        );
+      }
+      if (normalizeRemoteIdentity(snapshot.remote) !== normalizeRemoteIdentity(repository.remote)) {
+        throw new ProjectMemoryError(
+          'REPOSITORY_MISMATCH',
+          'The registered repository remote changed. Restart Gatekeeper only after explicitly repairing local Project Memory.',
         );
       }
       const [trackedFiles, commits] = await Promise.all([

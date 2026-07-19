@@ -88,7 +88,7 @@ export interface BuildGatekeeperServerOptions {
   ) => Promise<ReviewRunContract | null>;
   dashboardRoot: string;
   deterministicOnly?: boolean;
-  getStatus: () => StatusResponse;
+  getStatus: () => StatusResponse | Promise<StatusResponse>;
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
   prepareReview: (reviewId: string) => Promise<ReviewDraftContract | null>;
@@ -763,7 +763,7 @@ export async function buildGatekeeperServer(
     },
     async (_request, reply) => {
       try {
-        return statusResponseSchema.parse(options.getStatus());
+        return statusResponseSchema.parse(await options.getStatus());
       } catch {
         return reply
           .code(500)

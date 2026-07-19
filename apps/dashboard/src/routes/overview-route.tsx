@@ -94,7 +94,7 @@ export function OverviewRoute({ loadStatus }: OverviewRouteProps) {
         <section className={`${styles.panel} ${styles.repositoryPanel}`}>
           <div className={styles.panelHeader}>
             <h2>Repository</h2>
-            <p>Git state captured when Gatekeeper started.</p>
+            <p>Live Git state for the repository fixed when Gatekeeper started.</p>
           </div>
           <dl className={styles.fieldList}>
             <Field label="Root" mono value={repository.root} />

@@ -1,11 +1,12 @@
 # Local review workflow
 
 1. Call `gatekeeper_status`.
-2. Compare `status.repository.head` with `memory.indexState.head`.
+2. Compare the live fixed-repository `status.repository.head` with `memory.indexState.head`.
    - A null index state is uninitialized.
    - Different HEAD values are stale.
    - Matching HEAD values are current.
 3. If uninitialized or stale, ask for consent, then call `gatekeeper_index_repository`. Do not index merely because the tool exists.
+   - If Gatekeeper reports that the fixed repository identity changed, stop. Do not index or review until the user explicitly restores the original remote or repairs local Project Memory.
 4. Choose one review target:
    - For the current worktree, call `gatekeeper_review_worktree`.
    - For a GitHub pull request, ask for sync consent, run `gatekeeper sync github .`, then call `gatekeeper_review_pull_request` with only the positive pull-request number.

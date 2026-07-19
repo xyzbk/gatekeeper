@@ -33,7 +33,11 @@ import {
   pullRequestToRemoteRecord,
   type GitHubProvider,
 } from '@gatekeeper/github-gh';
-import { buildEvidenceTimeline, createProjectMemory } from '@gatekeeper/project-memory';
+import {
+  buildEvidenceTimeline,
+  createProjectMemory,
+  normalizeRemoteIdentity,
+} from '@gatekeeper/project-memory';
 import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
 import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
@@ -48,6 +52,7 @@ export interface StartGatekeeperServiceOptions {
   paths?: ServicePaths;
   repository: RepositorySnapshot;
   githubProvider?: GitHubProvider;
+  inspectRepository?: (repositoryPath: string) => Promise<RepositorySnapshot>;
   reviewPullRequest: (
     pullRequestNumber: number,
     context: PersistentReviewContext,
@@ -193,7 +198,21 @@ export async function startGatekeeperService(
     store = openSqliteProjectStore({
       databasePath: resolveProjectMemoryDatabasePath(paths.appData),
     });
-    const memory = createProjectMemory({ persistence: store, git: createGitProvider() });
+    const git = createGitProvider();
+    const memory = createProjectMemory({ persistence: store, git });
+    const inspectFixedRepository = async (): Promise<RepositorySnapshot> => {
+      const snapshot = await (options.inspectRepository ?? git.inspectRepository)(
+        options.repository.root,
+      );
+      if (
+        snapshot.root !== options.repository.root ||
+        normalizeRemoteIdentity(snapshot.remote) !==
+          normalizeRemoteIdentity(options.repository.remote)
+      ) {
+        throw new Error('The fixed repository identity changed while Gatekeeper was running.');
+      }
+      return snapshot;
+    };
     await memory.migrate();
     const registeredRepository = await memory.registerRepository({
       root: options.repository.root,
@@ -278,6 +297,7 @@ export async function startGatekeeperService(
       pullRequestNumber: number,
       context: PersistentReviewContext,
     ) => {
+      await inspectFixedRepository();
       const result = await options.reviewPullRequest(pullRequestNumber, context);
       if (result.remote.url !== fixedGitHubRemote().url) {
         throw new GitHubProviderError(
@@ -300,10 +320,15 @@ export async function startGatekeeperService(
       return result.review;
     };
     const executeCommitReview = async (sha: string, context: PersistentReviewContext) => {
+      await inspectFixedRepository();
       if (options.reviewCommit === undefined) {
         throw new Error('Historical commit review is not configured.');
       }
       return options.reviewCommit(sha, context);
+    };
+    const executeWorktreeReview = async (context: PersistentReviewContext) => {
+      await inspectFixedRepository();
+      return options.reviewWorktree(context);
     };
     const startReviewOperation = async (
       target: ReviewRunContract['target'],
@@ -414,12 +439,14 @@ export async function startGatekeeperService(
       },
       dashboardRoot: options.dashboardRoot,
       ...(options.deterministicOnly === true ? { deterministicOnly: true } : {}),
-      getStatus: () => {
+      getStatus: async () => {
         if (status === undefined) {
           throw new Error('Service status is not ready.');
         }
-
-        return status;
+        return statusResponseSchema.parse({
+          ...status,
+          repository: await inspectFixedRepository(),
+        });
       },
       projectMemory: {
         repository: registeredRepository,
@@ -427,6 +454,7 @@ export async function startGatekeeperService(
         getReview: (reviewId) => memory.getReview(reviewId),
         getReviewOperation: getComposedReviewOperation,
         indexRepository: async () => {
+          await inspectFixedRepository();
           const loadedPolicy = await loadRepositoryPolicy(options.repository.root);
           return memory.indexLocalRepository({
             repositoryId: registeredRepository.repositoryId,
@@ -466,7 +494,7 @@ export async function startGatekeeperService(
       },
       reviewWorktree: async () => {
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
-        const review = await options.reviewWorktree(
+        const review = await executeWorktreeReview(
           await createReviewContext(target, createReviewId()),
         );
         await memory.saveReview(review);
@@ -503,7 +531,7 @@ export async function startGatekeeperService(
         const target = { kind: 'worktree' as const, display: 'Current worktree' };
         return startReviewOperation(target, async (context, setStage) => {
           await setStage('evaluating_change');
-          return { historySync: null, review: await options.reviewWorktree(context) };
+          return { historySync: null, review: await executeWorktreeReview(context) };
         });
       },
       version: options.version,

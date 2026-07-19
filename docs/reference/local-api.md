@@ -51,7 +51,7 @@ Same-origin dashboard bootstrap with `Cache-Control: no-store`:
 
 ### `GET /v1/status`
 
-Authenticated service and fixed-repository status. It includes:
+Authenticated service and live status for the repository fixed when the service started. It includes:
 
 - service state, version, start time, and loopback URL;
 - repository root, branch, HEAD, dirty state, and origin;
@@ -59,7 +59,7 @@ Authenticated service and fixed-repository status. It includes:
 - disabled model reasoning and ready Project Memory state;
 - app-data, service-metadata, and storage paths.
 
-This endpoint accepts no path, query, body, or repository selector. Unknown query fields are rejected with `USAGE_ERROR`.
+This endpoint accepts no path, query, body, or repository selector. Unknown query fields are rejected with `USAGE_ERROR`. If the current Git root or normalized `origin` remote no longer matches the fixed service identity, it fails safely rather than reading, indexing, or reviewing another repository under the original Project Memory record.
 
 ### `POST /v1/reviews/worktree`
 

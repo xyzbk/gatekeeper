@@ -22,6 +22,7 @@ import {
   createProjectMemory,
   normalizeRemoteIdentity,
   type ProjectMemoryPersistence,
+  type ProjectMemoryError,
 } from './project-memory.js';
 
 const temporaryRoots: string[] = [];
@@ -651,6 +652,36 @@ describe('Project Memory', () => {
         query: 'redis',
       }),
     ).not.toHaveLength(0);
+    store.close();
+  });
+
+  it('rejects a changed remote at the same repository root before memories can mix', async () => {
+    const root = await temporaryRoot();
+    const state = fakeGit(root);
+    const store = openStore(join(root, 'memory.db'));
+    const memory = memoryWith(state, store);
+    await memory.migrate();
+    const repository = await memory.registerRepository({ root, remote: state.snapshot.remote });
+    await memory.indexLocalRepository({ repositoryId: repository.repositoryId });
+
+    state.snapshot = {
+      ...state.snapshot,
+      remote: 'https://github.com/example/different-project.git',
+    };
+
+    await expect(
+      memory.registerRepository({ root, remote: state.snapshot.remote }),
+    ).rejects.toMatchObject<ProjectMemoryError>({ code: 'REPOSITORY_MISMATCH' });
+    await expect(
+      memory.indexLocalRepository({ repositoryId: repository.repositoryId }),
+    ).rejects.toMatchObject<ProjectMemoryError>({ code: 'REPOSITORY_MISMATCH' });
+    expect(
+      await memory.search({
+        schemaVersion: 1,
+        repositoryId: repository.repositoryId,
+        query: 'redis',
+      }),
+    ).not.toEqual([]);
     store.close();
   });
 

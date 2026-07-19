@@ -22,6 +22,7 @@ import {
   reviewLookupSchema,
   reviewOperationSchema,
   reviewRunSchema,
+  statusResponseSchema,
 } from '@gatekeeper/contracts';
 import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
 import { describe, expect, it, vi } from 'vitest';
@@ -1181,6 +1182,44 @@ describe('Gatekeeper local service', () => {
     await service.close();
     await expect(access(`${paths.serviceMetadata}.lock`)).rejects.toThrow();
     await rm(appData, { force: true, recursive: true });
+  });
+
+  it('reports the live fixed-repository HEAD so index freshness cannot lie', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-live-status-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    const liveRepository = { ...repository, head: 'c'.repeat(40), dirty: true };
+    const service = await startGatekeeperService({
+      bearerToken,
+      dashboardRoot,
+      inspectRepository: () => Promise.resolve(liveRepository),
+      logger: false,
+      paths,
+      repository,
+      reviewPullRequest: unexercisedPullRequestReview,
+      reviewWorktree: ({ repositoryId }: PersistentReviewContext) =>
+        Promise.resolve({ ...reviewResponse, repositoryId }),
+      startedAt: '2026-07-19T20:00:00.000Z',
+      tools: statusResponse.tools,
+      version: '0.1.0',
+    });
+
+    try {
+      const response = await service.server.inject({
+        method: 'GET',
+        url: '/v1/status',
+        headers: { host: new URL(service.baseUrl).host, authorization: `Bearer ${bearerToken}` },
+      });
+      expect(statusResponseSchema.parse(response.json()).repository).toEqual(liveRepository);
+    } finally {
+      await service.close();
+      await rm(appData, { force: true, recursive: true });
+    }
   });
 
   it('enforces deterministic-only mode through the running service', async () => {
