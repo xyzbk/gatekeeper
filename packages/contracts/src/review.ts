@@ -13,6 +13,13 @@ import { githubSyncResultSchema } from './github.js';
 
 const identifierSchema = z.string().trim().min(1);
 
+export const commitReviewInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    sha: z.string().regex(/^[0-9a-f]{40,64}$/),
+  })
+  .strict();
+
 export const evidencePointerSchema = z
   .object({
     sourceType: z.enum(EVIDENCE_SOURCE_TYPES),
@@ -312,6 +319,11 @@ export const reviewLookupApiJsonSchema = {
   ...z.toJSONSchema(reviewLookupSchema, { target: 'draft-7' }),
 };
 
+export const commitReviewInputJsonSchema = {
+  $id: 'gatekeeper:commit-review-input-v1',
+  ...z.toJSONSchema(commitReviewInputSchema, { target: 'draft-7' }),
+};
+
 export type ReviewRunContract = z.infer<typeof reviewRunSchema>;
 export type ReviewDraftContract = z.infer<typeof reviewDraftSchema>;
 export type ReviewCompletionFinding = z.infer<typeof reviewCompletionFindingSchema>;
@@ -319,3 +331,4 @@ export type ReviewCompletionInput = z.infer<typeof reviewCompletionInputSchema>;
 export type ReviewOperationContract = z.infer<typeof reviewOperationSchema>;
 export type ReviewLookupContract = z.infer<typeof reviewLookupSchema>;
 export type EvidenceTimelineItem = z.infer<typeof evidenceTimelineItemSchema>;
+export type CommitReviewInput = z.infer<typeof commitReviewInputSchema>;

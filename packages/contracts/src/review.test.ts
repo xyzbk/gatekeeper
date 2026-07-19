@@ -176,6 +176,19 @@ describe('review completion contracts', () => {
   });
 });
 
+describe('historical commit review contract', () => {
+  it('accepts only a strict full lowercase commit SHA', async () => {
+    const { commitReviewInputSchema } = await import('./review.js');
+    const input = { schemaVersion: 1, sha: 'a'.repeat(40) } as const;
+
+    expect(commitReviewInputSchema.parse(input)).toEqual(input);
+    for (const sha of ['a'.repeat(12), 'A'.repeat(40), '--help']) {
+      expect(() => commitReviewInputSchema.parse({ schemaVersion: 1, sha })).toThrow();
+    }
+    expect(() => commitReviewInputSchema.parse({ ...input, extra: true })).toThrow();
+  });
+});
+
 describe('review operation contracts', () => {
   it('accepts strict queued, running, failed, and completed operation states', async () => {
     const [{ evidenceTimelineItemSchema, reviewOperationSchema }, { createReviewRunFixture }] =

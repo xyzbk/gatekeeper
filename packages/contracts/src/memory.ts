@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { gitCommitRecordSchema } from './project-source.js';
 import { evidencePointerSchema, evidenceRelationshipSchema } from './review.js';
 
 const identifierSchema = z.string().trim().min(1).max(300);
@@ -99,6 +100,17 @@ export const memorySearchResponseSchema = z
   })
   .strict();
 
+export const recentCommitEvidenceSchema = gitCommitRecordSchema
+  .pick({ sha: true, authoredAt: true, title: true })
+  .strict();
+
+export const recentCommitEvidenceResponseSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    commits: z.array(recentCommitEvidenceSchema).max(10),
+  })
+  .strict();
+
 export const repositoryRecordJsonSchema = {
   $id: 'gatekeeper:repository-record-v1',
   ...z.toJSONSchema(repositoryRecordSchema, { target: 'draft-7' }),
@@ -122,6 +134,11 @@ export const memorySearchInputJsonSchema = {
 export const memorySearchResponseJsonSchema = {
   $id: 'gatekeeper:memory-search-response-v1',
   ...z.toJSONSchema(memorySearchResponseSchema, { target: 'draft-7' }),
+};
+
+export const recentCommitEvidenceResponseJsonSchema = {
+  $id: 'gatekeeper:recent-commit-evidence-response-v1',
+  ...z.toJSONSchema(recentCommitEvidenceResponseSchema, { target: 'draft-7' }),
 };
 
 export const repositoryStatusJsonSchema = {
@@ -148,3 +165,5 @@ export type ReviewIdParams = z.infer<typeof reviewIdParamsSchema>;
 export type MemorySearchInput = z.infer<typeof memorySearchInputSchema>;
 export type MemorySearchResult = z.infer<typeof memorySearchResultSchema>;
 export type MemorySearchResponse = z.infer<typeof memorySearchResponseSchema>;
+export type RecentCommitEvidence = z.infer<typeof recentCommitEvidenceSchema>;
+export type RecentCommitEvidenceResponse = z.infer<typeof recentCommitEvidenceResponseSchema>;

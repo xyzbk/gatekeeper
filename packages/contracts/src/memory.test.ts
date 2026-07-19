@@ -204,4 +204,35 @@ describe('Project Memory contracts', () => {
       }).results[0]?.evidence.sourceType,
     ).toBe('documentation');
   });
+
+  it('accepts at most ten bounded recent commit evidence rows', async () => {
+    const { recentCommitEvidenceResponseSchema } = await import('./memory.js');
+    const commit = {
+      sha: 'a'.repeat(40),
+      authoredAt: '2026-07-19T20:00:00.000Z',
+      title: 'Add deterministic commit review',
+    } as const;
+
+    expect(
+      recentCommitEvidenceResponseSchema.parse({ schemaVersion: 1, commits: [commit] }),
+    ).toEqual({ schemaVersion: 1, commits: [commit] });
+    expect(() =>
+      recentCommitEvidenceResponseSchema.parse({
+        schemaVersion: 1,
+        commits: Array.from({ length: 11 }, () => commit),
+      }),
+    ).toThrow();
+    expect(() =>
+      recentCommitEvidenceResponseSchema.parse({
+        schemaVersion: 1,
+        commits: [{ ...commit, title: 'x'.repeat(301) }],
+      }),
+    ).toThrow();
+    expect(() =>
+      recentCommitEvidenceResponseSchema.parse({
+        schemaVersion: 1,
+        commits: [{ ...commit, authoredAt: 'not-a-date' }],
+      }),
+    ).toThrow();
+  });
 });

@@ -132,4 +132,39 @@ describe('changeSetSchema', () => {
 
     expect(changeSetSchema.parse(validChangeSet)).toEqual(validChangeSet);
   });
+
+  it('accepts an immutable commit target with full object IDs only', async () => {
+    const { changeSetSchema } = await import('./change.js');
+    const target = {
+      kind: 'commit_range',
+      display: 'Commit aaaaaaaaaaaa',
+      base: 'b'.repeat(40),
+      head: 'a'.repeat(40),
+    } as const;
+
+    expect(changeSetSchema.parse({ schemaVersion: 1, target, files: [] })).toMatchObject({
+      target,
+    });
+    expect(() =>
+      changeSetSchema.parse({
+        schemaVersion: 1,
+        target: { ...target, head: 'a'.repeat(12) },
+        files: [],
+      }),
+    ).toThrow();
+    expect(() =>
+      changeSetSchema.parse({
+        schemaVersion: 1,
+        target: { ...target, head: 'A'.repeat(40) },
+        files: [],
+      }),
+    ).toThrow();
+    expect(() =>
+      changeSetSchema.parse({
+        schemaVersion: 1,
+        target: { kind: 'commit_range', display: target.display },
+        files: [],
+      }),
+    ).toThrow();
+  });
 });

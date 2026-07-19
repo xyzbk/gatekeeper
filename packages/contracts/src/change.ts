@@ -97,6 +97,17 @@ export const changeSetSchema = z
           head: z.string().trim().min(1).max(300).optional(),
         })
         .strict(),
+      z
+        .object({
+          kind: z.literal('commit_range'),
+          display: z.string().trim().min(1).max(300),
+          base: z
+            .string()
+            .regex(/^[0-9a-f]{40,64}$/)
+            .optional(),
+          head: z.string().regex(/^[0-9a-f]{40,64}$/),
+        })
+        .strict(),
     ]),
     files: z.array(changedFileSchema).max(500),
   })

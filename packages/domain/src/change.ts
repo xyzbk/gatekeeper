@@ -26,6 +26,12 @@ export interface ChangeSet {
         pullRequestNumber: number;
         base?: string;
         head?: string;
+      }
+    | {
+        kind: 'commit_range';
+        display: string;
+        base?: string;
+        head: string;
       };
   files: ChangedFile[];
 }

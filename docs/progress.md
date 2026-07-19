@@ -520,3 +520,11 @@ Phase 7 is limited to security regression hardening, deterministic release contr
 ### Code-freeze boundary
 
 All planned hackathon phases are complete. The one post-freeze release-blocking process-safety correction is complete. Only future release-blocking bug fixes, documentation corrections, approved video edits, and user-authorized submission validation may follow; no new product feature should begin.
+
+## User-authorized post-freeze extension — historical commit review
+
+Status: in progress on 2026-07-19.
+
+The user explicitly authorized one bounded extension after code freeze: review one immutable historical commit through the existing deterministic pipeline and show the ten newest indexed commits beneath the Memory evidence query. It remains a single fixed-repository local service. Project selection, commit browsing, pagination, GitHub writes, model verdicts, database migrations, and new dependencies remain out of scope.
+
+The authoritative execution checklist is `docs/superpowers/plans/2026-07-19-historical-commit-review.md`; RED/GREEN evidence and corrections are recorded in `docs/development/historical-commit-review-execution-log.md`. Code freeze will be re-established only after the full extension acceptance gate passes.
