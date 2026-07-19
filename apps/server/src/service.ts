@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmod, mkdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 
 import {
@@ -82,6 +82,78 @@ export interface RunningGatekeeperService {
   status: StatusResponse;
 }
 
+class ServiceOwnershipError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'ServiceOwnershipError';
+  }
+}
+
+interface ServiceOwnership {
+  release: () => Promise<void>;
+}
+
+function processIsRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function readLockPid(lockPath: string): Promise<number | null> {
+  try {
+    const value: unknown = JSON.parse(await readFile(lockPath, 'utf8'));
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'pid' in value &&
+      typeof value.pid === 'number' &&
+      Number.isSafeInteger(value.pid) &&
+      value.pid > 0
+    ) {
+      return value.pid;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function acquireServiceOwnership(paths: ServicePaths): Promise<ServiceOwnership> {
+  const lockPath = `${paths.serviceMetadata}.lock`;
+  await mkdir(paths.appData, { recursive: true });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open(lockPath, 'wx', 0o600);
+      try {
+        await handle.writeFile(`${JSON.stringify({ pid: process.pid })}\n`, 'utf8');
+        await chmod(lockPath, 0o600);
+      } finally {
+        await handle.close();
+      }
+      return { release: () => rm(lockPath, { force: true }) };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
+      const pid = await readLockPid(lockPath);
+      if (pid === null || processIsRunning(pid)) {
+        throw new ServiceOwnershipError(
+          'Gatekeeper is already running for this machine. Stop the existing foreground service before starting another one.',
+        );
+      }
+      await rm(lockPath, { force: true });
+    }
+  }
+
+  throw new ServiceOwnershipError(
+    'Gatekeeper is already running for this machine. Stop the existing foreground service before starting another one.',
+  );
+}
+
 async function writeServiceMetadata(
   paths: ServicePaths,
   metadata: ReturnType<typeof serviceMetadataSchema.parse>,
@@ -100,10 +172,8 @@ export async function startGatekeeperService(
   const bearerToken = options.bearerToken ?? randomBytes(32).toString('base64url');
   const paths = options.paths ?? resolveServicePaths();
   const startedAt = options.startedAt ?? new Date().toISOString();
-  const store = openSqliteProjectStore({
-    databasePath: resolveProjectMemoryDatabasePath(paths.appData),
-  });
-  const memory = createProjectMemory({ persistence: store, git: createGitProvider() });
+  let ownership: ServiceOwnership | undefined;
+  let store: ReturnType<typeof openSqliteProjectStore> | undefined;
   const github = options.githubProvider ?? createGitHubProvider();
   const fixedGitHubRemote = () => {
     if (options.repository.remote === null) {
@@ -119,6 +189,11 @@ export async function startGatekeeperService(
   let server: FastifyInstance | undefined;
 
   try {
+    ownership = await acquireServiceOwnership(paths);
+    store = openSqliteProjectStore({
+      databasePath: resolveProjectMemoryDatabasePath(paths.appData),
+    });
+    const memory = createProjectMemory({ persistence: store, git: createGitProvider() });
     await memory.migrate();
     const registeredRepository = await memory.registerRepository({
       root: options.repository.root,
@@ -476,9 +551,13 @@ export async function startGatekeeperService(
           await activeServer.close();
         } finally {
           try {
-            store.close();
+            store?.close();
           } finally {
-            await rm(paths.serviceMetadata, { force: true });
+            try {
+              await rm(paths.serviceMetadata, { force: true });
+            } finally {
+              await ownership?.release();
+            }
           }
         }
       },
@@ -488,9 +567,15 @@ export async function startGatekeeperService(
       await server?.close();
     } finally {
       try {
-        store.close();
+        store?.close();
       } finally {
-        await rm(paths.serviceMetadata, { force: true });
+        if (ownership !== undefined) {
+          try {
+            await rm(paths.serviceMetadata, { force: true });
+          } finally {
+            await ownership.release();
+          }
+        }
       }
     }
     throw error;

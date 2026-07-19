@@ -10,6 +10,8 @@ pnpm --filter @gatekeeper/cli start -- start .
 
 The CLI prints the selected root and random loopback URL. Ctrl+C closes Fastify and removes the ephemeral service metadata file.
 
+Only one Gatekeeper foreground service may own machine-local Project Memory at a time. Starting a second service fails safely without replacing the active service's metadata or changing its operations. After a crash, Gatekeeper reclaims a lock only when its recorded process is no longer running; otherwise stop the existing foreground process first.
+
 ## Connection
 
 - Bind address: `127.0.0.1` only.

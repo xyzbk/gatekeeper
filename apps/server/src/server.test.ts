@@ -1111,6 +1111,78 @@ describe('Gatekeeper local service', () => {
     await expect(access(serviceMetadata)).rejects.toThrow();
   });
 
+  it('rejects a second foreground service without replacing the first metadata', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-single-owner-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    const options = {
+      bearerToken,
+      dashboardRoot,
+      logger: false,
+      paths,
+      repository,
+      reviewPullRequest: unexercisedPullRequestReview,
+      reviewWorktree: ({ repositoryId }: PersistentReviewContext) =>
+        Promise.resolve({ ...reviewResponse, repositoryId }),
+      startedAt: '2026-07-19T20:00:00.000Z',
+      tools: statusResponse.tools,
+      version: '0.1.0',
+    };
+    const first = await startGatekeeperService(options);
+    let second: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
+
+    try {
+      await expect(
+        startGatekeeperService(options).then((service) => {
+          second = service;
+          return service;
+        }),
+      ).rejects.toThrow('already running');
+      expect(JSON.parse(await readFile(paths.serviceMetadata, 'utf8'))).toMatchObject({
+        baseUrl: first.baseUrl,
+      });
+    } finally {
+      await second?.close().catch(() => undefined);
+      await first.close().catch(() => undefined);
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('reclaims a stale service lock before starting', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-stale-lock-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+    await writeFile(`${paths.serviceMetadata}.lock`, JSON.stringify({ pid: 999_999_999 }), 'utf8');
+
+    const service = await startGatekeeperService({
+      bearerToken,
+      dashboardRoot,
+      logger: false,
+      paths,
+      repository,
+      reviewPullRequest: unexercisedPullRequestReview,
+      reviewWorktree: ({ repositoryId }: PersistentReviewContext) =>
+        Promise.resolve({ ...reviewResponse, repositoryId }),
+      startedAt: '2026-07-19T20:00:00.000Z',
+      tools: statusResponse.tools,
+      version: '0.1.0',
+    });
+
+    await service.close();
+    await expect(access(`${paths.serviceMetadata}.lock`)).rejects.toThrow();
+    await rm(appData, { force: true, recursive: true });
+  });
+
   it('enforces deterministic-only mode through the running service', async () => {
     const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-deterministic-only-'));
     const paths = {
