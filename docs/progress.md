@@ -549,3 +549,12 @@ The user authorized a focused hardening pass after the historical-commit extensi
 RED/GREEN evidence, repair behavior, Git-state assertions, and the final release matrix are recorded in `docs/development/foundation-hardening-execution-log.md`. The verified passing commits are `ac3d6ed`, `2a4e2e9`, `4db277c`, `74413ae`, and the completion commit for this task.
 
 The complete matrix passed frozen install, lint, typecheck, 49-file/297-test suite, build, two Chromium stories, demo smoke, evaluation, zero-call model-data dry run, formatting, high-severity audit, strict Git object audit, and diff check. Code freeze is re-established: future work is limited to release-blocking fixes, documentation corrections, approved video edits, and user-authorized submission validation.
+
+## User-authorized post-freeze CI portability correction
+
+Status: local verification complete on 2026-07-19; GitHub Actions confirmation is tracked in issue #1.
+
+- GitHub Actions CI #59 exposed that the server-test fixture used a Windows-only repository root. The fixed-repository safety check correctly rejected that nonexistent path on Ubuntu before a review began, which cascaded into server lifecycle test failures.
+- The fixture now uses `process.cwd()` so the service tests exercise the actual checked-out repository on Windows and Linux. No production service behavior, dependency, product scope, or target repository behavior changed.
+- A deliberate inaccessible-root RED control reproduced 9 failed server tests locally. After the correction, the focused suite passed 42 tests and the full quality gate passed: lint, typecheck, 49 files / 297 tests, and build.
+- Detailed root-cause evidence is retained in `docs/development/foundation-hardening-execution-log.md`; GitHub issue #1 owns the external CI result and closure evidence.

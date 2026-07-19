@@ -35,7 +35,7 @@ import type { PersistentReviewContext } from './service.js';
 const host = '127.0.0.1:43127';
 const bearerToken = 'a'.repeat(43);
 const repository = {
-  root: 'D:\\work\\gatekeeper',
+  root: process.cwd(),
   branch: 'master',
   head: 'b'.repeat(40),
   dirty: false,

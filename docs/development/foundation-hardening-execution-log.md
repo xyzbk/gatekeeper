@@ -64,3 +64,11 @@ This user-authorized post-freeze hardening pass closes the five concrete audit f
 - Corrupt review-run JSON remains fail-closed and is never automatically deleted; the explicit repair path is limited to corrupt review-operation rows.
 - A repair is local-only and should be requested after stopping the foreground service. It does not reset Project Memory, alter Git state, or disclose source/diff content.
 - Gatekeeper remains a single fixed-repository local service. Project selection, hosted collaboration, background work, GitHub publication, target-repository mutation, and model verdicts remain out of scope.
+
+## Post-freeze CI portability correction
+
+- Evidence: GitHub Actions CI #59 failed the `quality` job with ten server-test errors. The issue is tracked in GitHub issue #1.
+- Root cause: the server-test repository fixture hard-coded `D:\\work\\gatekeeper`. The hardened service intentionally inspects its fixed repository before every review. That directory exists on this Windows checkout but not on the Ubuntu GitHub Actions runner, so operations failed before their review callbacks ran.
+- RED: changing the fixture to an inaccessible temporary repository reproduced the CI failure pattern locally: 9 of 42 server tests failed, including invalid review-response parsing, an accepted second operation (`202` rather than `503`), an environment-error `500`, and interrupted-operation polls.
+- GREEN: the fixture now uses `process.cwd()`, the actual checked-out repository path on every supported runner. The service remains unchanged; this is a test-environment portability correction, not a behavior change.
+- Local verification after the correction: the focused server suite passed 42 tests; `pnpm lint`, `pnpm typecheck`, `pnpm test` (49 files / 297 tests), and `pnpm build` all passed. GitHub Actions confirmation is recorded against issue #1 after the verified commit is pushed.
