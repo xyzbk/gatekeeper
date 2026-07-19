@@ -558,3 +558,19 @@ Status: local verification complete on 2026-07-19; GitHub Actions confirmation i
 - The fixture now uses `process.cwd()` so the service tests exercise the actual checked-out repository on Windows and Linux. No production service behavior, dependency, product scope, or target repository behavior changed.
 - A deliberate inaccessible-root RED control reproduced 9 failed server tests locally. After the correction, the focused suite passed 42 tests and the full quality gate passed: lint, typecheck, 49 files / 297 tests, and build.
 - Detailed root-cause evidence is retained in `docs/development/foundation-hardening-execution-log.md`; GitHub issue #1 owns the external CI result and closure evidence.
+
+## User-authorized post-freeze extension — local Commit Explorer
+
+Status: COMPLETE on 2026-07-19.
+
+The user explicitly authorized a bounded local Commit Explorer after code freeze. It adds `/commits` without changing the one-fixed-repository service model, Memory evidence search, CLI, MCP tools, or GitHub behavior.
+
+- The strict authenticated local API resolves `master` when present (otherwise the checked-out local branch), lists current local branches, returns at most 24 metadata cards, and joins only the existing indexed/reviewed facts from Project Memory.
+- The dashboard adds native branch/source/query/date/review-state/order filters, next/previous cursor navigation, loading/empty/stale-branch/error recovery, and compact graphite commit cards that start the existing immutable full-SHA review operation.
+- Git remains the only authority for branch membership and history. The extension has no migration, dependency, GitHub request, model call, target-repository mutation, repository picker, commit body/diff exposure, author filter, total-history count, or browser-persisted selection/token.
+- The existing Memory evidence search and its ten-row indexed-history grid remain unchanged.
+- Final release matrix passed: `pnpm lint`, `pnpm typecheck`, isolated-temp `pnpm test` (51 files / 313 tests), `pnpm build`, `pnpm format:check`, `pnpm audit --audit-level high`, and `git diff --check`.
+
+The authoritative checklist is `docs/superpowers/plans/2026-07-19-commit-explorer.md`; RED/GREEN evidence, corrections, and environmental limits are retained in `docs/development/commit-explorer-execution-log.md`.
+
+Verified implementation commits: `e27e5f5`, `6a66650`, `f39097c`, `b67c3c5`, and `c0656e3`; this documentation commit closes the extension record.

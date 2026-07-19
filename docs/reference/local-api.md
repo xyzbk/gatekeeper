@@ -258,6 +258,7 @@ The built React application supports direct entry and refresh for these fixed lo
 - `GET /reviews/worktree` — interactive worktree review;
 - `GET /reviews/pull-request` — explicit read-only history sync and pull-request review;
 - `GET /reviews/:reviewId` — one persisted review selected by its validated ID;
+- `GET /commits` — bounded local-branch Commit Explorer and historical-review entry;
 - `GET /memory` — Project Memory search for the repository fixed at service startup.
 
 The browser sends the in-memory bootstrap bearer token to the matching fixed-repository APIs. It never accepts a repository path, renders repository content as HTML, or stores the token in persistent browser storage.
