@@ -499,3 +499,9 @@ Detailed RED/GREEN states, browser failures, corrections, audits, and visual evi
 ## Phase 6 scope boundary audit at completion
 
 No hosted service, background worker, queue, SSE stream, account system, collaboration layer, analytics surface, settings/policy editor, chart package, GitHub write path, or second model provider exists. Phase 6 stops at the verified local remediation loop.
+
+## Phase 7 — Release hardening, judge demo, evals, and submission
+
+Status: IN PROGRESS on 2026-07-19.
+
+Phase 7 is limited to security regression hardening, deterministic release controls, network-free judge demonstration/evaluation, clean-install/uninstall evidence, release documentation, video/Devpost preparation, and final code freeze. It must not add new product behavior except a release-blocking security or reproducibility control discovered by verification.
