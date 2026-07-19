@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -795,7 +795,7 @@ describe('SQLite Project Memory store', () => {
     );
   });
 
-  it('fails closed when persisted review operation JSON is corrupt', async () => {
+  it('inspects and explicitly repairs only corrupt persisted review operations', async () => {
     const root = await temporaryRoot();
     const databasePath = join(root, 'gatekeeper.db');
     const store = openStore({ databasePath });
@@ -811,6 +811,7 @@ describe('SQLite Project Memory store', () => {
       updatedAt: '2026-07-18T18:00:00.000Z',
     });
     const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    const validReview = { ...review, reviewId: 'review_valid_operation' };
     store.saveReviewOperation({
       schemaVersion: 1,
       reviewId: review.reviewId,
@@ -820,6 +821,16 @@ describe('SQLite Project Memory store', () => {
       stage: 'queued',
       createdAt: review.createdAt,
       updatedAt: review.createdAt,
+    });
+    store.saveReviewOperation({
+      schemaVersion: 1,
+      reviewId: validReview.reviewId,
+      repositoryId: validReview.repositoryId,
+      target: validReview.target,
+      status: 'queued',
+      stage: 'queued',
+      createdAt: validReview.createdAt,
+      updatedAt: validReview.createdAt,
     });
     store.close();
 
@@ -833,6 +844,30 @@ describe('SQLite Project Memory store', () => {
     reopened.migrate();
     expect(() => reopened.getReviewOperation(review.reviewId)).toThrowError(
       'The stored review operation is corrupt and cannot be read safely.',
+    );
+    expect(reopened.inspectStoredState()).toEqual({
+      integrity: 'corrupt',
+      corruptReviewOperations: 1,
+    });
+
+    const backupPath = join(root, 'backups', 'project-memory-before-repair.sqlite3');
+    await expect(reopened.repairCorruptReviewOperations(backupPath)).resolves.toEqual({
+      repaired: 1,
+      backupPath,
+    });
+    await expect(access(backupPath)).resolves.toBeUndefined();
+    const backup = new Database(backupPath, { readonly: true });
+    expect(
+      backup
+        .prepare(
+          'select operation_json as operationJson from review_operations where review_id = ?',
+        )
+        .get(review.reviewId),
+    ).toEqual({ operationJson: '{' });
+    backup.close();
+    expect(reopened.getReviewOperation(review.reviewId)).toBeNull();
+    expect(reopened.getReviewOperation(validReview.reviewId)).toEqual(
+      expect.objectContaining({ status: 'queued' }),
     );
   });
 

@@ -39,7 +39,7 @@ import {
   normalizeRemoteIdentity,
 } from '@gatekeeper/project-memory';
 import { completeReview, prepareReviewDraft } from '@gatekeeper/review-engine';
-import { openSqliteProjectStore } from '@gatekeeper/store-sqlite';
+import { openSqliteProjectStore, SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
 import type { FastifyInstance } from 'fastify';
 
 import {
@@ -218,6 +218,12 @@ export async function startGatekeeperService(
       return snapshot;
     };
     await memory.migrate();
+    if (store.inspectStoredState().integrity === 'corrupt') {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Project Memory needs local repair before Gatekeeper can start safely.',
+      );
+    }
     const registeredRepository = await memory.registerRepository({
       root: options.repository.root,
       remote: options.repository.remote,
@@ -625,28 +631,30 @@ export async function startGatekeeperService(
       status,
       close: async () => {
         acceptingReviewOperations = false;
-        await Promise.all([...activeReviewOperations.keys()].map((reviewId) => {
-          const operation = activeReviewOperations.get(reviewId);
-          if (operation === undefined) {
-            return Promise.resolve();
-          }
-          const failed = reviewOperationSchema.parse({
-            ...operation,
-            status: 'failed',
-            stage: 'failed',
-            error: {
-              code: 'REVIEW_FAILED',
-              message: 'Gatekeeper stopped before the local review completed.',
-              repair: 'Start a new review from the dashboard.',
-            },
-            updatedAt: new Date().toISOString(),
-          });
-          transientReviewOperations.set(reviewId, failed);
-          return memory.saveReviewOperation(failed).then(
-            () => transientReviewOperations.delete(reviewId),
-            () => undefined,
-          );
-        }));
+        await Promise.all(
+          [...activeReviewOperations.keys()].map((reviewId) => {
+            const operation = activeReviewOperations.get(reviewId);
+            if (operation === undefined) {
+              return Promise.resolve();
+            }
+            const failed = reviewOperationSchema.parse({
+              ...operation,
+              status: 'failed',
+              stage: 'failed',
+              error: {
+                code: 'REVIEW_FAILED',
+                message: 'Gatekeeper stopped before the local review completed.',
+                repair: 'Start a new review from the dashboard.',
+              },
+              updatedAt: new Date().toISOString(),
+            });
+            transientReviewOperations.set(reviewId, failed);
+            return memory.saveReviewOperation(failed).then(
+              () => transientReviewOperations.delete(reviewId),
+              () => undefined,
+            );
+          }),
+        );
         try {
           await activeServer.close();
         } finally {

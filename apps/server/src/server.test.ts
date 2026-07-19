@@ -26,6 +26,7 @@ import {
 } from '@gatekeeper/contracts';
 import { GitHubProviderError, type GitHubProvider } from '@gatekeeper/github-gh';
 import * as projectMemoryModule from '@gatekeeper/project-memory';
+import { SqliteProjectStore } from '@gatekeeper/store-sqlite';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectMemoryApi } from './server.js';
@@ -1709,6 +1710,43 @@ describe('Gatekeeper local service', () => {
     } finally {
       createProjectMemory.mockRestore();
       await service?.close().catch(() => undefined);
+      await rm(appData, { force: true, recursive: true });
+    }
+  });
+
+  it('refuses startup when local review-operation state needs explicit repair', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-corrupt-state-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const inspection = vi
+      .spyOn(SqliteProjectStore.prototype, 'inspectStoredState')
+      .mockReturnValue({ integrity: 'corrupt', corruptReviewOperations: 1 });
+    const { startGatekeeperService } = await import('./service.js');
+
+    try {
+      await expect(
+        startGatekeeperService({
+          bearerToken,
+          dashboardRoot,
+          logger: false,
+          paths,
+          repository,
+          reviewPullRequest: unexercisedPullRequestReview,
+          reviewWorktree: () => Promise.resolve(reviewResponse),
+          startedAt: '2026-07-19T20:00:00.000Z',
+          tools: statusResponse.tools,
+          version: '0.1.0',
+        }),
+      ).rejects.toMatchObject({
+        code: 'CORRUPT_DATA',
+        message: 'Project Memory needs local repair before Gatekeeper can start safely.',
+      });
+    } finally {
+      inspection.mockRestore();
       await rm(appData, { force: true, recursive: true });
     }
   });

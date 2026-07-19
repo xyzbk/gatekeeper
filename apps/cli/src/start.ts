@@ -8,6 +8,7 @@ import {
   type RunningGatekeeperService,
   type StartGatekeeperServiceOptions,
 } from '@gatekeeper/server';
+import { SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
 import { execa } from 'execa';
 
 import { runWorktreeReview } from './worktree-review.js';
@@ -163,6 +164,10 @@ export async function runStartCommand(
 export function formatStartError(error: unknown): string {
   if (error instanceof RepositoryInspectionError) {
     return error.message;
+  }
+
+  if (error instanceof SqliteProjectStoreError && error.code === 'CORRUPT_DATA') {
+    return 'Project Memory needs local repair. Run gatekeeper doctor --repair, then start again.';
   }
 
   return 'Gatekeeper could not start the local service. Build the workspace and try again.';

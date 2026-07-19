@@ -85,6 +85,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Project Memory remains tied to the configured root and normalized remote. A changed remote fails closed rather than reusing or mixing a prior project's memory, while status reads live Git state for freshness.
 - Dashboard-started reviews admit one active local operation at a time. Shutdown stops new starts, records each active operation as a bounded terminal failure when possible, and prevents a resumed old task from writing a review afterward.
 - If an operation's terminal write itself fails, the foreground service retains that bounded failure in memory so polling does not misleadingly remain queued or running. It is discarded only when the service stops; no source, diff, token, or exception content is exposed.
+- Startup and Doctor fail closed if SQLite integrity or stored review-operation JSON is corrupt. `gatekeeper doctor --repair` is explicit: it writes a consistent machine-local backup before deleting only unparsable operation rows, never repository files, valid reviews, source, diffs, or remote data.
 
 ## Deferred boundaries
 

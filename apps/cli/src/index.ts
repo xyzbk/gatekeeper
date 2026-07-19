@@ -216,9 +216,10 @@ memoryCommand
 program
   .command('doctor')
   .description('Check the local Gatekeeper toolchain without authenticating.')
+  .option('--repair', 'Back up and remove only corrupt local review-operation records.')
   .addOption(outputFormatOption())
-  .action(async ({ format }: { format: 'human' | 'json' }) => {
-    const result = await runDoctor();
+  .action(async ({ format, repair }: { format: 'human' | 'json'; repair?: boolean }) => {
+    const result = await runDoctor(undefined, { repair: repair === true });
 
     if (format === 'json') {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

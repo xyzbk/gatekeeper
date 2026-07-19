@@ -53,6 +53,16 @@ export class SqliteProjectStoreError extends Error {
   }
 }
 
+export interface StoredStateInspection {
+  corruptReviewOperations: number;
+  integrity: 'ok' | 'corrupt';
+}
+
+export interface CorruptReviewOperationRepair {
+  backupPath: string | null;
+  repaired: number;
+}
+
 export interface RepositoryRegistration extends RepositoryRecord {
   normalizedRoot: string;
   normalizedRemote: string | null;
@@ -1077,6 +1087,103 @@ export class SqliteProjectStore {
         'The stored review operation is corrupt and cannot be read safely.',
         { cause: error },
       );
+    }
+  }
+
+  public inspectStoredState(): StoredStateInspection {
+    let corruptReviewOperations = 0;
+    try {
+      corruptReviewOperations = this.#corruptReviewOperationIds().length;
+    } catch {
+      return { integrity: 'corrupt', corruptReviewOperations };
+    }
+    return {
+      corruptReviewOperations,
+      integrity: this.#databaseIntegrityIsOk() && corruptReviewOperations === 0 ? 'ok' : 'corrupt',
+    };
+  }
+
+  public async repairCorruptReviewOperations(
+    backupPath: string,
+  ): Promise<CorruptReviewOperationRepair> {
+    if (!this.#databaseIntegrityIsOk()) {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Project Memory failed its database integrity check and cannot be repaired automatically.',
+      );
+    }
+    let corruptReviewOperationIds: string[];
+    try {
+      corruptReviewOperationIds = this.#corruptReviewOperationIds();
+    } catch (error) {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Project Memory could not inspect its stored review operations safely.',
+        { cause: error },
+      );
+    }
+    if (corruptReviewOperationIds.length === 0) {
+      return { repaired: 0, backupPath: null };
+    }
+    try {
+      mkdirSync(dirname(backupPath), { recursive: true });
+      await this.#database.backup(backupPath);
+    } catch (error) {
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Project Memory could not create a local recovery backup.',
+        { cause: error },
+      );
+    }
+    try {
+      this.#database
+        .transaction(() => {
+          const remove = this.#database.prepare(
+            'DELETE FROM review_operations WHERE review_id = ?',
+          );
+          for (const reviewId of corruptReviewOperationIds) {
+            if (remove.run(reviewId).changes !== 1) {
+              throw new SqliteProjectStoreError(
+                'CORRUPT_DATA',
+                'Project Memory could not repair its stored review operations.',
+              );
+            }
+          }
+        })
+        .immediate();
+    } catch (error) {
+      if (error instanceof SqliteProjectStoreError) {
+        throw error;
+      }
+      throw new SqliteProjectStoreError(
+        'CORRUPT_DATA',
+        'Project Memory could not repair its stored review operations.',
+        { cause: error },
+      );
+    }
+    return { repaired: corruptReviewOperationIds.length, backupPath };
+  }
+
+  #corruptReviewOperationIds(): string[] {
+    const rows = this.#database
+      .prepare<unknown[], { operationJson: string; reviewId: string }>(
+        'SELECT review_id AS reviewId, operation_json AS operationJson FROM review_operations',
+      )
+      .all();
+    return rows.flatMap(({ operationJson, reviewId }) => {
+      try {
+        return reviewOperationSchema.safeParse(JSON.parse(operationJson)).success ? [] : [reviewId];
+      } catch {
+        return [reviewId];
+      }
+    });
+  }
+
+  #databaseIntegrityIsOk(): boolean {
+    try {
+      return this.#database.pragma('quick_check', { simple: true }) === 'ok';
+    } catch {
+      return false;
     }
   }
 

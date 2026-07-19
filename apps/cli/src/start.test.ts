@@ -3,6 +3,7 @@ import type {
   ReviewRunContract,
   ToolAvailability,
 } from '@gatekeeper/contracts';
+import { SqliteProjectStoreError } from '@gatekeeper/store-sqlite';
 import { describe, expect, it, vi } from 'vitest';
 
 const repository: RepositorySnapshot = {
@@ -180,5 +181,13 @@ describe('local tool inspection', () => {
       'Gatekeeper could not start the local service. Build the workspace and try again.',
     );
     expect(message).not.toContain('private path');
+  });
+
+  it('directs corrupt local state to the explicit repair command', async () => {
+    const { formatStartError } = await import('./start.js');
+
+    expect(
+      formatStartError(new SqliteProjectStoreError('CORRUPT_DATA', 'private database detail')),
+    ).toBe('Project Memory needs local repair. Run gatekeeper doctor --repair, then start again.');
   });
 });

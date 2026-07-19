@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { access, mkdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { dirname, join } from 'node:path';
 
 import { resolveAppDataPath, resolveProjectMemoryDatabasePath } from '@gatekeeper/config';
 
@@ -8,7 +9,16 @@ export type DoctorCheckStatus = 'pass' | 'warn' | 'fail';
 
 export interface DoctorCheck {
   message: string;
-  name: 'node' | 'pnpm' | 'git' | 'gh' | 'appData' | 'betterSqlite3' | 'database' | 'fts5';
+  name:
+    | 'node'
+    | 'pnpm'
+    | 'git'
+    | 'gh'
+    | 'appData'
+    | 'betterSqlite3'
+    | 'database'
+    | 'fts5'
+    | 'storedState';
   required: boolean;
   status: DoctorCheckStatus;
   repair?: string;
@@ -26,6 +36,7 @@ export interface DoctorDependencies {
   ensureWritable: (path: string) => Promise<void>;
   nodeVersion: string;
   probeProjectMemory: (databasePath: string) => Promise<ProjectMemoryProbe>;
+  repairProjectMemory?: (databasePath: string) => Promise<ProjectMemoryRepair>;
 }
 
 export interface ProjectMemoryProbe {
@@ -33,6 +44,16 @@ export interface ProjectMemoryProbe {
   database: boolean;
   fts5: boolean;
   journalMode: string | null;
+  storedState: { corruptReviewOperations: number; integrity: 'ok' | 'corrupt' };
+}
+
+export interface ProjectMemoryRepair {
+  backupPath: string | null;
+  repaired: number;
+}
+
+export interface DoctorOptions {
+  repair?: boolean;
 }
 
 function defaultCommandExists(command: string): Promise<boolean> {
@@ -57,14 +78,26 @@ async function defaultEnsureWritable(path: string): Promise<void> {
 async function defaultProbeProjectMemory(databasePath: string): Promise<ProjectMemoryProbe> {
   const sqlite = await import('@gatekeeper/store-sqlite').catch(() => null);
   if (sqlite === null) {
-    return { betterSqlite3: false, database: false, fts5: false, journalMode: null };
+    return {
+      betterSqlite3: false,
+      database: false,
+      fts5: false,
+      journalMode: null,
+      storedState: { integrity: 'corrupt', corruptReviewOperations: 0 },
+    };
   }
 
   let store: ReturnType<typeof sqlite.openSqliteProjectStore>;
   try {
     store = sqlite.openSqliteProjectStore({ databasePath });
   } catch {
-    return { betterSqlite3: true, database: false, fts5: false, journalMode: null };
+    return {
+      betterSqlite3: true,
+      database: false,
+      fts5: false,
+      journalMode: null,
+      storedState: { integrity: 'corrupt', corruptReviewOperations: 0 },
+    };
   }
 
   try {
@@ -75,9 +108,33 @@ async function defaultProbeProjectMemory(databasePath: string): Promise<ProjectM
       database: true,
       fts5: capabilities.fts5,
       journalMode: capabilities.journalMode,
+      storedState: store.inspectStoredState(),
     };
   } catch {
-    return { betterSqlite3: true, database: true, fts5: false, journalMode: null };
+    return {
+      betterSqlite3: true,
+      database: true,
+      fts5: false,
+      journalMode: null,
+      storedState: { integrity: 'corrupt', corruptReviewOperations: 0 },
+    };
+  } finally {
+    store.close();
+  }
+}
+
+async function defaultRepairProjectMemory(databasePath: string): Promise<ProjectMemoryRepair> {
+  const sqlite = await import('@gatekeeper/store-sqlite').catch(() => null);
+  if (sqlite === null) {
+    throw new Error('SQLite is unavailable.');
+  }
+
+  const store = sqlite.openSqliteProjectStore({ databasePath });
+  try {
+    store.migrate();
+    return await store.repairCorruptReviewOperations(
+      join(dirname(databasePath), 'backups', `project-memory-${Date.now()}.sqlite3`),
+    );
   } finally {
     store.close();
   }
@@ -90,10 +147,12 @@ const defaultDependencies: DoctorDependencies = {
   ensureWritable: defaultEnsureWritable,
   nodeVersion: process.version,
   probeProjectMemory: defaultProbeProjectMemory,
+  repairProjectMemory: defaultRepairProjectMemory,
 };
 
 export async function runDoctor(
   dependencies: DoctorDependencies = defaultDependencies,
+  options: DoctorOptions = {},
 ): Promise<DoctorResult> {
   const nodeMajor = Number.parseInt(
     dependencies.nodeVersion.replace(/^v/, '').split('.')[0] ?? '',
@@ -151,6 +210,18 @@ export async function runDoctor(
     });
   }
 
+  let repair: ProjectMemoryRepair | undefined;
+  let repairFailed = false;
+  if (options.repair) {
+    try {
+      repair = await (dependencies.repairProjectMemory ?? defaultRepairProjectMemory)(
+        dependencies.databasePath,
+      );
+    } catch {
+      repairFailed = true;
+    }
+  }
+
   const projectMemory = await dependencies.probeProjectMemory(dependencies.databasePath);
   checks.push(
     projectMemory.betterSqlite3
@@ -194,6 +265,27 @@ export async function runDoctor(
           status: 'fail',
           message: 'SQLite FTS5 is unavailable.',
           repair: 'Install the supported Gatekeeper SQLite build.',
+        },
+    projectMemory.database && projectMemory.storedState.integrity === 'ok' && !repairFailed
+      ? {
+          name: 'storedState',
+          required: true,
+          status: 'pass',
+          message:
+            repair === undefined || repair.repaired === 0
+              ? 'Stored review operation state is valid.'
+              : `Repaired ${repair.repaired} corrupt review operation${repair.repaired === 1 ? '' : 's'}. Backup: ${repair.backupPath}`,
+        }
+      : {
+          name: 'storedState',
+          required: true,
+          status: 'fail',
+          message: repairFailed
+            ? 'The requested local-state repair could not complete safely.'
+            : 'Stored review operation state is corrupt.',
+          repair: repairFailed
+            ? 'Keep the local database unchanged and restore it from a known-good backup if needed.'
+            : 'Run gatekeeper doctor --repair to back up and remove only corrupt review operations.',
         },
   );
 

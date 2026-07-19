@@ -11,7 +11,13 @@ describe('runDoctor', () => {
       databasePath: 'C:\\state\\gatekeeper\\storage\\project-memory.sqlite3',
       ensureWritable: () => Promise.resolve(),
       probeProjectMemory: () =>
-        Promise.resolve({ betterSqlite3: true, database: true, fts5: true, journalMode: 'wal' }),
+        Promise.resolve({
+          betterSqlite3: true,
+          database: true,
+          fts5: true,
+          journalMode: 'wal',
+          storedState: { integrity: 'ok', corruptReviewOperations: 0 },
+        }),
     });
 
     expect(result.status).toBe('degraded');
@@ -37,7 +43,13 @@ describe('runDoctor', () => {
       databasePath: '/state/gatekeeper/storage/project-memory.sqlite3',
       ensureWritable: () => Promise.resolve(),
       probeProjectMemory: () =>
-        Promise.resolve({ betterSqlite3: true, database: true, fts5: true, journalMode: 'wal' }),
+        Promise.resolve({
+          betterSqlite3: true,
+          database: true,
+          fts5: true,
+          journalMode: 'wal',
+          storedState: { integrity: 'ok', corruptReviewOperations: 0 },
+        }),
     });
 
     expect(result.status).toBe('failed');
@@ -61,6 +73,7 @@ describe('runDoctor', () => {
           database: false,
           fts5: false,
           journalMode: null,
+          storedState: { integrity: 'corrupt', corruptReviewOperations: 0 },
         }),
     });
 
@@ -71,5 +84,76 @@ describe('runDoctor', () => {
         expect.objectContaining({ name: 'fts5', required: true, status: 'fail' }),
       ]),
     );
+  });
+
+  it('reports corrupt review operations with an explicit local repair command', async () => {
+    const { runDoctor } = await import('./doctor.js');
+
+    const result = await runDoctor({
+      nodeVersion: 'v24.16.0',
+      commandExists: () => Promise.resolve(true),
+      appDataPath: '/state/gatekeeper',
+      databasePath: '/state/gatekeeper/storage/project-memory.sqlite3',
+      ensureWritable: () => Promise.resolve(),
+      probeProjectMemory: () =>
+        Promise.resolve({
+          betterSqlite3: true,
+          database: true,
+          fts5: true,
+          journalMode: 'wal',
+          storedState: { integrity: 'corrupt' as const, corruptReviewOperations: 1 },
+        }),
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.checks).toContainEqual({
+      name: 'storedState',
+      required: true,
+      status: 'fail',
+      message: 'Stored review operation state is corrupt.',
+      repair:
+        'Run gatekeeper doctor --repair to back up and remove only corrupt review operations.',
+    });
+  });
+
+  it('repairs only after the explicit flag, then reports the local backup', async () => {
+    const { runDoctor } = await import('./doctor.js');
+    let repaired = false;
+    const result = await runDoctor(
+      {
+        nodeVersion: 'v24.16.0',
+        commandExists: () => Promise.resolve(true),
+        appDataPath: '/state/gatekeeper',
+        databasePath: '/state/gatekeeper/storage/project-memory.sqlite3',
+        ensureWritable: () => Promise.resolve(),
+        probeProjectMemory: () =>
+          Promise.resolve({
+            betterSqlite3: true,
+            database: true,
+            fts5: true,
+            journalMode: 'wal',
+            storedState: repaired
+              ? { integrity: 'ok' as const, corruptReviewOperations: 0 }
+              : { integrity: 'corrupt' as const, corruptReviewOperations: 1 },
+          }),
+        repairProjectMemory: () => {
+          repaired = true;
+          return Promise.resolve({
+            repaired: 1,
+            backupPath: '/state/gatekeeper/storage/backups/project-memory-before-repair.sqlite3',
+          });
+        },
+      },
+      { repair: true },
+    );
+
+    expect(result.status).toBe('ok');
+    expect(result.checks).toContainEqual({
+      name: 'storedState',
+      required: true,
+      status: 'pass',
+      message:
+        'Repaired 1 corrupt review operation. Backup: /state/gatekeeper/storage/backups/project-memory-before-repair.sqlite3',
+    });
   });
 });

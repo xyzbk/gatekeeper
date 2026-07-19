@@ -16,7 +16,10 @@ Checks Node, pnpm, Git, optional `gh`, the writable app-data path, the native SQ
 ```bash
 gatekeeper doctor
 gatekeeper doctor --format json
+gatekeeper doctor --repair
 ```
+
+`doctor --repair` is the only automatic recovery action. It creates a SQLite-consistent backup under the local Project Memory storage directory, then removes only review-operation records whose stored JSON fails Gatekeeper's strict contract. It never changes the target repository, valid review runs, source, diffs, or remote data. Stop the local Gatekeeper service before requesting repair.
 
 ## `policy validate [path]`
 
