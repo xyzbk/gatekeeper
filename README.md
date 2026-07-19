@@ -23,15 +23,15 @@ pnpm fixtures:prepare
 pnpm demo:smoke
 pnpm eval
 pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
-pnpm --filter @gatekeeper/cli start -- --help
-pnpm --filter @gatekeeper/cli start -- doctor --format json
-pnpm --filter @gatekeeper/cli start -- policy validate demo/fixtures/clean
-pnpm --filter @gatekeeper/cli start -- review worktree demo/fixtures/missing-test
-pnpm --filter @gatekeeper/cli start -- review worktree demo/fixtures/protected-path --format json
-pnpm --filter @gatekeeper/cli start -- repo init demo/fixtures/history
-pnpm --filter @gatekeeper/cli start -- index demo/fixtures/history
-pnpm --filter @gatekeeper/cli start -- memory search "redis cache" demo/fixtures/history
-pnpm --filter @gatekeeper/cli start -- start .
+node apps/cli/dist/index.js --help
+node apps/cli/dist/index.js doctor --format json
+node apps/cli/dist/index.js policy validate demo/fixtures/clean
+node apps/cli/dist/index.js review worktree demo/fixtures/missing-test
+node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --format json
+node apps/cli/dist/index.js repo init demo/fixtures/history
+node apps/cli/dist/index.js index demo/fixtures/history
+node apps/cli/dist/index.js memory search "redis cache" demo/fixtures/history
+node apps/cli/dist/index.js start .
 ```
 
 ## Judge demo

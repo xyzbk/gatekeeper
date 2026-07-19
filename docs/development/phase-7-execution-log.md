@@ -58,6 +58,12 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - GREEN: the complete release matrix was repeated after the correction. It passed frozen-lockfile install, lint, typecheck, all 47 test files/262 tests, build, Chromium acceptance, fixture generation, judge smoke, evaluation regeneration, model-data dry run, formatting, high-severity dependency audit, and diff check.
 - Ponytail: this was four option additions and three narrow boundary tests. No retry layer, subprocess wrapper, configuration switch, dependency, or new process abstraction was added.
 
+### Post-freeze CLI quick-start correction
+
+- RED: the root quick-start ran the package-scoped source script through `pnpm --filter` but supplied workspace-relative fixture paths. pnpm sets that command's working directory to `apps/cli`, so `demo/fixtures/...` was incorrectly resolved as `apps/cli/demo/fixtures/...` and returned the safe inaccessible-path error.
+- GREEN: the quick-start now invokes the already-built CLI artifact from the workspace root. The compiled policy validation and missing-test review both passed with the documented fixture paths; policy protection returned the expected deterministic `BLOCK`; repository initialization, a repeated zero-write index, and Redis evidence search all passed. The compiled foreground service reported a loopback dashboard URL and held its listening port until it was stopped. The source wrapper remains valid for package-local commands or paths relative to `apps/cli`.
+- Ponytail: documentation was corrected instead of adding invocation-sensitive `cwd` behavior to the CLI.
+
 ## Code-freeze conclusion
 
 Phase 7 is complete and Gatekeeper is frozen as a local hackathon release candidate. The initial freeze was reopened only for the corrected release-blocking subprocess-boundary defect recorded above. The verified product is a single foreground, loopback-only service for one fixed repository with deterministic review, Project Memory, optional read-only fixture-backed GitHub review in the judge path, and a local dashboard/MCP/CLI surface. It has no hosted backend, account system, GitHub write path, live judge credential requirement, or model request in its release proof. Further changes are limited to release-blocking fixes, documentation corrections, approved video edits, or user-authorized submission validation.
