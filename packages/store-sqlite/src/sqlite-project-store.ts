@@ -273,6 +273,12 @@ function verifyFts5(database: Database.Database): void {
   }
 }
 
+function targetKey(target: ReviewRunContract['target']): string {
+  return target.kind === 'commit_range'
+    ? `commit:${target.head}`
+    : `${target.kind}:${target.display}`;
+}
+
 export class SqliteProjectStore {
   readonly #database: Database.Database;
   readonly #migrationsFolder: string;
@@ -287,6 +293,7 @@ export class SqliteProjectStore {
     verifyFts5(this.#database);
     try {
       migrate(drizzle({ client: this.#database }), { migrationsFolder: this.#migrationsFolder });
+      this.#backfillReviewTargetKeys();
     } catch (error) {
       throw new SqliteProjectStoreError(
         'MIGRATION_FAILED',
@@ -918,13 +925,14 @@ export class SqliteProjectStore {
       const write = this.#database
         .prepare(
           `INSERT INTO review_runs (
-             review_id, repository_id, target_kind, target_display, verdict, summary,
+             review_id, repository_id, target_kind, target_display, target_key, verdict, summary,
              created_at, previous_review_id, review_json
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(review_id) DO UPDATE SET
              repository_id = excluded.repository_id,
              target_kind = excluded.target_kind,
              target_display = excluded.target_display,
+             target_key = excluded.target_key,
              verdict = excluded.verdict,
              summary = excluded.summary,
              created_at = excluded.created_at,
@@ -937,6 +945,7 @@ export class SqliteProjectStore {
           parsed.repositoryId,
           parsed.target.kind,
           parsed.target.display,
+          targetKey(parsed.target),
           parsed.verdict,
           parsed.summary,
           parsed.createdAt,
@@ -1187,6 +1196,29 @@ export class SqliteProjectStore {
     }
   }
 
+  #backfillReviewTargetKeys(): void {
+    const backfill = this.#database.transaction(() => {
+      const rows = this.#database
+        .prepare<unknown[], { reviewId: string; reviewJson: string }>(
+          "SELECT review_id AS reviewId, review_json AS reviewJson FROM review_runs WHERE target_key = ''",
+        )
+        .all();
+      const write = this.#database.prepare(
+        "UPDATE review_runs SET target_key = ? WHERE review_id = ? AND target_key = ''",
+      );
+      for (const row of rows) {
+        const review = reviewRunSchema.parse(JSON.parse(row.reviewJson));
+        if (write.run(targetKey(review.target), row.reviewId).changes !== 1) {
+          throw new SqliteProjectStoreError(
+            'MIGRATION_FAILED',
+            'Project Memory could not migrate its stored review identities.',
+          );
+        }
+      }
+    });
+    backfill.immediate();
+  }
+
   public failInterruptedReviewOperations(updatedAt: string): number {
     const fail = this.#database.transaction(() => {
       const rows = this.#database
@@ -1263,10 +1295,10 @@ export class SqliteProjectStore {
     const row = this.#database
       .prepare<unknown[], { reviewId: string }>(
         `SELECT review_id AS reviewId FROM review_runs
-         WHERE repository_id = ? AND target_kind = ? AND target_display = ?
+         WHERE repository_id = ? AND target_key = ?
          ORDER BY created_at DESC, rowid DESC LIMIT 1`,
       )
-      .get(repositoryId, target.kind, target.display);
+      .get(repositoryId, targetKey(target));
     return row?.reviewId ?? null;
   }
 

@@ -142,6 +142,7 @@ export const reviewRuns = sqliteTable(
       .references(() => repositories.id, { onDelete: 'cascade' }),
     targetKind: text('target_kind').notNull(),
     targetDisplay: text('target_display').notNull(),
+    targetKey: text('target_key').notNull(),
     verdict: text('verdict').notNull(),
     summary: text('summary').notNull(),
     createdAt: text('created_at').notNull(),
@@ -149,10 +150,9 @@ export const reviewRuns = sqliteTable(
     reviewJson: text('review_json').notNull(),
   },
   (table) => [
-    index('review_runs_repository_target_idx').on(
+    index('review_runs_repository_target_key_idx').on(
       table.repositoryId,
-      table.targetKind,
-      table.targetDisplay,
+      table.targetKey,
       table.createdAt,
     ),
   ],

@@ -97,6 +97,7 @@ describe('historical commit change extraction', () => {
     await writeRepositoryFile(root, 'README.md', '# Gatekeeper\n');
     const head = await commitAll(root, 'create repository');
     const { createGitProvider } = await import('./git-provider.js');
+    const before = await repositoryState(root);
 
     const changeSet = await createGitProvider().getCommitDiff(root, head);
 
@@ -109,6 +110,7 @@ describe('historical commit change extraction', () => {
     expect(changeSet.files).toContainEqual(
       expect.objectContaining({ path: 'README.md', status: 'added', additions: 1 }),
     );
+    await expect(repositoryState(root)).resolves.toEqual(before);
   });
 
   it('keeps rename, binary, deletion, and current ignore handling bounded', async () => {
@@ -124,6 +126,7 @@ describe('historical commit change extraction', () => {
     await runGit(root, ['rm', '--', 'src/remove.ts']);
     const head = await commitAll(root, 'change files');
     const { createGitProvider } = await import('./git-provider.js');
+    const before = await repositoryState(root);
 
     const files = (await createGitProvider().getCommitDiff(root, head)).files;
 
@@ -141,6 +144,7 @@ describe('historical commit change extraction', () => {
       expect.objectContaining({ path: 'src/remove.ts', status: 'deleted' }),
     );
     expect(files.map(({ path }) => path)).not.toContain('private/secret.ts');
+    await expect(repositoryState(root)).resolves.toEqual(before);
   });
 
   it('rejects an object that is not a commit without leaking Git output', async () => {
@@ -149,6 +153,7 @@ describe('historical commit change extraction', () => {
     await commitAll(root, 'create repository');
     const tree = await runGit(root, ['rev-parse', 'HEAD^{tree}']);
     const { createGitProvider } = await import('./git-provider.js');
+    const before = await repositoryState(root);
 
     await expect(createGitProvider().getCommitDiff(root, tree)).rejects.toEqual(
       expect.objectContaining({
@@ -156,6 +161,7 @@ describe('historical commit change extraction', () => {
         message: 'Git could not resolve the selected commit.',
       }),
     );
+    await expect(repositoryState(root)).resolves.toEqual(before);
   });
 
   it('uses the first parent when the selected commit is a merge', async () => {
@@ -172,10 +178,12 @@ describe('historical commit change extraction', () => {
     await runGit(root, ['merge', '--no-ff', 'feature', '--message', 'merge feature']);
     const head = await runGit(root, ['rev-parse', 'HEAD']);
     const { createGitProvider } = await import('./git-provider.js');
+    const before = await repositoryState(root);
 
     const changeSet = await createGitProvider().getCommitDiff(root, head);
 
     expect(changeSet.target).toMatchObject({ base: firstParent, head });
     expect(changeSet.files.map(({ path }) => path)).toEqual(['src/feature.ts']);
+    await expect(repositoryState(root)).resolves.toEqual(before);
   });
 });

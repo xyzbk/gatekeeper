@@ -677,6 +677,132 @@ describe('SQLite Project Memory store', () => {
     reopened.close();
   });
 
+  it('uses full commit identity instead of the abbreviated target display', async () => {
+    const root = await temporaryRoot();
+    const store = openStore({ databasePath: join(root, 'gatekeeper.db') });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const firstHead = `${'a'.repeat(12)}${'1'.repeat(28)}`;
+    const secondHead = `${'a'.repeat(12)}${'2'.repeat(28)}`;
+    const first = {
+      ...createReviewRunFixture(),
+      reviewId: 'review_commit_prefix_first',
+      repositoryId: 'repository_fixture',
+      target: {
+        kind: 'commit_range' as const,
+        display: `Commit ${firstHead.slice(0, 12)}`,
+        base: 'b'.repeat(40),
+        head: firstHead,
+      },
+    };
+    const second = {
+      ...first,
+      reviewId: 'review_commit_prefix_second',
+      target: { ...first.target, head: secondHead },
+    };
+
+    store.saveReview(first);
+    expect(store.latestReviewId(second.repositoryId, second.target)).toBeNull();
+    store.saveReview(second);
+    expect(store.latestReviewId(first.repositoryId, first.target)).toBe(first.reviewId);
+    expect(store.latestReviewId(second.repositoryId, second.target)).toBe(second.reviewId);
+  });
+
+  it('backfills an empty legacy target key from its validated stored review', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const head = 'c'.repeat(40);
+    const review = {
+      ...createReviewRunFixture(),
+      reviewId: 'review_legacy_target_key',
+      repositoryId: 'repository_fixture',
+      target: {
+        kind: 'commit_range' as const,
+        display: `Commit ${head.slice(0, 12)}`,
+        base: 'b'.repeat(40),
+        head,
+      },
+    };
+    store.saveReview(review);
+    store.close();
+
+    const database = new Database(databasePath);
+    database
+      .prepare('update review_runs set target_key = ? where review_id = ?')
+      .run('', review.reviewId);
+    database.close();
+
+    const reopened = openStore({ databasePath });
+    reopened.migrate();
+    expect(reopened.latestReviewId(review.repositoryId, review.target)).toBe(review.reviewId);
+    reopened.close();
+
+    const checked = new Database(databasePath, { readonly: true });
+    expect(
+      checked
+        .prepare('select target_key as targetKey from review_runs where review_id = ?')
+        .get(review.reviewId),
+    ).toEqual({ targetKey: `commit:${head}` });
+    checked.close();
+  });
+
+  it('fails closed instead of guessing a malformed legacy target identity', async () => {
+    const root = await temporaryRoot();
+    const databasePath = join(root, 'gatekeeper.db');
+    const store = openStore({ databasePath });
+    store.migrate();
+    store.registerRepository({
+      schemaVersion: 1,
+      repositoryId: 'repository_fixture',
+      root: 'D:/work/fixture',
+      normalizedRoot: 'd:/work/fixture',
+      remote: null,
+      normalizedRemote: null,
+      createdAt: '2026-07-18T18:00:00.000Z',
+      updatedAt: '2026-07-18T18:00:00.000Z',
+    });
+    const review = { ...createReviewRunFixture(), repositoryId: 'repository_fixture' };
+    store.saveReview(review);
+    store.close();
+
+    const database = new Database(databasePath);
+    database
+      .prepare('update review_runs set target_key = ?, review_json = ? where review_id = ?')
+      .run('', '{', review.reviewId);
+    database.close();
+
+    const reopened = openStore({ databasePath });
+    expect(() => reopened.migrate()).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION_FAILED',
+        message:
+          'Project Memory migrations failed. Reinstall Gatekeeper or repair the local database.',
+      }),
+    );
+    reopened.close();
+  });
+
   it('persists review operation progress and completes it with the review transaction', async () => {
     const root = await temporaryRoot();
     const databasePath = join(root, 'gatekeeper.db');

@@ -53,7 +53,7 @@ gatekeeper review commit <full-sha> .
 gatekeeper review commit <full-sha> . --format json
 ```
 
-The SHA must be lowercase hexadecimal and 40–64 characters. Root commits compare to Git's empty tree; merge commits compare only to their first parent. The command resolves the object without checkout, branch movement, index modification, or worktree mutation. It persists the ReviewRun in Project Memory and links a repeat review of the same SHA to its previous review. It accepts no branch, range, remote, URL, policy text, or repository selector.
+The SHA must be lowercase hexadecimal and 40–64 characters. Root commits compare to Git's empty tree; merge commits compare only to their first parent. The command resolves the object without checkout, branch movement, index modification, or worktree mutation. It persists the ReviewRun in Project Memory and links a repeat review of the same full SHA to its previous review; the abbreviated display label is never used as that identity. It accepts no branch, range, remote, URL, policy text, or repository selector.
 
 ### Exit behavior
 

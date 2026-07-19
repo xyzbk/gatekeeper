@@ -533,3 +533,19 @@ The authoritative execution checklist is `docs/superpowers/plans/2026-07-19-hist
 - Full completion matrix: frozen-lockfile install; lint; typecheck; 49-file/283-test suite; build; two Playwright Chromium stories; demo smoke; evaluation; model-data dry run with zero model calls; formatting; high-severity audit; and diff check all pass on 2026-07-19.
 - The real twelve-commit browser acceptance proves ten-row bounded history, search replacement, clear restoration, deterministic first-parent `REQUIRE_CHANGES`, restart-safe deep link/re-review comparison, and unchanged target repository state.
 - Code freeze is re-established. Future work is limited to release-blocking fixes, documentation corrections, approved video edits, and user-authorized submission validation; no deferred product surface may start without explicit authorization.
+
+## User-authorized post-freeze extension — foundation hardening
+
+Status: COMPLETE on 2026-07-19.
+
+The user authorized a focused hardening pass after the historical-commit extension. It closes the audited failure modes without broadening Gatekeeper beyond one foreground fixed-repository service:
+
+- A machine-local owner lock prevents a second service from replacing metadata or failing another service's review; a stale absent-process lock is reclaimed safely.
+- Project Memory now fails closed if a fixed checkout's normalized remote changes, and status reports the live repository snapshot rather than a startup-time head.
+- Dashboard review operations admit one active run. Terminal failure remains observable when its last SQLite write fails; orderly shutdown prevents resumed old tasks from writing afterward.
+- Doctor detects malformed review-operation state. The explicit `doctor --repair` action creates a local SQLite-consistent backup, then deletes only malformed operation records; it never touches target repositories or valid review runs.
+- Migration `0003_review_target_key` stores a private full target key. Historical commit comparison uses the complete SHA, so an abbreviated display-prefix collision cannot create a false `previousReviewId` link.
+
+RED/GREEN evidence, repair behavior, Git-state assertions, and the final release matrix are recorded in `docs/development/foundation-hardening-execution-log.md`. The verified passing commits are `ac3d6ed`, `2a4e2e9`, `4db277c`, `74413ae`, and the completion commit for this task.
+
+The complete matrix passed frozen install, lint, typecheck, 49-file/297-test suite, build, two Chromium stories, demo smoke, evaluation, zero-call model-data dry run, formatting, high-severity audit, strict Git object audit, and diff check. Code freeze is re-established: future work is limited to release-blocking fixes, documentation corrections, approved video edits, and user-authorized submission validation.
