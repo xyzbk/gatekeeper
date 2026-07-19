@@ -585,3 +585,13 @@ Status: README and contributor guide complete on 2026-07-20; repository-profile 
 - The approved GitHub About values are prepared: description `Local-first repository intelligence for evidence-backed, policy-aware code reviews.` and topics `codex`, `mcp`, `code-review`, `developer-tools`, `local-first`, `typescript`, and `sqlite`. No website is claimed because the dashboard is local-only.
 - The connected GitHub integration can read repository details but does not expose repository-metadata mutation, and this machine has no `gh` CLI. No tool, credential, or package was added merely to change the public profile.
 - Documentation entry-point commit: `8bf423a`.
+
+## User-authorized post-freeze repository scope cleanup
+
+Status: COMPLETE on 2026-07-20.
+
+- Removed ten unused starter-pack copies and templates from `gatekeeper_codex_build_pack/`, cutting 3,217 lines of stale planning material from the tracked tree.
+- Preserved `GATEKEEPER_COMPLETE_CODEX_SPEC.md` and the single canonical `gatekeeper_codex_build_pack/GATEKEEPER_HACKATHON_PHASED_EXECUTION_PLAN.md` required by `AGENTS.md` and prior execution records.
+- Kept product packages, tests, demo fixtures, generated contracts, release evidence, security/legal files, and the public installation path unchanged.
+- Ignored local Playwright output remains outside version control; the execution host rejected its recursive deletion before it ran, so no filesystem control was bypassed.
+- Focused MCP surface verification and the production build passed before the removal commit; the final quality gate is recorded with this cleanup entry.
