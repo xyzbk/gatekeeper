@@ -21,7 +21,7 @@ Verdict assembly checks in this order: hard deterministic finding, human-approva
 
 Findings carry severity, confidence, bounded evidence, remediation, approval need, and optional enforcement. Unknown serialized fields are rejected.
 
-Phase 2 creates only deterministic findings from five worktree checks:
+Gatekeeper creates deterministic findings from five worktree checks:
 
 - changed-file and changed-line limits;
 - source changes without a matching test change;

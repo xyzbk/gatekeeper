@@ -21,9 +21,9 @@ The canonical example is `gatekeeper.policy.example.yaml`. Repository policy liv
 
 Enforcement values are `advisory`, `required`, and `hard`. Risk-zone verdict floors are `FAST_PATH`, `REQUIRE_CHANGES`, or `ESCALATE`; policy configuration cannot set a risk-zone floor directly to `BLOCK`.
 
-## Phase 2 policy behavior
+## Policy behavior
 
-All Phase 2 findings have `DETERMINISTIC` authority and confidence `1`. For checks that declare enforcement, it maps to finding severity as follows: `advisory` to `low`, `required` to `medium`, and `hard` to `high`. Risk-zone findings use their configured level. Final verdict assembly remains independent and follows the rules in [verdicts.md](verdicts.md).
+All deterministic policy findings have `DETERMINISTIC` authority and confidence `1`. For checks that declare enforcement, it maps to finding severity as follows: `advisory` to `low`, `required` to `medium`, and `hard` to `high`. Risk-zone findings use their configured level. Final verdict assembly remains independent and follows the rules in [verdicts.md](verdicts.md).
 
 ### Change size
 
@@ -56,4 +56,4 @@ Ignored paths do not contribute metrics, findings, or ReviewRun change summaries
 
 ## Parsed but deferred sections
 
-The v1 parser retains forward-compatible product vocabulary, but Phase 2 does not evaluate `repository.defaultBase`, linked-issue or description requirements, documentation relationships, or generated-file denial. It also does not evaluate `riskZones[].requirements`. These fields are validated, not enforced, until their scheduled review inputs exist. The five implemented worktree checks above are the complete Phase 2 policy surface.
+The v1 parser retains forward-compatible product vocabulary, but it does not evaluate `repository.defaultBase`, linked-issue or description requirements, documentation relationships, generated-file denial, or `riskZones[].requirements`. These fields are validated rather than enforced. The five implemented worktree checks above are the complete policy surface.

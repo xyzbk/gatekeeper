@@ -1,6 +1,6 @@
 # Deterministic worktree review pipeline
 
-Phase 3 keeps one review composition and three presentation surfaces. The CLI calls it directly; `gatekeeper start` injects it into the local API; the dashboard requests that API. The CLI and server persist the validated ReviewRun through the same Project Memory boundary. Domain behavior remains outside every adapter.
+Gatekeeper keeps one review composition and three presentation surfaces. The CLI calls it directly; `gatekeeper start` injects it into the local API; the dashboard requests that API. The CLI and server persist the validated ReviewRun through the same Project Memory boundary. Domain behavior remains outside every adapter.
 
 ```text
 requested path
@@ -62,10 +62,10 @@ Before leaving composition, Zod validates ReviewRun v1. The output carries bound
 - Unexpected failures become one stable internal error.
 - API and dashboard errors never echo source, diff, YAML content, subprocess output, or bearer tokens.
 
-## Phase 3 persistence boundary
+## Persistence boundary
 
 ReviewRun is stored only after strict contract validation. SQLite saves the run, findings, and evidence pointers atomically and rejects a review ID already owned by another repository. A later review of the same worktree target records `previousReviewId`, and persisted runs can be reopened through CLI, API, or dashboard after restart.
 
-Phase 4 adds a completion loop without moving verdict authority into Codex. The service loads a stored run, asks the review engine to derive bounded Project Memory queries and a strict ReviewDraft, and returns only offered evidence pointers. Codex may submit `EVIDENCE_SUPPORTED` and `INFERENCE` findings through the completion contract; it cannot submit deterministic authority, enforcement, policy identity, or a verdict. The review engine validates every pointer and changed path, preserves deterministic findings, recomputes the verdict, and the service persists the completed ReviewRun through the same SQLite transaction used by earlier phases.
+The completion loop does not move verdict authority into Codex. The service loads a stored run, asks the review engine to derive bounded Project Memory queries and a strict ReviewDraft, and returns only offered evidence pointers. Codex may submit `EVIDENCE_SUPPORTED` and `INFERENCE` findings through the completion contract; it cannot submit deterministic authority, enforcement, policy identity, or a verdict. The review engine validates every pointer and changed path, preserves deterministic findings, recomputes the verdict, and the service persists the completed ReviewRun through the same SQLite transaction.
 
-The deterministic review itself still does not query history or let historical evidence produce `BLOCK`. There is no MCP transport, Codex skill, GitHub input, pull-request target, model judgment, or enforcement mutation in Phase 3. The policy parser accepts a few later-phase fields, but only the five checks above execute now.
+The deterministic review itself does not let historical evidence produce `BLOCK`. MCP, Codex skill, GitHub input, and pull-request review extend evidence retrieval and completion without changing deterministic enforcement. The policy parser accepts additional fields, but only the five checks above execute.

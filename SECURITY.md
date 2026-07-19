@@ -23,7 +23,7 @@ Include the affected version/commit, reproduction steps with synthetic data, imp
 - `gatekeeper start --deterministic-only` refuses model-assisted completion before parsing or persisting it; deterministic review and Project Memory remain local.
 - The judge demo uses a committed fixture transport and disposable local state. It does not invoke live `gh`, a hosted model endpoint, or a GitHub write path.
 
-## Phase 2 review boundary
+## Review boundary
 
 The Git adapter resolves a canonical repository root before inspection. Every Git invocation uses an executable and argument array. Changed paths must be canonical repository-relative POSIX paths; traversal, absolute paths, control characters, backslashes, and paths whose real target escapes the repository are rejected.
 
@@ -33,13 +33,13 @@ Added lines exist only in the internal ChangeSet so the deterministic import-bou
 
 The changed-path cap is checked before reading each included untracked file. Files that disappear or become unreadable during inspection fail with a stable safe error. When a configured import-boundary source has truncated added-line evidence, Gatekeeper escalates to human review rather than treating the incomplete check as a pass.
 
-All Phase 2 findings use `DETERMINISTIC` authority. `BLOCK` still requires both deterministic authority and `hard` enforcement. Review completion never mutates or publishes the target repository, and a `BLOCK` verdict is not used as a process exit failure in this phase.
+Deterministic findings use `DETERMINISTIC` authority. `BLOCK` requires both deterministic authority and `hard` enforcement. Review completion never mutates or publishes the target repository, and a `BLOCK` verdict is not used as a process exit failure.
 
 ## Local service
 
 The localhost service binds only to `127.0.0.1`, validates Host and Origin, protects `/v1/*` with an ephemeral bearer token, applies a restrictive CSP, and rejects unknown API inputs. `POST /v1/reviews/worktree` accepts exactly `{}` with no query or repository selector; repository, index, memory-search, and review-read APIs are all bound to the repository selected when `gatekeeper start` began. The dashboard keeps the token only in memory and sends it only in the Authorization header.
 
-## Phase 3 Project Memory boundary
+## Project Memory boundary
 
 - The SQLite database lives under Gatekeeper's per-user machine app-data directory, outside target repositories by default.
 - Startup enables foreign keys and WAL, verifies FTS5, and applies reviewed versioned migrations before serving requests.
@@ -51,4 +51,4 @@ The localhost service binds only to `127.0.0.1`, validates Host and Origin, prot
 - Every repository-derived result is capped and labelled `untrusted_repository_content`; the dashboard renders excerpts as plain text.
 - Corrupt stored review JSON fails closed with a stable error. API and logs do not expose database errors, source, diffs, secrets, or bearer tokens.
 
-MCP, Codex skill, GitHub data, embeddings, and model-data controls do not exist yet and must not be implied by Phase 3.
+MCP and Codex workflows use the same bounded, local Project Memory controls. Embeddings and model-owned enforcement are not part of Gatekeeper.

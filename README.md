@@ -143,7 +143,6 @@ It proves six committed outcomes—including deterministic `BLOCK` and evidence-
 - [Verdict and finding reference](docs/reference/verdicts.md)
 - [Policy reference](docs/reference/policy.md)
 - [Development setup](docs/development/setup.md)
-- [Build progress and verification record](docs/progress.md)
 
 ## Contributing
 

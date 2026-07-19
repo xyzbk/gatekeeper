@@ -2,7 +2,7 @@
 
 Gatekeeper is MIT licensed. Dependency versions are pinned in `pnpm-lock.yaml`.
 
-This Phase 7 inventory was generated from committed package metadata with:
+This inventory was generated from committed package metadata with:
 
 ```bash
 pnpm licenses list --json

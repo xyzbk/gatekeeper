@@ -1,6 +1,6 @@
 # MCP and Codex skill reference
 
-Phase 5 exposes Gatekeeper to Codex through one repository-scoped stdio MCP server. The server is a thin adapter over the foreground loopback service; it does not open repositories, run Git/`gh`, persist data, or assemble verdicts itself.
+Gatekeeper exposes one repository-scoped stdio MCP server to Codex. The server is a thin adapter over the foreground loopback service; it does not open repositories, run Git/`gh`, persist data, or assemble verdicts itself.
 
 ## Setup
 

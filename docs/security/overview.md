@@ -4,7 +4,7 @@
 
 Trusted inputs are checked-in Gatekeeper configuration and explicit user actions. Repository files, diffs, commit messages, issue/PR text, review comments, and retrieved excerpts are untrusted data. They may contain prompt injection and must never become instructions.
 
-## Phase 0 controls
+## Contracts and configuration
 
 - Zod contracts are strict and reject unknown fields.
 - The committed JSON Schema is generated from and tested against the Zod verdict contract.
@@ -15,7 +15,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - App state resolves to a per-user OS data location outside repositories.
 - CI actions are pinned to immutable commit SHAs and receives read-only repository contents permission.
 
-## Phase 1 Git and contract controls
+## Git and contract controls
 
 - The requested repository path is canonicalized and must be a directory.
 - Git's reported top level must contain the requested path; an unrelated root is rejected.
@@ -25,7 +25,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Health and status are different strict contracts; the health shape has no repository or path fields.
 - Service metadata and dashboard bootstrap contracts require loopback URLs and a high-entropy bearer-token shape.
 
-## Phase 1 local-service controls
+## Local service controls
 
 - Fastify binds explicitly to `127.0.0.1` on an available port.
 - A 32-byte token is generated with `node:crypto` and written to machine-local service metadata with mode `0600` where supported.
@@ -42,13 +42,13 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Service metadata is removed during orderly shutdown.
 - `gatekeeper start` prints the repository root and loopback URL but never prints the bearer token. Unexpected startup errors are reduced to a bounded message rather than exposing subprocess or filesystem details.
 
-## Phase 2 worktree-review controls
+## Worktree review controls
 
 - Staged, unstaged, and untracked inputs are path-contained and bounded before the pure review engine receives them.
 - Raw source and raw diffs never enter ReviewRun, CLI output, HTTP responses, dashboard state, or logs.
 - Deterministic policy remains the only authority capable of producing `BLOCK`.
 
-## Phase 3 Project Memory controls
+## Project Memory controls
 
 - The machine-local SQLite database is outside the target repository by default and starts only after WAL, foreign-key, migration, and FTS5 checks.
 - Index batches and persisted reviews are atomic. Repository ownership is enforced for document and review identities, including collision attempts.
@@ -56,7 +56,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Search is repository-scoped, exact-first, FTS-tokenized, parameterized, capped, and labelled `untrusted_repository_content`.
 - Corrupt persisted review JSON fails closed. Restart tests prove durable reads without widening repository selection.
 
-## Phase 4 MCP and Codex controls
+## MCP and Codex controls
 
 - Trusted-project MCP configuration contains only a local Node command, relative build path, working directory, and bounded timeouts; it contains no token or model credential.
 - The stdio server registers exactly nine fixed-repository tools. The GitHub tool reads one positive-numbered pull request through the local service; the two commit tools list at most ten indexed metadata rows or review one full SHA against its first parent. They persist only machine-local state, never check out a commit, and expose no arbitrary path, file-read, subprocess, remote selector, synchronization, or publication capability.
@@ -68,7 +68,7 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 - Deterministic findings remain immutable and Gatekeeper recomputes the verdict. Model inference cannot create `BLOCK`.
 - The Gatekeeper skill requires consent before first setup/indexing and model reasoning when the current request has not already authorized the action. It never remediates or changes files without a separate explicit request.
 
-## Phase 5 GitHub history controls
+## GitHub history controls
 
 - The production GitHub provider uses `execa` with `shell: false`, stdin disabled, argument arrays, a 30-second timeout, and a 2 MiB output cap.
 - Supported provider commands are read-only: authentication status, pull-request view, and explicit GET API endpoints. No token is requested, returned, persisted, or logged.
@@ -92,13 +92,13 @@ Trusted inputs are checked-in Gatekeeper configuration and explicit user actions
 
 Pull-request CLI, fixed-repository API, MCP, and dashboard composition are implemented. The dashboard creates external anchors only for parsed `https://github.com/...` evidence URLs and renders all other values as text. GitHub publication, checks, comments, labels, merges, closes, and Actions remain deferred.
 
-## Phase 7 release controls
+## Release controls
 
 - Deterministic-only startup rejects the completion endpoint before it interprets submitted model findings. It does not disable deterministic review, Project Memory, dashboard reads, or bounded local indexing.
 - `pnpm model-data:dry-run` exercises the fixture-backed provider and review-draft path with zero model calls, then reports counts and source pointer metadata only—never source bodies or excerpts.
 - `pnpm demo` and `pnpm demo:smoke` use a committed Ghost fixture, a disposable local Git repository, and a loopback service. They do not invoke the live GitHub CLI, external network, model endpoints, or GitHub write operations.
 - Release helpers and local capability probes follow the same subprocess boundary: executable-plus-argument calls, a 30-second timeout, and a 1 MiB cap whenever output is read.
-- User-authorized video, Devpost, repository sharing, and feedback-session actions remain outside automated release work.
+- Video publishing, repository sharing, and feedback-session actions remain outside automated release work.
 
 ## Logging
 

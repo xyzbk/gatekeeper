@@ -32,7 +32,7 @@ const status = {
   },
 };
 
-describe('Phase 1 service contracts', () => {
+describe('service contracts', () => {
   it('accepts the complete real status shape', async () => {
     const { statusResponseSchema } = await import('./status.js');
 
