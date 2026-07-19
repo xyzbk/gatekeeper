@@ -109,6 +109,16 @@ The shortened example omits optional metrics and uses an empty findings array on
 
 Starts the same persisted worktree review for the dashboard without holding the HTTP request open. The request requirements are identical to the synchronous worktree endpoint. The `202` response is a strict ReviewOperation v1 with a preallocated review ID and `queued` status. The dashboard polls that ID through `GET /v1/reviews/:reviewId`.
 
+### `POST /v1/reviews/commit` and `/v1/reviews/commit/start`
+
+Review one immutable full local commit SHA, synchronously or as the dashboard operation:
+
+```json
+{ "schemaVersion": 1, "sha": "<40-64 lowercase hexadecimal object ID>" }
+```
+
+The fixed service repository is the only repository considered. The synchronous endpoint returns ReviewRun v1; the start endpoint returns the existing queued ReviewOperation v1. Gatekeeper compares the selected commit with its first parent (or Git's empty tree for a root commit), uses the current policy and ignore rules, and never checks out, moves a branch, changes the index, or modifies the worktree. Extra fields, ranges, branches, paths, remotes, and malformed SHAs are rejected.
+
 ### `POST /v1/reviews/pull-request`
 
 Runs the same deterministic reviewer for one pull request belonging to the fixed service repository:
@@ -162,6 +172,10 @@ Accepts strict MemorySearchInput v1 for the fixed repository only:
 ```
 
 The query is 1–256 characters and the optional limit is 1–50. Results are bounded EvidencePointers labelled `untrusted_repository_content`; repository content remains data, never instructions. A linked result includes its explicit `relationship` (`mentions`, `implements`, `reverts`, `supersedes`, `caused_by`, or `resolves`) and remains in its stored link position.
+
+### `GET /v1/memory/commits`
+
+Returns at most ten newest indexed commit records for the fixed repository, ordered by authored time then SHA. Each result contains only SHA, authored time, and title; titles are untrusted repository data. The endpoint accepts no selector, query field, commit body, or diff request. It is history evidence, not a repository browser or pagination API.
 
 ### `GET /v1/reviews/:reviewId`
 

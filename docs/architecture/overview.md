@@ -15,7 +15,7 @@ HTTP review ┘                                                 │       │
                                     CLI text/JSON <─ local API ─> React dashboard
 ```
 
-The Codex path is `Codex skill -> seven stdio MCP tools -> fixed loopback API -> review engine / Project Memory -> persisted ReviewRun`. The MCP process never bypasses the API to reach Git, GitHub, SQLite, or repository files.
+The Codex path is `Codex skill -> nine stdio MCP tools -> fixed loopback API -> review engine / Project Memory -> persisted ReviewRun`. The MCP process never bypasses the API to reach Git, GitHub, SQLite, or repository files.
 
 The current dependency direction is:
 
@@ -43,11 +43,11 @@ The `domain` package owns public entities and the rule that only a hard determin
 
 `store-sqlite` owns WAL mode, foreign keys, migrations, FTS5 synchronization, exact/linked/lexical search, remote sync cursors, and atomic review persistence. Local re-indexing manages only local source types and cannot delete remote documents. Remote sync upserts only remote documents, preserves valid records from partial batches, advances its cursor only after a complete batch, and ignores stale cursor/document replays. The database lives under machine-local Gatekeeper app data, outside the target repository by default.
 
-`apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, migrates/registers the fixed repository before listening, and exposes authenticated fixed-repository index, GitHub sync, memory-search, worktree/pull-request review, and review-read endpoints. HTTP input cannot select a path, remote, or another repository.
+`apps/server` remains a foreground-only Fastify adapter. It binds to an ephemeral port on `127.0.0.1`, writes ephemeral connection metadata under machine-local app data, migrates/registers the fixed repository before listening, and exposes authenticated fixed-repository index, GitHub sync, memory-search/history, worktree/commit/pull-request review, and review-read endpoints. Commit review resolves a full SHA against its first parent without checkout. HTTP input cannot select a path, remote, or another repository.
 
 `apps/dashboard` remains a small browser adapter. React Router provides Overview, `/reviews/worktree`, `/reviews/pull-request`, `/reviews/:reviewId`, and `/memory`; TanStack Query owns request state. A shared closure reads bootstrap once and holds the bearer token only in memory. Repository and GitHub excerpts render as bounded plain text; only validated `https://github.com/...` evidence becomes a safe external link.
 
-`apps/mcp-server` is a stdio-only presentation adapter. It reads validated ephemeral service metadata, calls only the recorded loopback origin with native fetch, and exposes six strict local tools. The repository skill owns the Codex workflow; the MCP adapter owns no review, evidence, persistence, or verdict behavior. Review preparation and completion remain in `review-engine`, and the foreground service remains the composition/persistence owner.
+`apps/mcp-server` is a stdio-only presentation adapter. It reads validated ephemeral service metadata, calls only the recorded loopback origin with native fetch, and exposes nine strict fixed-repository tools. The repository skill owns the Codex workflow; the MCP adapter owns no review, evidence, persistence, or verdict behavior. Review preparation and completion remain in `review-engine`, and the foreground service remains the composition/persistence owner.
 
 `gatekeeper start [path]` composes the same review and Project Memory services used by direct CLI commands. It does not open a browser, daemonize, mutate the repository, make a network request, or call a model.
 

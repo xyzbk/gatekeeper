@@ -49,3 +49,11 @@ Historical reviews compare a selected full commit object ID with its first paren
 - GREEN: `Review commit` starts the existing persisted operation and navigates to the existing Review Inspector. Re-review supports commit targets; a failed commit operation returns to Memory.
 - Correction: render history only while the submitted query is empty, and wrap the mutation client call so only the SHA reaches the transport boundary.
 - Verification: 4 focused dashboard test files / 21 tests passed; dashboard typecheck/build, Prettier, and `git diff --check` passed.
+
+## Task 6 — Codex MCP and Gatekeeper skill
+
+- RED: MCP client tests could not request the fixed service's commit routes, and the official MCP client exposed no commit-history or commit-review tools.
+- GREEN: `gatekeeper_list_recent_commits` returns the same bounded ten-row evidence response as Memory. `gatekeeper_review_commit` accepts only one strict full SHA, creates the existing persisted deterministic draft, and never selects a path, remote, branch, range, or process.
+- GREEN: the nine-tool registry explicitly labels recent history read-only and commit review local-write/non-idempotent. The Gatekeeper skill teaches selection from the bounded list, first-parent/current-policy semantics, untrusted titles, and the no-checkout boundary.
+- Findings: focused tests initially exposed a commit draft lookup fixture collision and an order mismatch between the public tool-name constant and registration. Both were fixed without expanding the public surface.
+- Verification: official in-memory and real stdio MCP suites, client contracts, repository-surface skill checks, MCP TypeScript build, Prettier, and `git diff --check` passed.

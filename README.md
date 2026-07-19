@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phases 0 through 7 are complete and the hackathon release is code-frozen. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
+Phases 0 through 7 are complete. This user-authorized post-freeze extension adds immutable historical-commit review. Gatekeeper reviews local worktrees, selected local commits, and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, nine-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
 
 ## Quick start
 
@@ -28,6 +28,7 @@ node apps/cli/dist/index.js doctor --format json
 node apps/cli/dist/index.js policy validate demo/fixtures/clean
 node apps/cli/dist/index.js review worktree demo/fixtures/missing-test
 node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --format json
+node apps/cli/dist/index.js review commit <full-sha> demo/fixtures/history --format json
 node apps/cli/dist/index.js repo init demo/fixtures/history
 node apps/cli/dist/index.js index demo/fixtures/history
 node apps/cli/dist/index.js memory search "redis cache" demo/fixtures/history
@@ -68,7 +69,7 @@ GPT-5.6 in Codex assisted the implementation process; Gatekeeper’s enforcement
 
 `gh` remains optional for the offline workflow. Doctor reports its absence as a warning and verifies the native SQLite driver, app-data writability, WAL mode, and FTS5 without authenticating or making network calls. Live `sync github` and `review pr` require an installed, authenticated GitHub CLI; default tests and the Ghost Change fixture do not.
 
-`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Open Reviews to run and persist a worktree or pull-request review, follow real progress and ordered evidence, copy a bounded remediation prompt, and compare a re-review; use Memory to search bounded evidence directly. Stop the process with Ctrl+C; it does not install a service, mutate the repository, or run in the background.
+`gatekeeper start` runs in the foreground and prints the random loopback dashboard URL. Open Reviews to run and persist a worktree or pull-request review, follow real progress and ordered evidence, copy a bounded remediation prompt, and compare a re-review; use Memory to search bounded evidence or select one of the ten newest indexed commits for a first-parent historical review. That review uses the current policy and never checks out or modifies the target repository. Stop the process with Ctrl+C; it does not install a service, mutate the repository, or run in the background.
 
 After `pnpm build`, trusted Codex projects discover the local server through `.codex/config.toml` and the Gatekeeper workflow through `.agents/skills/gatekeeper`. Start the foreground service, then ask Codex: “Review my current worktree with Gatekeeper. Show deterministic findings first, then Project Memory evidence. Do not change files.” Gatekeeper—not Codex—validates completion and assembles the persisted verdict.
 
@@ -85,7 +86,7 @@ After `pnpm build`, trusted Codex projects discover the local server through `.c
 - `packages/testkit`: deterministic fixtures shared by tests.
 - `apps/cli`: offline Doctor, policy validation, Project Memory/GitHub sync commands, worktree/PR review, and the foreground `start [path]` lifecycle.
 - `apps/server`: loopback-only Fastify service with secure bootstrap and fixed-repository review, GitHub, and memory APIs.
-- `apps/mcp-server`: protocol-clean stdio adapter exposing seven strict fixed-repository tools to Codex.
+- `apps/mcp-server`: protocol-clean stdio adapter exposing nine strict fixed-repository tools to Codex.
 - `apps/dashboard`: authenticated React/Vite repository overview, pollable worktree/PR Review Inspector, evidence timeline, remediation and re-review comparison, persisted review routes, and Project Memory search.
 
 The canonical verdict JSON Schema is [schemas/verdict.schema.json](schemas/verdict.schema.json), generated from the Zod contract and checked for drift by tests. The canonical policy example is [gatekeeper.policy.example.yaml](gatekeeper.policy.example.yaml).

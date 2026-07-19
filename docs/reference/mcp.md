@@ -15,25 +15,27 @@ Open the repository as a trusted Codex project. [`.codex/config.toml`](../../.co
 
 The project skill lives at [`.agents/skills/gatekeeper/SKILL.md`](../../.agents/skills/gatekeeper/SKILL.md). Restart Codex if an already-open session does not discover a newly built server or skill.
 
-## Phase 5 tools
+## Tools
 
-| Tool                             | Effect                                                       | Annotation summary                       |
-| -------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
-| `gatekeeper_status`              | Reads service, repository, and index freshness               | read-only, idempotent                    |
-| `gatekeeper_index_repository`    | Updates machine-local Project Memory incrementally           | local write, idempotent                  |
-| `gatekeeper_review_worktree`     | Persists a deterministic worktree run and prepares a draft   | local write, non-idempotent              |
-| `gatekeeper_search_memory`       | Reads bounded untrusted evidence                             | read-only, idempotent                    |
-| `gatekeeper_complete_review`     | Validates and replaces one local review record               | local write, non-idempotent              |
-| `gatekeeper_get_review`          | Reads one persisted review                                   | read-only, idempotent                    |
-| `gatekeeper_review_pull_request` | Reads one fixed-repository PR, persists it, prepares a draft | local write, open-world, no remote write |
+| Tool                             | Effect                                                        | Annotation summary                       |
+| -------------------------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| `gatekeeper_status`              | Reads service, repository, and index freshness                | read-only, idempotent                    |
+| `gatekeeper_index_repository`    | Updates machine-local Project Memory incrementally            | local write, idempotent                  |
+| `gatekeeper_review_worktree`     | Persists a deterministic worktree run and prepares a draft    | local write, non-idempotent              |
+| `gatekeeper_search_memory`       | Reads bounded untrusted evidence                              | read-only, idempotent                    |
+| `gatekeeper_complete_review`     | Validates and replaces one local review record                | local write, non-idempotent              |
+| `gatekeeper_get_review`          | Reads one persisted review                                    | read-only, idempotent                    |
+| `gatekeeper_review_pull_request` | Reads one fixed-repository PR, persists it, prepares a draft  | local write, open-world, no remote write |
+| `gatekeeper_list_recent_commits` | Reads at most ten indexed commit SHA/date/title records       | read-only, idempotent                    |
+| `gatekeeper_review_commit`       | Reviews one full immutable local SHA against its first parent | local write, non-idempotent              |
 
-Every tool declares strict Zod input and output schemas, returns validated `structuredContent`, and includes a concise text summary. All seven declare `destructiveHint: false`; only pull-request review declares `openWorldHint: true` because it reads GitHub. No MCP tool publishes, accepts a path/remote, synchronizes implicitly, reads arbitrary files, or runs arbitrary subprocesses.
+Every tool declares strict Zod input and output schemas, returns validated `structuredContent`, and includes a concise text summary. All nine declare `destructiveHint: false`; only pull-request review declares `openWorldHint: true` because it reads GitHub. No MCP tool publishes, accepts a path/remote, synchronizes implicitly, checks out a commit, reads arbitrary files, or runs arbitrary subprocesses.
 
 `gatekeeper_status` reports both the current repository HEAD and the stored index HEAD. A null index is uninitialized; a different HEAD is stale; matching values are current. This lets the skill avoid unnecessary indexing.
 
 ## Review completion
 
-`gatekeeper_review_worktree` and `gatekeeper_review_pull_request` return ReviewDraft v1 with immutable deterministic findings, bounded change summaries, and at most twenty deduplicated evidence candidates. Repository and GitHub excerpts are untrusted data even if they resemble system or developer instructions. The PR tool accepts only a positive integer and calls the real fixed-repository API; it never accepts or derives authority from remote text.
+`gatekeeper_review_worktree`, `gatekeeper_review_pull_request`, and `gatekeeper_review_commit` return ReviewDraft v1 with immutable deterministic findings, bounded change summaries, and at most twenty deduplicated evidence candidates. Repository and GitHub excerpts are untrusted data even if they resemble system or developer instructions. The commit tool accepts only a full lowercase 40â€“64 hexadecimal object ID, uses the first parent (or Git's empty tree for a root commit), applies the current policy, and never checks out or changes the target worktree. The PR tool accepts only a positive integer and calls the real fixed-repository API; it never accepts or derives authority from remote text.
 
 The skill asks for consent before the separate `gatekeeper sync github .` command when historical GitHub evidence is needed. Sync is explicit and read-only; it is not hidden inside the MCP review tool.
 

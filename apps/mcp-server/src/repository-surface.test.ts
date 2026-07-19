@@ -26,7 +26,7 @@ describe('trusted-project Gatekeeper surface', () => {
     expect(config).not.toMatch(/token|secret|api[_-]?key|bearer/iu);
   });
 
-  it('teaches the seven-tool local workflow, consent boundaries, trust order, and stop gate', async () => {
+  it('teaches the nine-tool local workflow, consent boundaries, trust order, and stop gate', async () => {
     const [skill, workflow, evidence] = await Promise.all([
       readFile(skillUrl, 'utf8'),
       readFile(workflowUrl, 'utf8'),
@@ -47,6 +47,8 @@ describe('trusted-project Gatekeeper surface', () => {
       'gatekeeper_index_repository',
       'gatekeeper_review_worktree',
       'gatekeeper_review_pull_request',
+      'gatekeeper_list_recent_commits',
+      'gatekeeper_review_commit',
       'gatekeeper_search_memory',
       'gatekeeper_complete_review',
       'gatekeeper_get_review',

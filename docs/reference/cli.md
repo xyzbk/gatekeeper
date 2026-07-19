@@ -41,9 +41,20 @@ gatekeeper review worktree . --format json
 
 The review loads `.gatekeeper/policies.yaml` when present and otherwise uses an empty version-1 policy. It never accepts a base branch, remote, URL, pull request, arbitrary file, or policy text through the command line.
 
+## `review commit <full-sha> [path]`
+
+Reviews one immutable local commit against its first parent using the current checked-out policy and ignore rules:
+
+```bash
+gatekeeper review commit <full-sha> .
+gatekeeper review commit <full-sha> . --format json
+```
+
+The SHA must be lowercase hexadecimal and 40–64 characters. Root commits compare to Git's empty tree; merge commits compare only to their first parent. The command resolves the object without checkout, branch movement, index modification, or worktree mutation. It persists the ReviewRun in Project Memory and links a repeat review of the same SHA to its previous review. It accepts no branch, range, remote, URL, policy text, or repository selector.
+
 ### Exit behavior
 
-For `policy validate` and `review worktree`:
+For `policy validate`, `review worktree`, and `review commit`:
 
 - `0`: validation or review completed, including `REQUIRE_CHANGES`, `ESCALATE`, or `BLOCK`;
 - `2`: policy/configuration error;

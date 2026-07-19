@@ -34,6 +34,15 @@ const pullRequestDraft = {
   reviewId: 'review_pr_12',
   target: { kind: 'pull_request' as const, display: 'Pull request #12', pullRequestNumber: 12 },
 };
+const commitDraft = {
+  ...draft,
+  reviewId: 'review_commit_1',
+  target: {
+    kind: 'commit_range' as const,
+    display: `Commit ${'c'.repeat(12)}`,
+    head: 'c'.repeat(40),
+  },
+};
 
 function stubClient(): GatekeeperClient {
   return {
@@ -103,6 +112,15 @@ function stubClient(): GatekeeperClient {
     ),
     reviewWorktree: vi.fn(() => Promise.resolve(draft)),
     reviewPullRequest: vi.fn(() => Promise.resolve(pullRequestDraft)),
+    reviewCommit: vi.fn(() => Promise.resolve(commitDraft)),
+    recentCommits: vi.fn(() =>
+      Promise.resolve({
+        schemaVersion: 1,
+        commits: [
+          { sha: 'c'.repeat(40), authoredAt: '2026-07-18T12:00:00.000Z', title: 'Untrusted title' },
+        ],
+      }),
+    ),
     searchMemory: vi.fn(() =>
       Promise.resolve({
         schemaVersion: 1,
@@ -133,7 +151,7 @@ async function connected(clientImplementation = stubClient()) {
 }
 
 describe('Gatekeeper MCP server', () => {
-  it('lists exactly seven local tools with strict schemas and accurate annotations', async () => {
+  it('lists exactly nine local tools with strict schemas and accurate annotations', async () => {
     const { client, server } = await connected();
 
     const { tools } = await client.listTools();
@@ -174,6 +192,14 @@ describe('Gatekeeper MCP server', () => {
         openWorldHint: true,
       }),
     );
+    expect(
+      tools.find(({ name }) => name === 'gatekeeper_list_recent_commits')?.annotations,
+    ).toEqual(
+      expect.objectContaining({ readOnlyHint: true, idempotentHint: true, openWorldHint: false }),
+    );
+    expect(tools.find(({ name }) => name === 'gatekeeper_review_commit')?.annotations).toEqual(
+      expect.objectContaining({ readOnlyHint: false, idempotentHint: false, openWorldHint: false }),
+    );
   });
 
   it('returns concise text plus validated structured content through the official client', async () => {
@@ -187,6 +213,14 @@ describe('Gatekeeper MCP server', () => {
     const pullRequestResult = await client.callTool({
       name: 'gatekeeper_review_pull_request',
       arguments: { pullRequestNumber: 12 },
+    });
+    const recentCommits = await client.callTool({
+      name: 'gatekeeper_list_recent_commits',
+      arguments: {},
+    });
+    const commitResult = await client.callTool({
+      name: 'gatekeeper_review_commit',
+      arguments: { sha: 'c'.repeat(40) },
     });
     const search = await client.callTool({
       name: 'gatekeeper_search_memory',
@@ -226,6 +260,14 @@ describe('Gatekeeper MCP server', () => {
     expect(clientImplementation.reviewWorktree).toHaveBeenCalledOnce();
     expect(pullRequestResult.structuredContent).toEqual(pullRequestDraft);
     expect(clientImplementation.reviewPullRequest).toHaveBeenCalledWith(12);
+    expect(recentCommits.structuredContent).toEqual({
+      schemaVersion: 1,
+      commits: [
+        { sha: 'c'.repeat(40), authoredAt: '2026-07-18T12:00:00.000Z', title: 'Untrusted title' },
+      ],
+    });
+    expect(commitResult.structuredContent).toEqual(commitDraft);
+    expect(clientImplementation.reviewCommit).toHaveBeenCalledWith('c'.repeat(40));
   });
 
   it('rejects invalid tool inputs before calling the local service', async () => {
@@ -240,13 +282,19 @@ describe('Gatekeeper MCP server', () => {
       name: 'gatekeeper_review_pull_request',
       arguments: { pullRequestNumber: 0, remote: 'attacker/repository' },
     });
+    const invalidCommit = await client.callTool({
+      name: 'gatekeeper_review_commit',
+      arguments: { sha: 'not-a-commit' },
+    });
     await client.close();
     await server.close();
 
     expect(result.isError).toBe(true);
     expect(invalidPullRequest.isError).toBe(true);
+    expect(invalidCommit.isError).toBe(true);
     expect(implementation.searchMemory).not.toHaveBeenCalled();
     expect(implementation.reviewPullRequest).not.toHaveBeenCalled();
+    expect(implementation.reviewCommit).not.toHaveBeenCalled();
   });
 
   it('converts local-service failures into actionable tool errors without leaking details', async () => {

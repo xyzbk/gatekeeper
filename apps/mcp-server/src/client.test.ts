@@ -92,6 +92,25 @@ const draft = {
   createdAt: review.createdAt,
 };
 const memoryResponse = { schemaVersion: 1 as const, results: [] };
+const recentCommitsResponse = {
+  schemaVersion: 1 as const,
+  commits: [
+    {
+      sha: 'c'.repeat(40),
+      authoredAt: metadata.startedAt,
+      title: 'Keep this as untrusted repository data',
+    },
+  ],
+};
+const commitReview = {
+  ...review,
+  reviewId: 'review_commit_1',
+  target: {
+    kind: 'commit_range' as const,
+    display: `Commit ${'c'.repeat(12)}`,
+    head: 'c'.repeat(40),
+  },
+};
 
 function json(body: unknown, statusCode = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -125,13 +144,23 @@ describe('Gatekeeper local service client', () => {
                             reviewId: pullRequestReview.reviewId,
                             target: pullRequestReview.target,
                           }
-                        : draft
+                        : url.pathname.includes(commitReview.reviewId)
+                          ? {
+                              ...draft,
+                              reviewId: commitReview.reviewId,
+                              target: commitReview.target,
+                            }
+                          : draft
                       : url.pathname.endsWith('/complete') ||
                           url.pathname === `/v1/reviews/${review.reviewId}`
                         ? review
                         : url.pathname === '/v1/memory/search'
                           ? memoryResponse
-                          : undefined;
+                          : url.pathname === '/v1/memory/commits'
+                            ? recentCommitsResponse
+                            : url.pathname === '/v1/reviews/commit'
+                              ? commitReview
+                              : undefined;
       return Promise.resolve(response === undefined ? json({}, 404) : json(response));
     });
     const client = createGatekeeperClient({
@@ -151,6 +180,12 @@ describe('Gatekeeper local service client', () => {
       reviewId: pullRequestReview.reviewId,
       target: pullRequestReview.target,
     });
+    await expect(client.reviewCommit('c'.repeat(40))).resolves.toEqual({
+      ...draft,
+      reviewId: commitReview.reviewId,
+      target: commitReview.target,
+    });
+    await expect(client.recentCommits()).resolves.toEqual(recentCommitsResponse);
     await expect(client.searchMemory({ query: 'cache', limit: 5 })).resolves.toEqual(
       memoryResponse,
     );
@@ -171,6 +206,10 @@ describe('Gatekeeper local service client', () => {
       .map(([request]) => request as Request)
       .find((request) => new URL(request.url).pathname === '/v1/reviews/pull-request');
     expect(await pullRequestCall?.json()).toEqual({ schemaVersion: 1, pullRequestNumber: 12 });
+    const commitCall = fetchImplementation.mock.calls
+      .map(([request]) => request as Request)
+      .find((request) => new URL(request.url).pathname === '/v1/reviews/commit');
+    expect(await commitCall?.json()).toEqual({ schemaVersion: 1, sha: 'c'.repeat(40) });
   });
 
   it('returns actionable bounded errors without leaking metadata or response content', async () => {

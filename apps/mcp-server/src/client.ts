@@ -6,6 +6,7 @@ import {
   gatekeeperMcpStatusSchema,
   indexResultSchema,
   memorySearchResponseSchema,
+  recentCommitEvidenceResponseSchema,
   repositoryRecordSchema,
   repositoryStatusSchema,
   reviewDraftSchema,
@@ -15,6 +16,7 @@ import {
   type GatekeeperMcpStatus,
   type IndexResult,
   type MemorySearchResponse,
+  type RecentCommitEvidenceResponse,
   type ReviewCompletionFinding,
   type ReviewDraftContract,
   type ReviewRunContract,
@@ -47,6 +49,8 @@ export interface GatekeeperClient {
   indexRepository: () => Promise<IndexResult>;
   reviewWorktree: () => Promise<ReviewDraftContract>;
   reviewPullRequest: (pullRequestNumber: number) => Promise<ReviewDraftContract>;
+  reviewCommit: (sha: string) => Promise<ReviewDraftContract>;
+  recentCommits: () => Promise<RecentCommitEvidenceResponse>;
   searchMemory: (input: SearchMemoryRequest) => Promise<MemorySearchResponse>;
   completeReview: (input: CompleteReviewRequest) => Promise<ReviewRunContract>;
   getReview: (reviewId: string) => Promise<ReviewRunContract>;
@@ -177,6 +181,14 @@ export function createGatekeeperClient(options: GatekeeperClientOptions = {}): G
       });
       return request(`/v1/reviews/${encodeURIComponent(review.reviewId)}/draft`, reviewDraftSchema);
     },
+    reviewCommit: async (sha) => {
+      const review = await request('/v1/reviews/commit', reviewRunSchema, {
+        method: 'POST',
+        body: { schemaVersion: 1, sha },
+      });
+      return request(`/v1/reviews/${encodeURIComponent(review.reviewId)}/draft`, reviewDraftSchema);
+    },
+    recentCommits: () => request('/v1/memory/commits', recentCommitEvidenceResponseSchema),
     searchMemory: async ({ query, limit }) => {
       const selected = await repository();
       return request('/v1/memory/search', memorySearchResponseSchema, {
