@@ -60,9 +60,10 @@ program
   .command('start')
   .description('Start Gatekeeper for one local Git repository.')
   .argument('[path]', 'repository path', '.')
-  .action(async (path: string) => {
+  .option('--deterministic-only', 'Disable Codex completion and run deterministic review only.')
+  .action(async (path: string, options: { deterministicOnly?: boolean }) => {
     try {
-      await runStartCommand(path);
+      await runStartCommand(path, undefined, options);
     } catch (error) {
       process.stderr.write(`Error: ${formatStartError(error)}\n`);
       process.exitCode = 1;

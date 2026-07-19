@@ -47,6 +47,10 @@ export interface StartCommandDependencies {
   write: (message: string) => void;
 }
 
+export interface StartCommandOptions {
+  deterministicOnly?: boolean;
+}
+
 async function runToolCommand(
   executable: 'gh' | 'git',
   arguments_: readonly string[],
@@ -114,6 +118,7 @@ const defaultDependencies: StartCommandDependencies = {
 export async function runStartCommand(
   repositoryPath: string,
   dependencies: StartCommandDependencies = defaultDependencies,
+  options: StartCommandOptions = {},
 ): Promise<void> {
   const repository = await dependencies.inspectRepository(repositoryPath);
   const [git, gh] = await Promise.all([
@@ -122,6 +127,7 @@ export async function runStartCommand(
   ]);
   const service = await dependencies.startService({
     dashboardRoot: dependencies.dashboardRoot,
+    ...(options.deterministicOnly === true ? { deterministicOnly: true } : {}),
     repository,
     reviewPullRequest: (number, context) =>
       dependencies.reviewPullRequest(repository.root, number, context),

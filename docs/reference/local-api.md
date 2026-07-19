@@ -210,6 +210,8 @@ Accepts strict model-authored findings and persists the recomputed ReviewRun v1:
 
 The request cannot contain a verdict, deterministic authority, policy identity, or enforcement. Evidence-supported findings require at least one exact pointer offered by the draft. Gatekeeper rejects duplicate IDs, cross-repository or forged pointers, and affected paths outside the stored change. It preserves deterministic findings, fixes the reasoning provider to `codex`, assembles the verdict locally, and atomically replaces the stored run. A missing review returns `NOT_FOUND`; invalid completion claims return the stable `USAGE_ERROR` envelope without echoing rejected content.
 
+When the foreground service started with `gatekeeper start --deterministic-only`, this endpoint always returns `403 FORBIDDEN` before interpreting the submitted completion. Deterministic review creation, stored-review reads, Project Memory, and dashboard routes remain available.
+
 ## Dashboard routes
 
 The built React application supports direct entry and refresh for these fixed local routes:

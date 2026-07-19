@@ -19,6 +19,13 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - RED: the release threat model, submission checklist, and Phase 7 execution log were absent; the required documentation scan returned missing paths.
 - GREEN: the threat model now maps every implemented trust boundary to controls and regression evidence, while the submission checklist explicitly reserves feedback, video, repository-sharing, Devpost creation, and submission for user authorization.
 
+### Deterministic release controls
+
+- RED: deterministic-only completion returned `200` and invoked the completion callback; the CLI did not forward the requested mode; the model-data report module did not exist.
+- GREEN: `gatekeeper start --deterministic-only` forwards one optional boolean through the start/service seam and the authenticated completion endpoint returns the existing bounded `403 FORBIDDEN` envelope before parsing or invoking a completion callback. Direct-server and live-service tests prove deterministic review remains available while completion is refused.
+- GREEN: `pnpm model-data:dry-run` runs the fixture-backed production provider, Project Memory, and review-draft path in a disposable SQLite database, then prints only source IDs/types/paths and counts with `modelCalls: 0` and `transport: "none"`.
+- Correction: the first root-level `tsx` invocation could not resolve workspace package aliases. The existing runnable demo pattern uses relative source entrypoints, so the report now follows that pattern; its root script succeeds without adding a package or dependency.
+
 ## External authorization boundary
 
 The user authorized Phase 7 engineering work. They have not authorized publishing a video, sharing repository access, creating or submitting Devpost content, or transmitting a feedback session identifier. Phase 7 prepares these artifacts but does not perform those external actions.

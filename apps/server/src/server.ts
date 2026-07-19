@@ -81,6 +81,7 @@ export interface BuildGatekeeperServerOptions {
     input: ReviewCompletionInput,
   ) => Promise<ReviewRunContract | null>;
   dashboardRoot: string;
+  deterministicOnly?: boolean;
   getStatus: () => StatusResponse;
   logger?: false | GatekeeperLoggerOptions;
   projectMemory: ProjectMemoryApi;
@@ -600,6 +601,17 @@ export async function buildGatekeeperServer(
       },
     },
     async (request, reply) => {
+      if (options.deterministicOnly === true) {
+        return reply
+          .code(403)
+          .send(
+            createError(
+              'FORBIDDEN',
+              'Model-assisted completion is disabled in deterministic-only mode.',
+            ),
+          );
+      }
+
       const input = reviewCompletionInputSchema.parse(request.body);
       const review = await options.completeReview(request.params.reviewId, input);
       return review === null

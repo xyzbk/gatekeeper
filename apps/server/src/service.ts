@@ -43,6 +43,7 @@ import { buildGatekeeperServer, type BuildGatekeeperServerOptions } from './serv
 export interface StartGatekeeperServiceOptions {
   bearerToken?: string;
   dashboardRoot: string;
+  deterministicOnly?: boolean;
   logger?: BuildGatekeeperServerOptions['logger'];
   paths?: ServicePaths;
   repository: RepositorySnapshot;
@@ -330,6 +331,7 @@ export async function startGatekeeperService(
         return completed;
       },
       dashboardRoot: options.dashboardRoot,
+      ...(options.deterministicOnly === true ? { deterministicOnly: true } : {}),
       getStatus: () => {
         if (status === undefined) {
           throw new Error('Service status is not ready.');

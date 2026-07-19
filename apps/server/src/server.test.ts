@@ -250,6 +250,7 @@ async function buildTestServer(
       reviewId: string,
       input: ReviewCompletionInput,
     ) => Promise<ReviewRunContract | null>;
+    deterministicOnly?: boolean;
     logger?: unknown;
     prepareReview?: (reviewId: string) => Promise<ReviewDraftContract | null>;
     projectMemory?: Partial<ProjectMemoryApi>;
@@ -271,6 +272,7 @@ async function buildTestServer(
       ((reviewId) =>
         Promise.resolve(reviewId === reviewResponse.reviewId ? completedReview : null)),
     dashboardRoot,
+    deterministicOnly: options.deterministicOnly,
     getStatus: () => statusResponse,
     logger: options.logger ?? false,
     projectMemory: {
@@ -837,6 +839,28 @@ describe('Gatekeeper local service', () => {
     expect(completeReview).toHaveBeenCalledWith(reviewResponse.reviewId, completionInput);
   });
 
+  it('rejects model-assisted completion in deterministic-only mode without invoking it', async () => {
+    const completeReview = vi.fn(() => Promise.resolve(completedReview));
+    const server = await buildTestServer({ completeReview, deterministicOnly: true });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: `/v1/reviews/${reviewResponse.reviewId}/complete`,
+      headers: { host, authorization: `Bearer ${bearerToken}` },
+      payload: completionInput,
+    });
+    await server.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Model-assisted completion is disabled in deterministic-only mode.',
+      },
+    });
+    expect(completeReview).not.toHaveBeenCalled();
+  });
+
   it('returns not found when completing an unknown review', async () => {
     const completeReview = vi.fn(() => Promise.resolve(null));
     const server = await buildTestServer({ completeReview });
@@ -987,6 +1011,62 @@ describe('Gatekeeper local service', () => {
 
     await service.close();
     await expect(access(serviceMetadata)).rejects.toThrow();
+  });
+
+  it('enforces deterministic-only mode through the running service', async () => {
+    const appData = await mkdtemp(join(tmpdir(), 'gatekeeper-deterministic-only-'));
+    const paths = {
+      appData,
+      serviceMetadata: join(appData, 'service.json'),
+      storage: join(appData, 'storage'),
+    };
+    const dashboardRoot = await createDashboardFixture();
+    const { startGatekeeperService } = await import('./service.js');
+
+    const service = await startGatekeeperService({
+      bearerToken,
+      dashboardRoot,
+      deterministicOnly: true,
+      logger: false,
+      paths,
+      repository,
+      reviewPullRequest: unexercisedPullRequestReview,
+      reviewWorktree: ({ repositoryId }) => Promise.resolve({ ...reviewResponse, repositoryId }),
+      startedAt: '2026-07-17T00:00:00.000Z',
+      tools: statusResponse.tools,
+      version: '0.1.0',
+    });
+
+    try {
+      const headers = {
+        host: new URL(service.baseUrl).host,
+        authorization: `Bearer ${bearerToken}`,
+      };
+      const created = await service.server.inject({
+        method: 'POST',
+        url: '/v1/reviews/worktree',
+        headers,
+        payload: {},
+      });
+      const review = reviewRunSchema.parse(created.json());
+      const completed = await service.server.inject({
+        method: 'POST',
+        url: `/v1/reviews/${review.reviewId}/complete`,
+        headers,
+        payload: completionInput,
+      });
+
+      expect(completed.statusCode).toBe(403);
+      expect(completed.json()).toEqual({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Model-assisted completion is disabled in deterministic-only mode.',
+        },
+      });
+    } finally {
+      await service.close();
+      await rm(appData, { recursive: true, force: true });
+    }
   });
 
   it('persists a review before response and reads it after a complete service restart', async () => {

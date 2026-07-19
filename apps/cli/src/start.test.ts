@@ -46,42 +46,47 @@ describe('start command lifecycle', () => {
     });
     const { runStartCommand } = await import('./start.js');
 
-    await runStartCommand('D:\\work\\gatekeeper', {
-      dashboardRoot: 'D:\\work\\gatekeeper\\apps\\dashboard\\dist',
-      inspectRepository: (path) => {
-        events.push(`inspect:${path}`);
-        return Promise.resolve(repository);
+    await runStartCommand(
+      'D:\\work\\gatekeeper',
+      {
+        dashboardRoot: 'D:\\work\\gatekeeper\\apps\\dashboard\\dist',
+        inspectRepository: (path) => {
+          events.push(`inspect:${path}`);
+          return Promise.resolve(repository);
+        },
+        inspectTool: (name) => {
+          events.push(`tool:${name}`);
+          return Promise.resolve(name === 'git' ? git : gh);
+        },
+        reviewWorktree: (root, context) => {
+          events.push(`review:${root}`);
+          return Promise.resolve({ ...review, repositoryId: context.repositoryId });
+        },
+        reviewPullRequest: () => Promise.reject(new Error('not exercised')),
+        startService: async (options) => {
+          events.push('start');
+          expect(options).toMatchObject({
+            dashboardRoot: 'D:\\work\\gatekeeper\\apps\\dashboard\\dist',
+            deterministicOnly: true,
+            repository,
+            tools: { git, gh },
+            version: '0.1.0',
+          });
+          await expect(
+            options.reviewWorktree({ repositoryId: 'repository_start_test' as never }),
+          ).resolves.toEqual(review);
+          return { baseUrl: 'http://127.0.0.1:43127', close };
+        },
+        waitUntilShutdown: () => {
+          events.push('wait');
+          return Promise.resolve();
+        },
+        write: (message) => {
+          output.push(message);
+        },
       },
-      inspectTool: (name) => {
-        events.push(`tool:${name}`);
-        return Promise.resolve(name === 'git' ? git : gh);
-      },
-      reviewWorktree: (root, context) => {
-        events.push(`review:${root}`);
-        return Promise.resolve({ ...review, repositoryId: context.repositoryId });
-      },
-      reviewPullRequest: () => Promise.reject(new Error('not exercised')),
-      startService: async (options) => {
-        events.push('start');
-        expect(options).toMatchObject({
-          dashboardRoot: 'D:\\work\\gatekeeper\\apps\\dashboard\\dist',
-          repository,
-          tools: { git, gh },
-          version: '0.1.0',
-        });
-        await expect(
-          options.reviewWorktree({ repositoryId: 'repository_start_test' as never }),
-        ).resolves.toEqual(review);
-        return { baseUrl: 'http://127.0.0.1:43127', close };
-      },
-      waitUntilShutdown: () => {
-        events.push('wait');
-        return Promise.resolve();
-      },
-      write: (message) => {
-        output.push(message);
-      },
-    });
+      { deterministicOnly: true },
+    );
 
     expect(events).toEqual([
       'inspect:D:\\work\\gatekeeper',

@@ -98,9 +98,12 @@ Starts the loopback service and built dashboard for one fixed repository:
 
 ```bash
 gatekeeper start .
+gatekeeper start --deterministic-only .
 ```
 
 The command prints the canonical repository root and random `127.0.0.1` URL, remains in the foreground, and stops on Ctrl+C. The dashboard Overview, Review Inspector, stored-review routes, and Project Memory search use the same repository for the service lifetime. Completed reviews and bounded indexes remain available after restart in machine-local Project Memory.
+
+`--deterministic-only` retains deterministic review, Project Memory, stored-review, and dashboard behavior, but rejects Codex completion at the local API boundary. Use it for a credential-free judging or security demonstration where no model-authored findings may be accepted.
 
 ## Deterministic demo fixtures
 
@@ -125,7 +128,8 @@ The Phase 5 Ghost Change is also exported as a raw GitHub-response fixture. Its 
 
 ```bash
 pnpm vitest run --config vitest.workspace.ts demo/ghost-change.test.ts
+pnpm model-data:dry-run
 pnpm demo:seed -- --repo owner/gatekeeper-demo-repo --dry-run
 ```
 
-The optional seeder defaults to zero-request dry-run. Its separately authorized `--apply` path requires one exact dedicated repository and three prepared branches; see [demo-seeding.md](../development/demo-seeding.md).
+`pnpm model-data:dry-run` runs the same local Ghost Change provider, Project Memory, and draft preparation path without network access or a model request. It prints `modelCalls: 0`, `transport: "none"`, and only source pointer metadata/counts; it never prints source bodies or excerpts. The optional seeder defaults to zero-request dry-run. Its separately authorized `--apply` path requires one exact dedicated repository and three prepared branches; see [demo-seeding.md](../development/demo-seeding.md).

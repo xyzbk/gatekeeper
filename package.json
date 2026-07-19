@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "fixtures:prepare": "tsx demo/prepare-fixtures.ts",
     "lint": "eslint packages apps demo tests playwright.config.ts --max-warnings 0",
+    "model-data:dry-run": "tsx demo/model-data-dry-run.ts",
     "schema:verdict": "pnpm --filter @gatekeeper/contracts schema:verdict",
     "test": "vitest run --config vitest.workspace.ts",
     "typecheck": "tsc -b --pretty false && pnpm --filter @gatekeeper/dashboard typecheck && tsc --noEmit --pretty false -p tsconfig.playwright.json"
