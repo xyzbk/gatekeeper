@@ -8,13 +8,22 @@ import {
   type RunGit,
 } from './repository-path.js';
 import { listCommits, listTrackedFiles, readFileAtRef } from './project-memory-source.js';
-import { extractWorktreeDiff, type WorktreeDiffOptions } from './worktree-diff.js';
+import {
+  extractCommitDiff,
+  extractWorktreeDiff,
+  type WorktreeDiffOptions,
+} from './worktree-diff.js';
 
 interface GitProviderOptions {
   runGit?: RunGit;
 }
 
 export interface GitProvider {
+  getCommitDiff(
+    repositoryPath: string,
+    sha: string,
+    options?: WorktreeDiffOptions,
+  ): ReturnType<typeof extractCommitDiff>;
   getWorktreeDiff(
     repositoryPath: string,
     options?: WorktreeDiffOptions,
@@ -94,6 +103,8 @@ export function createGitProvider(options: GitProviderOptions = {}): GitProvider
   const runGit = options.runGit ?? runGitCommand;
 
   return {
+    getCommitDiff: async (repositoryPath, sha, diffOptions) =>
+      extractCommitDiff(repositoryPath, sha, runGit, diffOptions),
     getWorktreeDiff: async (repositoryPath, diffOptions) =>
       extractWorktreeDiff(repositoryPath, runGit, diffOptions),
     inspectRepository: async (repositoryPath) => inspectRepository(repositoryPath, runGit),

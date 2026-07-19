@@ -201,12 +201,13 @@ function parseAddedLines(output: string): Map<string, AddedLineSummary> {
 function requireSuccessfulDiffCommand(
   result: Awaited<ReturnType<RunGit>>,
   message: string,
+  limitMessage = 'The worktree diff exceeds the 2 MiB limit.',
 ): string {
   if (result.failureReason === 'max_buffer') {
-    throw new WorktreeDiffError('DIFF_TOO_LARGE', 'The worktree diff exceeds the 2 MiB limit.');
+    throw new WorktreeDiffError('DIFF_TOO_LARGE', limitMessage);
   }
   if (Buffer.byteLength(result.stdout, 'utf8') > MAX_DIFF_BYTES) {
-    throw new WorktreeDiffError('DIFF_TOO_LARGE', 'The worktree diff exceeds the 2 MiB limit.');
+    throw new WorktreeDiffError('DIFF_TOO_LARGE', limitMessage);
   }
   if (result.exitCode !== 0) {
     throw new WorktreeDiffError('GIT_COMMAND_FAILED', message);
@@ -368,14 +369,15 @@ async function readUntrackedFile(repositoryRoot: string, path: string): Promise<
   }
 }
 
-export async function extractWorktreeDiff(
-  repositoryPath: string,
+async function extractTrackedFiles(
+  repositoryRoot: string,
   runGit: RunGit,
-  options: WorktreeDiffOptions = {},
-): Promise<ChangeSet> {
-  const repositoryRoot = await resolveRepositoryRoot(repositoryPath, runGit);
-  const matchers = await createIgnoreMatchers(repositoryRoot, options.ignorePatterns ?? []);
-  const [numstatResult, nameStatusResult, patchResult, untrackedResult] = await Promise.all([
+  refs: readonly string[],
+  matchers: readonly Ignore[],
+  historical = false,
+): Promise<ChangedFile[]> {
+  const safeDiffOptions = historical ? ['--no-ext-diff', '--no-textconv'] : [];
+  const [numstatResult, nameStatusResult, patchResult] = await Promise.all([
     runGit([
       '-C',
       repositoryRoot,
@@ -385,7 +387,8 @@ export async function extractWorktreeDiff(
       '--numstat',
       '-z',
       '--find-renames',
-      'HEAD',
+      ...safeDiffOptions,
+      ...refs,
       '--',
     ]),
     runGit([
@@ -397,7 +400,8 @@ export async function extractWorktreeDiff(
       '--name-status',
       '-z',
       '--find-renames',
-      'HEAD',
+      ...safeDiffOptions,
+      ...refs,
       '--',
     ]),
     runGit([
@@ -408,24 +412,42 @@ export async function extractWorktreeDiff(
       'diff',
       '--unified=0',
       '--no-ext-diff',
+      '--no-textconv',
       '--find-renames',
       '--no-prefix',
-      'HEAD',
+      ...refs,
       '--',
     ]),
-    runGit(['-C', repositoryRoot, 'ls-files', '--others', '--exclude-standard', '-z', '--']),
   ]);
+  const limitMessage = historical
+    ? 'The historical commit diff exceeds the 2 MiB limit.'
+    : 'The worktree diff exceeds the 2 MiB limit.';
   const stats = parseNumstat(
-    requireSuccessfulDiffCommand(numstatResult, 'Git could not calculate worktree statistics.'),
+    requireSuccessfulDiffCommand(
+      numstatResult,
+      historical
+        ? 'Git could not calculate historical commit statistics.'
+        : 'Git could not calculate worktree statistics.',
+      limitMessage,
+    ),
   );
   const identities = parseNameStatus(
-    requireSuccessfulDiffCommand(nameStatusResult, 'Git could not list changed worktree paths.'),
+    requireSuccessfulDiffCommand(
+      nameStatusResult,
+      historical
+        ? 'Git could not list historical commit paths.'
+        : 'Git could not list changed worktree paths.',
+      limitMessage,
+    ),
   );
   const addedLines = parseAddedLines(
-    requireSuccessfulDiffCommand(patchResult, 'Git could not inspect changed worktree lines.'),
-  );
-  const untrackedPaths = splitNullTerminated(
-    requireSuccessfulDiffCommand(untrackedResult, 'Git could not list untracked paths.'),
+    requireSuccessfulDiffCommand(
+      patchResult,
+      historical
+        ? 'Git could not inspect historical commit lines.'
+        : 'Git could not inspect changed worktree lines.',
+      limitMessage,
+    ),
   );
   const files: ChangedFile[] = [];
 
@@ -454,7 +476,80 @@ export async function extractWorktreeDiff(
     });
   }
 
-  const trackedPaths = new Set(identities.map(({ path }) => path));
+  return files;
+}
+
+function requireCommitSha(sha: string): string {
+  if (!/^[0-9a-f]{40,64}$/.test(sha)) {
+    throw new WorktreeDiffError('GIT_COMMAND_FAILED', 'The requested commit ID is invalid.');
+  }
+  return sha;
+}
+
+function requireCommitResult(result: Awaited<ReturnType<RunGit>>, message: string): string {
+  if (result.exitCode !== 0 || result.failureReason !== undefined) {
+    throw new WorktreeDiffError('GIT_COMMAND_FAILED', message);
+  }
+  const value = result.stdout.trim();
+  if (!/^[0-9a-f]{40,64}$/.test(value)) {
+    throw new WorktreeDiffError('GIT_COMMAND_FAILED', message);
+  }
+  return value;
+}
+
+async function resolveCommit(repositoryRoot: string, sha: string, runGit: RunGit): Promise<string> {
+  return requireCommitResult(
+    await runGit([
+      '-C',
+      repositoryRoot,
+      'rev-parse',
+      '--verify',
+      '--end-of-options',
+      `${sha}^{commit}`,
+    ]),
+    'Git could not resolve the selected commit.',
+  );
+}
+
+async function commitBase(repositoryRoot: string, head: string, runGit: RunGit): Promise<string> {
+  const parents = await runGit(['-C', repositoryRoot, 'rev-list', '--parents', '-n', '1', head]);
+  if (parents.exitCode !== 0 || parents.failureReason !== undefined) {
+    throw new WorktreeDiffError(
+      'GIT_COMMAND_FAILED',
+      'Git could not read the selected commit parent.',
+    );
+  }
+  const values = parents.stdout.trim().split(/\s+/u);
+  if (values[0] !== head || values.some((value) => !/^[0-9a-f]{40,64}$/.test(value))) {
+    throw new WorktreeDiffError(
+      'GIT_COMMAND_FAILED',
+      'Git could not read the selected commit parent.',
+    );
+  }
+  if (values[1] !== undefined) {
+    return values[1];
+  }
+  return requireCommitResult(
+    await runGit(['-C', repositoryRoot, 'hash-object', '-t', 'tree', '--stdin']),
+    'Git could not resolve the empty tree.',
+  );
+}
+
+export async function extractWorktreeDiff(
+  repositoryPath: string,
+  runGit: RunGit,
+  options: WorktreeDiffOptions = {},
+): Promise<ChangeSet> {
+  const repositoryRoot = await resolveRepositoryRoot(repositoryPath, runGit);
+  const matchers = await createIgnoreMatchers(repositoryRoot, options.ignorePatterns ?? []);
+  const [files, untrackedResult] = await Promise.all([
+    extractTrackedFiles(repositoryRoot, runGit, ['HEAD'], matchers),
+    runGit(['-C', repositoryRoot, 'ls-files', '--others', '--exclude-standard', '-z', '--']),
+  ]);
+  const untrackedPaths = splitNullTerminated(
+    requireSuccessfulDiffCommand(untrackedResult, 'Git could not list untracked paths.'),
+  );
+  const trackedPaths = new Set(files.map(({ path }) => path));
   for (const path of untrackedPaths) {
     await validatePath(repositoryRoot, path);
     if (trackedPaths.has(path) || isIgnored(path, matchers)) {
@@ -468,6 +563,33 @@ export async function extractWorktreeDiff(
   return changeSetSchema.parse({
     schemaVersion: 1,
     target: { kind: 'worktree', display: 'Current worktree' },
+    files,
+  });
+}
+
+export async function extractCommitDiff(
+  repositoryPath: string,
+  sha: string,
+  runGit: RunGit,
+  options: WorktreeDiffOptions = {},
+): Promise<ChangeSet> {
+  const selected = requireCommitSha(sha);
+  const repositoryRoot = await resolveRepositoryRoot(repositoryPath, runGit);
+  const [head, matchers] = await Promise.all([
+    resolveCommit(repositoryRoot, selected, runGit),
+    createIgnoreMatchers(repositoryRoot, options.ignorePatterns ?? []),
+  ]);
+  const base = await commitBase(repositoryRoot, head, runGit);
+  const files = await extractTrackedFiles(repositoryRoot, runGit, [base, head], matchers, true);
+  files.sort((left, right) => left.path.localeCompare(right.path));
+  return changeSetSchema.parse({
+    schemaVersion: 1,
+    target: {
+      kind: 'commit_range',
+      display: `Commit ${head.slice(0, 12)}`,
+      base,
+      head,
+    },
     files,
   });
 }

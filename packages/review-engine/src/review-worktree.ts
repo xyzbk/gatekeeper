@@ -33,6 +33,7 @@ export interface ReviewChangeSetInput {
 }
 
 export type ReviewWorktreeInput = ReviewChangeSetInput;
+export type ReviewCommitInput = ReviewChangeSetInput;
 
 export interface ReviewPullRequestInput extends ReviewChangeSetInput {
   pullRequest: PullRequestRecord;
@@ -424,6 +425,13 @@ export function reviewChangeSet(input: ReviewChangeSetInput): ReviewRun {
 export function reviewWorktree(input: ReviewWorktreeInput): ReviewRun {
   if (input.changeSet.target.kind !== 'worktree') {
     throw new Error('Worktree review requires a worktree change target.');
+  }
+  return reviewChangeSet(input);
+}
+
+export function reviewCommit(input: ReviewCommitInput): ReviewRun {
+  if (input.changeSet.target.kind !== 'commit_range') {
+    throw new Error('Commit review requires a commit change target.');
   }
   return reviewChangeSet(input);
 }

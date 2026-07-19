@@ -8,7 +8,12 @@ import type { GatekeeperPolicy } from '@gatekeeper/config';
 import { assembleVerdict, type RepositoryId, type ReviewId } from '@gatekeeper/domain';
 import { describe, expect, it } from 'vitest';
 
-import { createLocalRepositoryId, reviewPullRequest, reviewWorktree } from './review-worktree.js';
+import {
+  createLocalRepositoryId,
+  reviewCommit,
+  reviewPullRequest,
+  reviewWorktree,
+} from './review-worktree.js';
 
 const repositoryId = 'repository_test' as RepositoryId;
 const reviewId = 'review_test' as ReviewId;
@@ -282,6 +287,57 @@ describe('reviewWorktree', () => {
         },
       ]),
     ).toBe('ESCALATE');
+  });
+});
+
+describe('reviewCommit', () => {
+  it('applies the existing deterministic policy engine to a commit target', () => {
+    const result = reviewCommit({
+      changeSet: {
+        schemaVersion: 1,
+        target: {
+          kind: 'commit_range',
+          display: 'Commit aaaaaaaaaaaa',
+          base: 'b'.repeat(40),
+          head: 'a'.repeat(40),
+        },
+        files: [changedFile('src/app.ts')],
+      },
+      createdAt: '2026-07-19T12:00:00.000Z',
+      policy: {
+        version: 1,
+        tests: {
+          relationships: [
+            {
+              id: 'source-needs-tests',
+              source: ['src/**'],
+              tests: ['tests/**'],
+              enforcement: 'required',
+            },
+          ],
+        },
+      },
+      repositoryId,
+      reviewId,
+    });
+
+    expect(result.target.kind).toBe('commit_range');
+    expect(result.verdict).toBe('REQUIRE_CHANGES');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ policyId: 'source-needs-tests', authority: 'DETERMINISTIC' }),
+    );
+  });
+
+  it('rejects a non-commit target', () => {
+    expect(() =>
+      reviewCommit({
+        changeSet: changeSet([]),
+        createdAt: '2026-07-19T12:00:00.000Z',
+        policy: { version: 1 },
+        repositoryId,
+        reviewId,
+      }),
+    ).toThrow('Commit review requires a commit change target.');
   });
 });
 

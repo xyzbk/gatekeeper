@@ -18,3 +18,11 @@ Historical reviews compare a selected full commit object ID with its first paren
 - GREEN: strict commit-review input, immutable commit target, and bounded recent-commit response contracts now pass their focused tests.
 - Correction: the approved `40–64` object-ID compatibility range intentionally accepts intermediate lengths for forward compatibility, matching existing Project Memory commit contracts. The initial test incorrectly rejected 41 characters and was corrected; short, uppercase, option-like, malformed, and extra-field inputs remain rejected.
 - Verification: focused contracts tests and `pnpm exec tsc -b packages/contracts/tsconfig.json --pretty false` pass.
+
+## Task 2 — immutable Git extraction and deterministic review
+
+- RED: the first historical extraction test failed because `GitProvider.getCommitDiff` did not exist. Engine tests then failed because `reviewCommit` did not exist, and the CLI composition test failed because its module was absent.
+- GREEN: one private tracked-diff collector now serves both worktree and historical paths. Historical extraction resolves only a validated commit object, reads its first parent (or the Git-computed empty tree for a root commit), disables external diff/text conversion, enforces the existing output/path/file/line limits, and never checks out or changes repository state.
+- GREEN: real temporary-repository coverage proves normal, root, merge, rename, binary, deletion, current-ignore, malformed-ID, non-commit, and branch/HEAD/index/status preservation behavior. The deterministic engine adds only a target-kind guard and delegates all findings/verdict assembly to `reviewChangeSet`.
+- GREEN: `runCommitReview` loads the current repository policy, forwards its ignore patterns to immutable extraction, and uses the existing deterministic engine and review contract.
+- Verification: 5 focused test files / 36 tests passed; Git adapter, review engine, and CLI TypeScript project builds passed; Prettier and `git diff --check` passed.
