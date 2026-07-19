@@ -502,11 +502,21 @@ No hosted service, background worker, queue, SSE stream, account system, collabo
 
 ## Phase 7 — Release hardening, judge demo, evals, and submission
 
-Status: IN PROGRESS on 2026-07-19.
+Status: COMPLETE on 2026-07-19.
 
 Phase 7 is limited to security regression hardening, deterministic release controls, network-free judge demonstration/evaluation, clean-install/uninstall evidence, release documentation, video/Devpost preparation, and final code freeze. It must not add new product behavior except a release-blocking security or reproducibility control discovered by verification.
 
-### Current release evidence
+### Completion evidence
 
 - Deterministic-only startup, model-data dry run, the disposable fixture-only judge service, six-outcome golden evaluation, and the checked-in report are implemented and committed as Phase 7 release controls.
-- A fresh detached Windows checkout passed frozen-lockfile install, build, and the judge smoke matrix. The final attack matrix, Playwright release gate, dependency audit, and code-freeze report remain required before Phase 7 can be marked complete.
+- A fresh detached Windows checkout passed frozen-lockfile install, build, and the judge smoke matrix. The final Windows release matrix passed frozen-lockfile install, lint, typecheck, 44-file/259-test suite, production build, Chromium acceptance, judge smoke, evaluation regeneration, model-data dry run, formatting, high-severity dependency audit, and diff check.
+- The targeted 84-check attack suite covers prompt injection, path/symlink containment, Git argument arrays, secret denial/redaction, poisoned remote content, Host/Origin and token protection, stale data boundaries, deterministic `BLOCK` authority, and deterministic-only refusal. No release-blocking defect was found.
+- Ponytail found no redundant Phase 7 dependency, evaluator framework, launcher layer, or post-hackathon surface. The codebase is frozen after commit `docs: complete phase 7 release hardening`.
+
+### Remaining user-authorized submission steps
+
+- No video was uploaded, repository access was shared, feedback session identifier was transmitted, Devpost project was created/finalized, or submission was made. The prepared checklist and draft copy retain those actions for explicit user authorization only.
+
+### Code-freeze boundary
+
+All planned hackathon phases are complete. Only release-blocking bug fixes, documentation corrections, approved video edits, and user-authorized submission validation may follow; no new product feature should begin.

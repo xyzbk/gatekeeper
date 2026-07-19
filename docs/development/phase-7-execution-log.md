@@ -41,6 +41,19 @@ Expected RED states, GREEN results, unexpected failures, and corrections are app
 - GREEN: a fresh detached Windows checkout at the committed judge-demo revision passed `pnpm install --frozen-lockfile`, `pnpm build`, and `pnpm demo:smoke`. It installed the locked 400-package workspace from the local package cache, made no lockfile change, and produced all six golden verdicts.
 - Environment limitation: after Git removed the detached worktree registration, this host policy blocked recursive deletion of its untracked dependency cache. No Gatekeeper source, target repository, service state, or remote system was changed; the host-local temporary directory can be removed outside this session.
 
+### Final attack matrix and code freeze
+
+- GREEN: the focused attack suite passed 84 checks across prompt-injection containment, repository/path and outside-symlink denial, Git executable-plus-argument invocation, secret-file exclusion/redaction, poisoned GitHub record handling, loopback Host/Origin protections, bearer-token non-leakage, Project Memory isolation/stale-record handling, and the deterministic verdict boundary. The completion tests specifically prove that a model-assisted path cannot create `BLOCK`; `BLOCK` remains deterministic-policy-only.
+- GREEN: deterministic-only completion refusal is covered both directly and through the judge service. The authenticated completion endpoint returns bounded `403 FORBIDDEN` before it parses input or invokes a completion callback, while deterministic review and persisted reads remain available.
+- GREEN: the final release matrix passed on Windows: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm test` (44 files, 259 tests), `pnpm build`, `pnpm playwright test` (1 Chromium test), `pnpm demo:smoke` (six expected outcomes), `pnpm eval`, `pnpm model-data:dry-run` (eight pointers, zero model calls, no transport), `pnpm format:check`, `pnpm audit --audit-level high`, and `git diff --check`.
+- GREEN: the regenerated golden report stays fixture-only with zero external network/model calls; `BLOCK` appears only for the deterministic protected-path scenario, while authentication, Redis revival, and prompt injection remain `ESCALATE`.
+- Ponytail audit: no Phase 7 runtime dependency, launcher layer, generic evaluator framework, worker, queue, browser-opening dependency, hosted surface, or speculative post-hackathon abstraction was added. The optional boolean, route guard, finite scripts, and TypeScript project reference are each directly required by the deterministic release path or testable source import. No removable production code was found.
+- Screenshot/video limitation: Phase 6's local browser evidence and the Phase 7 narration were reviewed against the implemented product, but no new recording, screenshot upload, video upload, repository sharing, feedback transmission, or Devpost action was performed. Those remain user-authorized external steps.
+
+## Code-freeze conclusion
+
+Phase 7 is complete and Gatekeeper is frozen as a local hackathon release candidate. The verified product is a single foreground, loopback-only service for one fixed repository with deterministic review, Project Memory, optional read-only fixture-backed GitHub review in the judge path, and a local dashboard/MCP/CLI surface. It has no hosted backend, account system, GitHub write path, live judge credential requirement, or model request in its release proof. Further changes are limited to release-blocking fixes, documentation corrections, approved video edits, or user-authorized submission validation.
+
 ## External authorization boundary
 
 The user authorized Phase 7 engineering work. They have not authorized publishing a video, sharing repository access, creating or submitting Devpost content, or transmitting a feedback session identifier. Phase 7 prepares these artifacts but does not perform those external actions.

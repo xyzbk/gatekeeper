@@ -2,9 +2,9 @@
 
 ## Verified local release evidence
 
-- [ ] Run the full Phase 7 quality gate and record exact output in the execution log.
-- [ ] Run the network-free judge demo and golden evaluation report.
-- [ ] Review the final README, security statement, screenshots, and demo narration against the product actually implemented.
+- [x] Run the full Phase 7 quality gate and record exact output in the execution log.
+- [x] Run the network-free judge demo and golden evaluation report.
+- [x] Review the final README, security statement, Phase 6 browser evidence, and demo narration against the product actually implemented.
 
 ## Requires user authorization
 

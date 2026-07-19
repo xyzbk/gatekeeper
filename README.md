@@ -6,7 +6,7 @@ Gatekeeper is a local-first repository intelligence and governance agent for Cod
 
 ## Current status
 
-Phases 0 through 6 are complete; Phase 7 release hardening is in progress. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
+Phases 0 through 7 are complete and the hackathon release is code-frozen. Gatekeeper reviews local worktrees and GitHub pull requests, persists strict ReviewRuns and pollable operations in local SQLite Project Memory, retrieves bounded linked repository/GitHub history, and exposes the same fixed-repository system through the CLI, bearer-authenticated API, React dashboard, seven-tool stdio MCP server, and repository Codex skill. The dashboard closes the loop from real progress and ordered evidence through remediation prompts and an immutable before/after re-review comparison. The local judge demo and golden evaluation need no GitHub credential or model key. GitHub publication, embeddings, a second model provider, packaging, and submission remain outside the implemented product.
 
 ## Quick start
 
@@ -49,6 +49,8 @@ pnpm demo
 ## Judge test
 
 Use the frozen-lockfile sequence in [clean install and uninstall](docs/release/clean-install-uninstall.md). The judge path is local after dependencies are installed: `pnpm demo:smoke`, `pnpm eval`, and `pnpm model-data:dry-run` need no GitHub credential or model key.
+
+Phase 7's final attack, browser, reproducibility, formatting, and high-severity dependency gates passed on Windows. The remaining video, feedback, repository-sharing, Devpost, and submission steps need explicit user authorization; see the [submission checklist](docs/release/submission-checklist.md).
 
 ## Supported platforms
 
