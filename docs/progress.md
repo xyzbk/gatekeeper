@@ -580,6 +580,7 @@ Verified implementation commits: `e27e5f5`, `6a66650`, `f39097c`, `b67c3c5`, and
 Status: README and contributor guide complete on 2026-07-20; repository-profile metadata is an external follow-up.
 
 - The public README now leads with the product, a beginner-first local setup and review path, a concise workflow, trust boundaries, and verification routes instead of internal phase history.
+- The README and MCP reference now include the distinct Codex-skill/MCP/service responsibilities, a one-time trusted-project setup, and a copyable evidence-led review prompt.
 - `CONTRIBUTING.md` establishes the supported quality gate, safety boundaries, package ownership, and security-reporting route for open-source contributors.
 - The approved GitHub About values are prepared: description `Local-first repository intelligence for evidence-backed, policy-aware code reviews.` and topics `codex`, `mcp`, `code-review`, `developer-tools`, `local-first`, `typescript`, and `sqlite`. No website is claimed because the dashboard is local-only.
 - The connected GitHub integration can read repository details but does not expose repository-metadata mutation, and this machine has no `gh` CLI. No tool, credential, or package was added merely to change the public profile.

@@ -50,6 +50,49 @@ Gatekeeper does not check out branches, stage files, reset Git state, or modify 
 | Use Gatekeeper from Codex              | [MCP and Codex skill setup](docs/reference/mcp.md#setup)                           |
 | Review a GitHub pull request           | [`review pr`](docs/reference/cli.md#review-pr-number-path) with authenticated `gh` |
 
+## Use Gatekeeper with Codex
+
+The Codex integration has four deliberately separate responsibilities:
+
+| Part               | Responsibility                                                                                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gatekeeper service | Fixes one repository, applies policy, owns Project Memory, and assembles the verdict.                                                                    |
+| MCP server         | Gives Codex nine small, typed Gatekeeper tools over the local service. It does not decide verdicts or publish anything.                                  |
+| Gatekeeper skill   | Gives Codex the repeatable review sequence: check status, ask before indexing or reasoning, cite returned evidence, then offer remediation.              |
+| Codex              | Investigates the supplied evidence and may add `EVIDENCE_SUPPORTED` or `INFERENCE` findings. It cannot create `BLOCK` or replace deterministic findings. |
+
+### One-time setup
+
+Keep the Gatekeeper workspace open as the trusted Codex project; it contains the checked-in [MCP configuration](.codex/config.toml) and [Gatekeeper skill](.agents/skills/gatekeeper/SKILL.md). From that workspace, build Gatekeeper and start it for the repository you want to review:
+
+```powershell
+pnpm build
+node apps/cli/dist/index.js start "C:\path\to\your\repository"
+```
+
+Leave that terminal running. Open `D:\work\gatekeeper` in Codex as a trusted project, then start a new task (or restart Codex) so it discovers the project skill and the local MCP server. Gatekeeper binds the service to the repository path in the command above; MCP tools do not accept a different path or remote later.
+
+### Ask Codex to review efficiently
+
+Mention the skill and give Codex the review boundary in one prompt:
+
+```text
+$gatekeeper Review the fixed repository's worktree. First check Gatekeeper status.
+If Project Memory is uninitialized or stale, ask me before indexing it. After approval,
+index exactly once, review the worktree, and search memory only for a specific follow-up.
+Keep deterministic findings separate from evidence-supported conclusions and inferences.
+Do not change files or publish anything. Finish with Gatekeeper's persisted verdict and
+an optional remediation plan.
+```
+
+For a historical commit, ask Codex to list recent commits first and choose the full SHA. For a pull request, explicitly approve the separate read-only GitHub sync and run it from the Gatekeeper workspace using the same target path:
+
+```powershell
+node apps/cli/dist/index.js sync github "C:\path\to\your\repository"
+```
+
+Then ask Codex to review the PR number. This keeps memory fresh without repeatedly re-indexing, keeps Codex scoped to one repository, and makes every conclusion traceable to returned evidence.
+
 ## How it works
 
 ```mermaid

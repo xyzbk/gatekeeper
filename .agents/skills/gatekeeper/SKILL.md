@@ -20,7 +20,7 @@ Before acting, read [Workflow](references/workflow.md) and [Evidence and verdict
 
 ## Consent
 
-Use `gatekeeper_status` first. When setup is needed, ask for consent before starting the service or registering the repository. Ask for consent before the first or stale `gatekeeper_index_repository` call, before `gatekeeper sync github .`, and before Codex authors model-reasoned findings, unless the user's current request explicitly authorizes that exact action. Batch these choices into one concise question when possible.
+Use `gatekeeper_status` first. When setup is needed, ask for consent before starting the service or registering the repository. Ask for consent before the first or stale `gatekeeper_index_repository` call, before the explicit `gatekeeper sync github <user-approved-target-path>` command, and before Codex authors model-reasoned findings, unless the user's current request explicitly authorizes that exact action. Batch these choices into one concise question when possible.
 
 ## Output order
 
