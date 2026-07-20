@@ -146,3 +146,16 @@ pnpm model-data:dry-run
 ```
 
 `pnpm model-data:dry-run` runs the same local Ghost Change provider, Project Memory, and draft preparation path without network access or a model request. It prints `modelCalls: 0`, `transport: "none"`, and only source pointer metadata/counts; it never prints source bodies or excerpts.
+
+### Decision Replay fixtures
+
+`pnpm judge` installs pinned dependencies, builds, runs the smoke proof, and starts the offline dashboard replay. `pnpm demo` starts the already-built version. Both print a direct local review URL; open it for the Ghost Change `ESCALATE` review, then click **Run re-review** to load the committed SQLite correction and inspect the resulting `FAST_PATH` comparison. They use committed fixture responses only: no network, credentials, model request, or MCP connection.
+
+For a real local Codex/MCP replay instead, build then start the normal service for the disposable `replay` repository:
+
+```bash
+pnpm build
+pnpm demo:codex-replay
+```
+
+That command is equivalent to preparing fixtures and running `gatekeeper start demo/fixtures/replay`. It leaves the service in the foreground and prints the dashboard URL for Codex and the dashboard. The replay worktree intentionally revives a required Redis cache while its history and active ADR retain SQLite. When Codex completion returns a `reviewId`, open `<dashboard URL>/reviews/<reviewId>`. After an approved fix changes `src/cache.ts` and `tests/cache.test.ts` back to SQLite, use the dashboard re-review action to obtain `FAST_PATH`. See the [MCP reference](mcp.md#live-codex-decision-replay) for the required Codex prompt and authority boundary.
