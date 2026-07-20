@@ -1162,6 +1162,11 @@ describe('Gatekeeper local service', () => {
       url: '/reviews/pull-request',
       headers: { host },
     });
+    const pullRequestExplorer = await server.inject({
+      method: 'GET',
+      url: '/pull-requests',
+      headers: { host },
+    });
     const memory = await server.inject({ method: 'GET', url: '/memory', headers: { host } });
     const storedReview = await server.inject({
       method: 'GET',
@@ -1179,6 +1184,8 @@ describe('Gatekeeper local service', () => {
     expect(reviewInspector.body).toContain('<title>Gatekeeper</title>');
     expect(pullRequestInspector.statusCode).toBe(200);
     expect(pullRequestInspector.body).toContain('<title>Gatekeeper</title>');
+    expect(pullRequestExplorer.statusCode).toBe(200);
+    expect(pullRequestExplorer.body).toContain('<title>Gatekeeper</title>');
     expect(memory.statusCode).toBe(200);
     expect(memory.body).toContain('<title>Gatekeeper</title>');
     expect(storedReview.statusCode).toBe(200);

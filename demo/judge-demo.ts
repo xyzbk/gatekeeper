@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 import {
   repositoryRecordSchema,
+  pullRequestExplorerResponseSchema,
   reviewOperationSchema,
   type RepositorySnapshot,
   type ReviewOperationContract,
@@ -40,6 +41,7 @@ export interface RunningJudgeDemo {
 export interface JudgeDemoSmokeResult {
   githubTransport: 'fixture';
   modelCalls: 0;
+  historicalPullRequestNumbers: number[];
   initialReviewId: string;
   initialVerdict: 'ESCALATE';
   correctedVerdict: 'FAST_PATH';
@@ -242,6 +244,28 @@ export async function runJudgeDemoSmoke(
     if (initial.status !== 'completed' || initial.review.verdict !== 'ESCALATE') {
       throw new Error('Judge demo did not retain the expected Ghost Change escalation.');
     }
+    const historicalPullRequests = pullRequestExplorerResponseSchema.parse(
+      await requestJson(demo, '/v1/pull-requests/explore', {
+        method: 'POST',
+        body: JSON.stringify({
+          schemaVersion: 1,
+          repositoryId: initial.repositoryId,
+          state: 'all',
+          reviewState: 'all',
+          sort: 'newest',
+        }),
+      }),
+    );
+    const historicalPullRequestNumbers = historicalPullRequests.pullRequests.map(
+      ({ number }) => number,
+    );
+    if (
+      !historicalPullRequestNumbers.includes(8) ||
+      !historicalPullRequestNumbers.includes(10) ||
+      !historicalPullRequestNumbers.includes(12)
+    ) {
+      throw new Error('Judge demo did not expose the historical Ghost Change pull requests.');
+    }
     const started = reviewOperationSchema.parse(
       await requestJson(demo, '/v1/reviews/pull-request/start', {
         method: 'POST',
@@ -259,6 +283,7 @@ export async function runJudgeDemoSmoke(
     return {
       githubTransport: demo.githubTransport,
       modelCalls: demo.modelCalls,
+      historicalPullRequestNumbers,
       initialReviewId: demo.initialReviewId,
       initialVerdict: initial.review.verdict,
       correctedVerdict: corrected.review.verdict,
@@ -286,7 +311,7 @@ async function waitForShutdownSignal(): Promise<void> {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const demo = await startJudgeDemo();
   process.stdout.write(
-    `Gatekeeper judge demo is ready at ${demo.baseUrl}/reviews/${demo.initialReviewId}. Open the ESCALATE review, then run its re-review to show the corrected FAST_PATH result. Press Ctrl+C to stop.\n`,
+    `Gatekeeper judge demo is ready at ${demo.baseUrl}/pull-requests. Browse the historical PR evidence, open PR #12, then run its re-review to show the corrected FAST_PATH result. Press Ctrl+C to stop.\n`,
   );
   try {
     await waitForShutdownSignal();

@@ -155,18 +155,36 @@ test.describe('Ghost Change dashboard', () => {
     );
     expect(indexResponse.ok()).toBe(true);
 
-    await page.goto(`${service.baseUrl}/reviews/pull-request?number=0`);
-    const pullRequestNumber = page.getByLabel('Pull request number');
-    await expect(pullRequestNumber).toHaveValue('0');
-    await page.getByRole('button', { name: 'Review pull request' }).click();
-    await expect(page).toHaveURL(/number=0$/u);
-    await expect(pullRequestNumber).toBeFocused();
+    const syncResponse = await page.request.post(
+      `${service.baseUrl}/v1/repositories/${repository.repositoryId}/sync/github`,
+      { data: {}, headers },
+    );
+    expect(syncResponse.ok()).toBe(true);
 
-    await pullRequestNumber.fill('12');
-    await page.getByRole('button', { name: 'Review pull request' }).click();
+    await page.goto(`${service.baseUrl}/pull-requests`);
+    await expect(page.getByRole('heading', { name: 'Browse pull requests' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revive required Redis cache' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revert required Redis cache' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Require Redis cache' })).toBeVisible();
+
+    const currentPullRequest = page
+      .getByRole('article')
+      .filter({ hasText: 'Revive required Redis cache' });
+    await currentPullRequest.getByRole('link', { name: 'View evidence' }).click();
+    await expect(page).toHaveURL(/\/memory\?query=pull_request%3A%2312$/u);
+    await expect(page.getByRole('heading', { name: 'Evidence' })).toBeVisible();
+    await expect(page.getByText('pull_request:#12', { exact: true })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Pull request evidence' }).click();
+    await expect(page).toHaveURL(/\/pull-requests$/u);
+    await page.getByRole('button', { name: 'Review pull request #12' }).click();
     await expect(page).toHaveURL(/\/reviews\/review_[a-f0-9]+$/u);
     await expect(page.getByRole('status', { name: 'Review progress' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'ESCALATE' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Prompt-injection pattern detected in untrusted evidence' }),
+    ).toBeVisible();
+    await expect(page.getByText('Assembled locally by Gatekeeper')).toBeVisible();
 
     const timeline = page.getByRole('list', { name: 'Evidence timeline' });
     await expect(timeline.getByRole('listitem')).toHaveCount(6);

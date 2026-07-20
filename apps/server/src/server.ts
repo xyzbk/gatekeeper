@@ -873,6 +873,7 @@ export async function buildGatekeeperServer(
     wildcard: false,
   });
   server.get('/memory', (_request, reply) => reply.sendFile('index.html'));
+  server.get('/pull-requests', (_request, reply) => reply.sendFile('index.html'));
   server.get('/reviews/worktree', (_request, reply) => reply.sendFile('index.html'));
   server.get('/reviews/pull-request', (_request, reply) => reply.sendFile('index.html'));
   server.get('/reviews/:reviewId', (_request, reply) => reply.sendFile('index.html'));
