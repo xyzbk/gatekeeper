@@ -12,6 +12,8 @@ import {
   type IndexState,
   type MemorySearchInput,
   type MemorySearchResult,
+  type PullRequestExplorerInput,
+  type PullRequestExplorerResponse,
   type RecentCommitEvidence,
   type RepositoryRecord,
   type RepositorySnapshot,
@@ -125,6 +127,7 @@ export interface ProjectMemoryPersistence {
   recentCommits(repositoryId: string): RecentCommitEvidence[];
   commitStates(repositoryId: string, shas: readonly string[]): CommitMemoryState[];
   search(input: { repositoryId: string; query: string; limit?: number }): MemorySearchResult[];
+  explorePullRequests(input: PullRequestExplorerInput): PullRequestExplorerResponse;
   saveReview(review: ReviewRunContract): void;
   saveReviewOperation(operation: ReviewOperationContract): void;
   getReview(reviewId: string): ReviewRunContract | null;
@@ -168,6 +171,7 @@ export interface ProjectMemory {
   recentCommits(repositoryId: string): Promise<RecentCommitEvidence[]>;
   commitStates(repositoryId: string, shas: readonly string[]): Promise<CommitMemoryState[]>;
   search(input: MemorySearchInput): Promise<MemorySearchResult[]>;
+  explorePullRequests(input: PullRequestExplorerInput): Promise<PullRequestExplorerResponse>;
   saveReview(review: ReviewRunContract): Promise<void>;
   saveReviewOperation(operation: ReviewOperationContract): Promise<void>;
   getReview(reviewId: string): Promise<ReviewRunContract | null>;
@@ -827,6 +831,7 @@ export function createProjectMemory(options: CreateProjectMemoryOptions): Projec
         }),
       );
     },
+    explorePullRequests: (input) => Promise.resolve(options.persistence.explorePullRequests(input)),
     saveReview: (review) => {
       options.persistence.saveReview(review);
       return Promise.resolve();

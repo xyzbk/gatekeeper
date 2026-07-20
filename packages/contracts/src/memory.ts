@@ -159,6 +159,58 @@ export const commitExplorerResponseSchema = z
   })
   .strict();
 
+const pullRequestExplorerStateSchema = z.enum(['all', 'open', 'closed']);
+const pullRequestExplorerReviewStateSchema = z.enum(['all', 'reviewed', 'not_reviewed']);
+const pullRequestExplorerSortSchema = z.enum(['newest', 'oldest']);
+const pullRequestExplorerCursorSchema = z.int().nonnegative().max(50_000);
+
+export const pullRequestExplorerInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    repositoryId: identifierSchema,
+    query: z.string().trim().min(1).max(256).optional(),
+    state: pullRequestExplorerStateSchema,
+    updatedAfter: z.iso.date().optional(),
+    updatedBefore: z.iso.date().optional(),
+    reviewState: pullRequestExplorerReviewStateSchema,
+    sort: pullRequestExplorerSortSchema,
+    cursor: pullRequestExplorerCursorSchema.optional(),
+  })
+  .strict();
+
+const pullRequestExplorerEvidenceSchema = evidencePointerSchema
+  .pick({
+    sourceType: true,
+    repositoryId: true,
+    sourceId: true,
+    title: true,
+    remoteUrl: true,
+    contentHash: true,
+  })
+  .extend({ sourceType: z.literal('pull_request') })
+  .strict();
+
+export const pullRequestExplorerPullRequestSchema = z
+  .object({
+    number: z.int().positive(),
+    title: z.string().trim().min(1).max(300),
+    state: z.enum(['open', 'closed']),
+    updatedAt: z.iso.datetime(),
+    reviewed: z.boolean(),
+    trust: z.literal('untrusted_repository_content'),
+    evidence: pullRequestExplorerEvidenceSchema,
+  })
+  .strict();
+
+export const pullRequestExplorerResponseSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    selection: pullRequestExplorerInputSchema,
+    pullRequests: z.array(pullRequestExplorerPullRequestSchema).max(24),
+    nextCursor: pullRequestExplorerCursorSchema.nullable(),
+  })
+  .strict();
+
 export const repositoryRecordJsonSchema = {
   $id: 'gatekeeper:repository-record-v1',
   ...z.toJSONSchema(repositoryRecordSchema, { target: 'draft-7' }),
@@ -199,6 +251,16 @@ export const commitExplorerResponseJsonSchema = {
   ...z.toJSONSchema(commitExplorerResponseSchema, { target: 'draft-7' }),
 };
 
+export const pullRequestExplorerInputJsonSchema = {
+  $id: 'gatekeeper:pull-request-explorer-input-v1',
+  ...z.toJSONSchema(pullRequestExplorerInputSchema, { target: 'draft-7' }),
+};
+
+export const pullRequestExplorerResponseJsonSchema = {
+  $id: 'gatekeeper:pull-request-explorer-response-v1',
+  ...z.toJSONSchema(pullRequestExplorerResponseSchema, { target: 'draft-7' }),
+};
+
 export const repositoryStatusJsonSchema = {
   $id: 'gatekeeper:repository-status-v1',
   ...z.toJSONSchema(repositoryStatusSchema, { target: 'draft-7' }),
@@ -229,3 +291,6 @@ export type CommitExplorerInput = z.infer<typeof commitExplorerInputSchema>;
 export type CommitExplorerSelection = z.infer<typeof commitExplorerSelectionSchema>;
 export type CommitExplorerCommit = z.infer<typeof commitExplorerCommitSchema>;
 export type CommitExplorerResponse = z.infer<typeof commitExplorerResponseSchema>;
+export type PullRequestExplorerInput = z.infer<typeof pullRequestExplorerInputSchema>;
+export type PullRequestExplorerPullRequest = z.infer<typeof pullRequestExplorerPullRequestSchema>;
+export type PullRequestExplorerResponse = z.infer<typeof pullRequestExplorerResponseSchema>;

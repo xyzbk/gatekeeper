@@ -8,6 +8,8 @@ import {
   indexStateSchema,
   memorySearchInputSchema,
   memorySearchResultSchema,
+  pullRequestExplorerInputSchema,
+  pullRequestExplorerResponseSchema,
   recentCommitEvidenceSchema,
   repositoryRecordSchema,
   reviewOperationSchema,
@@ -17,6 +19,8 @@ import {
   type GitHubHistoryFailure,
   type GitHubSyncResult,
   type MemorySearchResult,
+  type PullRequestExplorerInput,
+  type PullRequestExplorerResponse,
   type RecentCommitEvidence,
   type RepositoryRecord,
   type ReviewOperationContract,
@@ -29,6 +33,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 const DEFAULT_MIGRATIONS_FOLDER = fileURLToPath(new URL('../drizzle', import.meta.url));
 const TRUST_LABEL = 'untrusted_repository_content' as const;
 const MAX_COMMIT_STATE_LOOKUP = 48;
+const PULL_REQUEST_EXPLORER_PAGE_SIZE = 24;
 
 export type SqliteProjectStoreErrorCode =
   | 'CORRUPT_DATA'
@@ -169,6 +174,16 @@ interface RepositoryRow {
   updatedAt: string;
 }
 
+interface PullRequestExplorerRow {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  updatedAt: string;
+  reviewed: 0 | 1;
+  remoteUrl: string | null;
+  contentHash: string;
+}
+
 function uniqueBy<T>(
   values: readonly T[],
   key: (value: T) => string,
@@ -228,6 +243,10 @@ function ftsQuery(query: string): string | undefined {
     : tokens.map((token) => `"${token}"`).join(' AND ');
 }
 
+function likePattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
 function repositoryRecord(row: RepositoryRow): RepositoryRecord {
   return repositoryRecordSchema.parse({
     schemaVersion: 1,
@@ -281,9 +300,32 @@ function verifyFts5(database: Database.Database): void {
 }
 
 function targetKey(target: ReviewRunContract['target']): string {
-  return target.kind === 'commit_range'
-    ? `commit:${target.head}`
-    : `${target.kind}:${target.display}`;
+  if (target.kind === 'commit_range') {
+    return `commit:${target.head}`;
+  }
+  const pullRequestNumber = target.pullRequestNumber;
+  if (
+    target.kind === 'pull_request' &&
+    typeof pullRequestNumber === 'number' &&
+    Number.isSafeInteger(pullRequestNumber) &&
+    pullRequestNumber > 0
+  ) {
+    return `pull_request:${pullRequestNumber}`;
+  }
+  return `${target.kind}:${target.display}`;
+}
+
+function targetKeys(target: ReviewRunContract['target']): string[] {
+  const pullRequestNumber = target.pullRequestNumber;
+  if (
+    target.kind === 'pull_request' &&
+    typeof pullRequestNumber === 'number' &&
+    Number.isSafeInteger(pullRequestNumber) &&
+    pullRequestNumber > 0
+  ) {
+    return [`pull_request:${pullRequestNumber}`, `pull_request:Pull request #${pullRequestNumber}`];
+  }
+  return [targetKey(target)];
 }
 
 export class SqliteProjectStore {
@@ -966,6 +1008,99 @@ export class SqliteProjectStore {
     return results;
   }
 
+  public explorePullRequests(input: PullRequestExplorerInput): PullRequestExplorerResponse {
+    const parsed = pullRequestExplorerInputSchema.parse(input);
+    const pullRequestNumber = 'substr(d.source_id, 15)';
+    const clauses = [
+      'd.repository_id = ?',
+      "d.source_type = 'pull_request'",
+      'd.chunk_index = 0',
+      'd.occurred_at IS NOT NULL',
+      "d.source_id GLOB 'pull_request:#*'",
+      `${pullRequestNumber} NOT GLOB '*[^0-9]*'`,
+      `${pullRequestNumber} GLOB '[1-9]*'`,
+      `CAST(CAST(${pullRequestNumber} AS INTEGER) AS TEXT) = ${pullRequestNumber}`,
+      `(length(${pullRequestNumber}) < 16 OR (${pullRequestNumber} <= '9007199254740991' AND length(${pullRequestNumber}) = 16))`,
+    ];
+    const parameters: (string | number)[] = [parsed.repositoryId];
+    const reviewed = `EXISTS (
+      SELECT 1 FROM review_runs AS r
+      WHERE r.repository_id = d.repository_id
+        AND r.target_kind = 'pull_request'
+        AND r.target_key IN (
+          'pull_request:' || substr(d.source_id, 15),
+          'pull_request:Pull request #' || substr(d.source_id, 15)
+        )
+    )`;
+
+    if (parsed.query !== undefined) {
+      clauses.push(
+        "(d.source_id LIKE ? ESCAPE '\\' COLLATE NOCASE OR d.title LIKE ? ESCAPE '\\' COLLATE NOCASE)",
+      );
+      const query = likePattern(parsed.query);
+      parameters.push(query, query);
+    }
+    if (parsed.state === 'open') {
+      clauses.push("d.status = 'active'");
+    } else if (parsed.state === 'closed') {
+      clauses.push("d.status <> 'active'");
+    }
+    if (parsed.updatedAfter !== undefined) {
+      clauses.push('d.occurred_at >= ?');
+      parameters.push(`${parsed.updatedAfter}T00:00:00.000Z`);
+    }
+    if (parsed.updatedBefore !== undefined) {
+      clauses.push('d.occurred_at < ?');
+      const nextDay = new Date(`${parsed.updatedBefore}T00:00:00.000Z`);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      parameters.push(nextDay.toISOString());
+    }
+    if (parsed.reviewState !== 'all') {
+      clauses.push(parsed.reviewState === 'reviewed' ? reviewed : `NOT ${reviewed}`);
+    }
+
+    const cursor = parsed.cursor ?? 0;
+    const direction = parsed.sort === 'newest' ? 'DESC' : 'ASC';
+    const rows = this.#database
+      .prepare<unknown[], PullRequestExplorerRow>(
+        `SELECT CAST(substr(d.source_id, 15) AS INTEGER) AS number,
+                d.title,
+                CASE WHEN d.status = 'active' THEN 'open' ELSE 'closed' END AS state,
+                d.occurred_at AS updatedAt,
+                ${reviewed} AS reviewed,
+                d.remote_url AS remoteUrl,
+                d.content_hash AS contentHash
+         FROM documents AS d
+         WHERE ${clauses.join(' AND ')}
+         ORDER BY d.occurred_at ${direction}, d.source_id ${direction}
+         LIMIT ? OFFSET ?`,
+      )
+      .all(...parameters, PULL_REQUEST_EXPLORER_PAGE_SIZE + 1, cursor);
+    const hasNextPage = rows.length > PULL_REQUEST_EXPLORER_PAGE_SIZE;
+
+    return pullRequestExplorerResponseSchema.parse({
+      schemaVersion: 1,
+      selection: parsed,
+      pullRequests: rows.slice(0, PULL_REQUEST_EXPLORER_PAGE_SIZE).map((row) => ({
+        number: row.number,
+        title: row.title,
+        state: row.state,
+        updatedAt: row.updatedAt,
+        reviewed: row.reviewed === 1,
+        trust: TRUST_LABEL,
+        evidence: {
+          sourceType: 'pull_request',
+          repositoryId: parsed.repositoryId,
+          sourceId: `pull_request:#${row.number}`,
+          title: row.title,
+          ...(row.remoteUrl === null ? {} : { remoteUrl: row.remoteUrl }),
+          contentHash: row.contentHash,
+        },
+      })),
+      nextCursor: hasNextPage ? cursor + PULL_REQUEST_EXPLORER_PAGE_SIZE : null,
+    });
+  }
+
   public saveReview(review: ReviewRunContract): void {
     const parsed = reviewRunSchema.parse(review);
     const save = this.#database.transaction(() => {
@@ -1339,13 +1474,15 @@ export class SqliteProjectStore {
   }
 
   public latestReviewId(repositoryId: string, target: ReviewRunContract['target']): string | null {
+    const keys = targetKeys(target);
+    const placeholders = keys.map(() => '?').join(', ');
     const row = this.#database
       .prepare<unknown[], { reviewId: string }>(
         `SELECT review_id AS reviewId FROM review_runs
-         WHERE repository_id = ? AND target_key = ?
+         WHERE repository_id = ? AND target_key IN (${placeholders})
          ORDER BY created_at DESC, rowid DESC LIMIT 1`,
       )
-      .get(repositoryId, targetKey(target));
+      .get(repositoryId, ...keys);
     return row?.reviewId ?? null;
   }
 

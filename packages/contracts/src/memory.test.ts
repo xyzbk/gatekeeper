@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   commitExplorerInputSchema,
   commitExplorerResponseSchema,
+  pullRequestExplorerInputSchema,
+  pullRequestExplorerResponseSchema,
   indexResultSchema,
   indexStateSchema,
   memorySearchInputSchema,
@@ -295,6 +297,80 @@ describe('Project Memory contracts', () => {
         branches: ['master'],
         selection: input,
         commits: Array.from({ length: 25 }, () => commit),
+        nextCursor: null,
+      }),
+    ).toThrow();
+  });
+
+  it('strictly validates a bounded historical pull request explorer request and response', () => {
+    const input = {
+      schemaVersion: 1,
+      repositoryId: repository.repositoryId,
+      query: 'redis cache',
+      state: 'closed',
+      updatedAfter: '2026-07-01',
+      updatedBefore: '2026-07-31',
+      reviewState: 'not_reviewed',
+      sort: 'newest',
+      cursor: 24,
+    } as const;
+    const pullRequest = {
+      number: 12,
+      title: 'Revert required Redis cache',
+      state: 'closed',
+      updatedAt: '2026-07-18T20:00:00.000Z',
+      reviewed: false,
+      trust: 'untrusted_repository_content',
+      evidence: {
+        sourceType: 'pull_request',
+        repositoryId: repository.repositoryId,
+        sourceId: 'pull_request:#12',
+        title: 'Revert required Redis cache',
+        remoteUrl: 'https://github.com/example/fixture/pull/12',
+        contentHash: 'a'.repeat(64),
+      },
+    } as const;
+
+    expect(pullRequestExplorerInputSchema.parse(input)).toEqual(input);
+    expect(
+      pullRequestExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        selection: input,
+        pullRequests: [pullRequest],
+        nextCursor: 48,
+      }),
+    ).toEqual({
+      schemaVersion: 1,
+      selection: input,
+      pullRequests: [pullRequest],
+      nextCursor: 48,
+    });
+    expect(() => pullRequestExplorerInputSchema.parse({ ...input, cursor: -1 })).toThrow();
+    expect(() =>
+      pullRequestExplorerInputSchema.parse({ ...input, query: 'x'.repeat(257) }),
+    ).toThrow();
+    expect(() => pullRequestExplorerInputSchema.parse({ ...input, state: 'merged' })).toThrow();
+    expect(() =>
+      pullRequestExplorerInputSchema.parse({ ...input, unexpected: 'selector' }),
+    ).toThrow();
+    expect(() =>
+      pullRequestExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        selection: input,
+        pullRequests: Array.from({ length: 25 }, () => pullRequest),
+        nextCursor: null,
+      }),
+    ).toThrow();
+    expect(() =>
+      pullRequestExplorerResponseSchema.parse({
+        schemaVersion: 1,
+        selection: input,
+        pullRequests: [
+          {
+            ...pullRequest,
+            evidence: { ...pullRequest.evidence, excerpt: 'PR body must not be exposed.' },
+          },
+        ],
         nextCursor: null,
       }),
     ).toThrow();

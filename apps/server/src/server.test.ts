@@ -10,6 +10,7 @@ import type {
   IndexResult,
   IndexState,
   MemorySearchResult,
+  PullRequestExplorerResponse,
   RecentCommitEvidence,
   PullRequestRecord,
   RepositoryRecord,
@@ -21,6 +22,7 @@ import type {
 } from '@gatekeeper/contracts';
 import {
   recentCommitEvidenceResponseSchema,
+  pullRequestExplorerResponseSchema,
   commitExplorerResponseSchema,
   reviewLookupSchema,
   reviewOperationSchema,
@@ -176,6 +178,36 @@ const commitExplorerResponse: CommitExplorerResponse = {
       title: 'Add bounded commit explorer',
       indexed: true,
       reviewed: false,
+    },
+  ],
+  nextCursor: null,
+};
+
+const pullRequestExplorerResponse: PullRequestExplorerResponse = {
+  schemaVersion: 1,
+  selection: {
+    schemaVersion: 1,
+    repositoryId: repositoryRecord.repositoryId,
+    state: 'all',
+    reviewState: 'all',
+    sort: 'newest',
+  },
+  pullRequests: [
+    {
+      number: 12,
+      title: 'Require Redis cache',
+      state: 'open',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+      reviewed: false,
+      trust: 'untrusted_repository_content',
+      evidence: {
+        sourceType: 'pull_request',
+        repositoryId: repositoryRecord.repositoryId,
+        sourceId: 'pull_request:#12',
+        title: 'Require Redis cache',
+        remoteUrl: 'https://github.com/xyzbk/gatekeeper/pull/12',
+        contentHash: 'a'.repeat(64),
+      },
     },
   ],
   nextCursor: null,
@@ -340,6 +372,7 @@ async function buildTestServer(
       getReviewOperation: () => Promise.resolve(null),
       indexRepository: () => Promise.resolve(indexResult),
       recentCommits: () => Promise.resolve(recentCommits),
+      explorePullRequests: () => Promise.resolve(pullRequestExplorerResponse),
       searchMemory: () => Promise.resolve([memoryResult]),
       syncGitHub: () => Promise.resolve(githubSyncResult),
       ...options.projectMemory,
@@ -383,6 +416,35 @@ describe('Gatekeeper local service', () => {
     expect(commitExplorerResponseSchema.parse(response.json())).toEqual(commitExplorerResponse);
     expect(exploreCommits).toHaveBeenCalledWith(input);
     await server.close();
+  });
+
+  it('returns only the fixed repository historical pull-request evidence page', async () => {
+    const explorePullRequests = vi.fn(() => Promise.resolve(pullRequestExplorerResponse));
+    const server = await buildTestServer({ projectMemory: { explorePullRequests } });
+    const headers = { host, authorization: `Bearer ${bearerToken}` };
+    const input = pullRequestExplorerResponse.selection;
+
+    const found = await server.inject({
+      method: 'POST',
+      url: '/v1/pull-requests/explore',
+      headers,
+      payload: input,
+    });
+    const wrongRepository = await server.inject({
+      method: 'POST',
+      url: '/v1/pull-requests/explore',
+      headers,
+      payload: { ...input, repositoryId: 'repository_other' },
+    });
+    await server.close();
+
+    expect(found.statusCode).toBe(200);
+    expect(pullRequestExplorerResponseSchema.parse(found.json())).toEqual(
+      pullRequestExplorerResponse,
+    );
+    expect(wrongRepository.statusCode).toBe(404);
+    expect(explorePullRequests).toHaveBeenCalledWith(input);
+    expect(explorePullRequests).toHaveBeenCalledOnce();
   });
 
   it('keeps a stale local branch recoverable without invoking Git through the HTTP boundary', async () => {

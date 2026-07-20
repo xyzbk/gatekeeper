@@ -25,6 +25,10 @@ import {
   memorySearchInputSchema,
   memorySearchResponseJsonSchema,
   memorySearchResponseSchema,
+  pullRequestExplorerInputJsonSchema,
+  pullRequestExplorerInputSchema,
+  pullRequestExplorerResponseJsonSchema,
+  pullRequestExplorerResponseSchema,
   recentCommitEvidenceResponseJsonSchema,
   recentCommitEvidenceResponseSchema,
   repositoryIdParamsJsonSchema,
@@ -55,6 +59,8 @@ import {
   type GitHubSyncResult,
   type MemorySearchInput,
   type MemorySearchResult,
+  type PullRequestExplorerInput,
+  type PullRequestExplorerResponse,
   type RecentCommitEvidence,
   type RepositoryRecord,
   type PullRequestReviewInput,
@@ -124,6 +130,7 @@ export interface ProjectMemoryApi {
   getReviewOperation: (reviewId: string) => Promise<ReviewOperationContract | null>;
   indexRepository: () => Promise<IndexResult>;
   recentCommits: () => Promise<RecentCommitEvidence[]>;
+  explorePullRequests: (input: PullRequestExplorerInput) => Promise<PullRequestExplorerResponse>;
   searchMemory: (input: MemorySearchInput) => Promise<MemorySearchResult[]>;
   syncGitHub: () => Promise<GitHubSyncResult>;
 }
@@ -228,6 +235,8 @@ export async function buildGatekeeperServer(
   server.addSchema(repositoryStatusJsonSchema);
   server.addSchema(memorySearchInputJsonSchema);
   server.addSchema(memorySearchResponseJsonSchema);
+  server.addSchema(pullRequestExplorerInputJsonSchema);
+  server.addSchema(pullRequestExplorerResponseJsonSchema);
   server.addSchema(recentCommitEvidenceResponseJsonSchema);
   server.addSchema(repositoryIdParamsJsonSchema);
   server.addSchema(reviewIdParamsJsonSchema);
@@ -377,6 +386,35 @@ export async function buildGatekeeperServer(
       commitExplorerResponseSchema.parse(
         await options.exploreCommits(commitExplorerInputSchema.parse(request.body)),
       ),
+  );
+
+  server.post<{ Body: PullRequestExplorerInput }>(
+    '/v1/pull-requests/explore',
+    {
+      schema: {
+        body: { $ref: 'gatekeeper:pull-request-explorer-input-v1#' },
+        querystring: { $ref: 'gatekeeper:empty-request#' },
+        response: {
+          200: { $ref: 'gatekeeper:pull-request-explorer-response-v1#' },
+          400: { $ref: 'gatekeeper:error-envelope#' },
+          401: { $ref: 'gatekeeper:error-envelope#' },
+          403: { $ref: 'gatekeeper:error-envelope#' },
+          404: { $ref: 'gatekeeper:error-envelope#' },
+          500: { $ref: 'gatekeeper:error-envelope#' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = pullRequestExplorerInputSchema.parse(request.body);
+      if (input.repositoryId !== options.projectMemory.repository.repositoryId) {
+        return reply
+          .code(404)
+          .send(createError('NOT_FOUND', 'The requested local resource was not found.'));
+      }
+      return pullRequestExplorerResponseSchema.parse(
+        await options.projectMemory.explorePullRequests(input),
+      );
+    },
   );
 
   server.post(

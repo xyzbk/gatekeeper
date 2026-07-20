@@ -528,6 +528,7 @@ export async function startGatekeeperService(
           });
         },
         recentCommits: () => memory.recentCommits(registeredRepository.repositoryId),
+        explorePullRequests: (input) => memory.explorePullRequests(input),
         searchMemory: (input: MemorySearchInput) => memory.search(input),
         syncGitHub,
       },
