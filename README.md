@@ -58,6 +58,18 @@ node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --forma
 
 `pnpm fixtures:prepare` recreates only those disposable fixture directories. Once those results make sense, replace the fixture path with your own repository path in the commands above.
 
+### Evaluate the dashboard without an account
+
+For the complete dashboard and pull-request experience, run the committed judge demo after the build:
+
+```powershell
+pnpm demo
+```
+
+It creates a temporary local repository, starts a loopback dashboard, and prints its `127.0.0.1` URL. Open that URL, choose **Pull requests**, enter `12`, and select **Review pull request**. The result is an `ESCALATE` verdict with a traceable evidence timeline and remediation. The demo uses committed GitHub-response data: it makes no network request, requires no GitHub account or API key, makes no model call, and never reads your repository. Stop it with `Ctrl+C`; its temporary repository and Project Memory are removed.
+
+This is the quickest evaluation route for Gatekeeper as a local developer tool. The verified desktop platform is Windows; see the [clean install and evaluation guide](docs/release/clean-install-uninstall.md) for prerequisites and the exact fresh-clone path.
+
 ## Choose your workflow
 
 | If you want to…                        | Start with…                                                                        |
@@ -112,6 +124,12 @@ node apps/cli/dist/index.js sync github "C:\path\to\your\repository"
 
 Then ask Codex to review the PR number. This keeps memory fresh without repeatedly re-indexing, keeps Codex scoped to one repository, and makes every conclusion traceable to returned evidence.
 
+## Built with Codex and GPT-5.6
+
+Gatekeeper was planned, implemented, audited, and iterated in Codex with GPT-5.6. Codex turned the scoped product work into typed contracts, local adapters, fixtures, tests, documentation, and release checks. GPT-5.6 was used to reason through architecture boundaries, policy and safety edge cases, product scope, and review findings before the resulting changes were verified locally.
+
+Those are build-time contributions. At runtime, Gatekeeper's Codex skill and MCP server have the separate, constrained role described above: they retrieve evidence and submit bounded review input, while Gatekeeper preserves deterministic policy and final-verdict authority. The dated Git history records the implementation work; the primary Codex `/feedback` session is included with the Devpost submission.
+
 ## How it works
 
 ```mermaid
@@ -141,7 +159,7 @@ flowchart LR
 
 Live GitHub review uses an authenticated `gh` CLI and is read-only. Default tests, the local judge demo, and deterministic workflows do not require GitHub access or an OpenAI key. See the [security overview](docs/security/overview.md) for the full trust model.
 
-## Run the full offline demo
+## Run the full offline verification
 
 After building, run the reproducible offline judge path:
 

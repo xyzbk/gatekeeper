@@ -14,6 +14,18 @@ pnpm model-data:dry-run
 
 The smoke command proves all six golden verdicts without a GitHub credential, external network request, or model call after dependencies are installed. `pnpm eval` regenerates the checked-in golden report.
 
+## Interactive evaluation
+
+After the same install and build, run:
+
+```bash
+pnpm demo
+```
+
+The command starts the compiled dashboard against a disposable local repository and committed GitHub-response fixture. Open the printed `127.0.0.1` URL, select **Pull requests**, review pull request `12`, and inspect the resulting `ESCALATE` evidence timeline and remediation. No account, credential, source repository, external network request, or model call is needed. `Ctrl+C` stops the foreground process and removes the temporary repository and its Project Memory.
+
+This is the supported hands-on evaluation route for the local developer tool; it avoids asking an evaluator to create data, configure GitHub, or connect a model before seeing a complete review.
+
 ## Supported platforms
 
 Windows is the verified desktop platform. The application uses Node.js, SQLite, Git, and standard loopback HTTP; the non-browser workspace gate also has existing Ubuntu CI coverage. macOS and a full browser release run were not independently performed, so they are not claimed as verified platforms.
