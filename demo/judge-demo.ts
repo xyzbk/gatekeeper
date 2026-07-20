@@ -15,7 +15,11 @@ import { createGitHubProvider, normalizeGitHubRemote } from '../packages/github-
 import { reviewPullRequest } from '../packages/review-engine/src/index.js';
 
 import { startGatekeeperService } from '../apps/server/src/service.js';
-import { createGhostChangeRunner, loadGhostChangeFixture } from './ghost-change-fixture.js';
+import {
+  createGhostChangeRunner,
+  loadGhostChangeFixture,
+  type GhostChangePhase,
+} from './ghost-change-fixture.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +32,7 @@ export interface RunningJudgeDemo {
   baseUrl: string;
   bearerToken: string;
   githubTransport: 'fixture';
+  initialReviewId: string;
   modelCalls: 0;
   close: () => Promise<void>;
 }
@@ -35,8 +40,12 @@ export interface RunningJudgeDemo {
 export interface JudgeDemoSmokeResult {
   githubTransport: 'fixture';
   modelCalls: 0;
-  verdict: 'ESCALATE';
+  initialReviewId: string;
+  initialVerdict: 'ESCALATE';
+  correctedVerdict: 'FAST_PATH';
+  correctedPreviousReviewId: string;
   evidenceIds: string[];
+  correctedFindingIds: string[];
 }
 
 async function runGit(root: string, arguments_: readonly string[]): Promise<string> {
@@ -83,18 +92,19 @@ function defaultDashboardRoot(): string {
 export async function startJudgeDemo(options: JudgeDemoOptions = {}): Promise<RunningJudgeDemo> {
   const fixture = await loadGhostChangeFixture();
   const root = await mkdtemp(join(tmpdir(), 'gatekeeper-judge-demo-'));
+  let service: Awaited<ReturnType<typeof startGatekeeperService>> | undefined;
 
   try {
     const repository = await createJudgeRepository(root, fixture.remote);
-    const github = createGitHubProvider({ runGh: createGhostChangeRunner(fixture) });
+    let phase: GhostChangePhase = 'revived';
+    const github = createGitHubProvider({ runGh: createGhostChangeRunner(fixture, () => phase) });
     const remote = normalizeGitHubRemote(fixture.remote);
     const paths = {
       appData: join(root, 'app-data'),
       serviceMetadata: join(root, 'app-data', 'service.json'),
       storage: join(root, 'app-data', 'storage'),
     };
-    let reviewSequence = 0;
-    const service = await startGatekeeperService({
+    const activeService = await startGatekeeperService({
       dashboardRoot: options.dashboardRoot ?? defaultDashboardRoot(),
       deterministicOnly: true,
       githubProvider: github,
@@ -107,14 +117,14 @@ export async function startJudgeDemo(options: JudgeDemoOptions = {}): Promise<Ru
           github.getPullRequest(remote, pullRequestNumber),
           github.getPullRequestDiff(remote, pullRequestNumber),
         ]);
-        reviewSequence += 1;
         return {
           pullRequest,
           remote,
           review: reviewPullRequest({
             changeSet,
             pullRequest,
-            createdAt: `2026-07-19T12:0${reviewSequence}:00.000Z`,
+            createdAt:
+              phase === 'revived' ? '2026-07-19T12:00:00.000Z' : '2026-07-19T12:01:00.000Z',
             policy: { version: 1 },
             repositoryId: context.repositoryId,
             reviewId: context.reviewId,
@@ -133,13 +143,37 @@ export async function startJudgeDemo(options: JudgeDemoOptions = {}): Promise<Ru
       },
       version: '0.1.0',
     });
+    service = activeService;
+    const connection: JudgeDemoConnection = {
+      baseUrl: activeService.baseUrl,
+      bearerToken: activeService.bearerToken,
+    };
+    const registeredRepository = repositoryRecordSchema.parse(
+      await requestJson(connection, '/v1/repositories', { method: 'POST', body: '{}' }),
+    );
+    await requestJson(connection, `/v1/repositories/${registeredRepository.repositoryId}/index`, {
+      method: 'POST',
+      body: '{}',
+    });
+    const started = reviewOperationSchema.parse(
+      await requestJson(connection, '/v1/reviews/pull-request/start', {
+        method: 'POST',
+        body: JSON.stringify({ schemaVersion: 1, pullRequestNumber: fixture.pullRequestNumber }),
+      }),
+    );
+    const initialReview = await waitForCompletedReview(connection, started.reviewId);
+    if (initialReview.status !== 'completed' || initialReview.review.verdict !== 'ESCALATE') {
+      throw new Error('Judge demo did not produce the expected Ghost Change escalation.');
+    }
+    phase = 'corrected';
     let closed = false;
 
     return {
       root,
-      baseUrl: service.baseUrl,
-      bearerToken: service.bearerToken,
+      baseUrl: activeService.baseUrl,
+      bearerToken: activeService.bearerToken,
       githubTransport: 'fixture',
+      initialReviewId: initialReview.reviewId,
       modelCalls: 0,
       close: async () => {
         if (closed) {
@@ -147,20 +181,21 @@ export async function startJudgeDemo(options: JudgeDemoOptions = {}): Promise<Ru
         }
         closed = true;
         try {
-          await service.close();
+          await activeService.close();
         } finally {
           await rm(root, { recursive: true, force: true });
         }
       },
     };
   } catch (error) {
+    await service?.close();
     await rm(root, { recursive: true, force: true });
     throw error;
   }
 }
 
 async function requestJson(
-  demo: RunningJudgeDemo,
+  demo: JudgeDemoConnection,
   path: string,
   options: RequestInit = {},
 ): Promise<unknown> {
@@ -179,7 +214,7 @@ async function requestJson(
 }
 
 async function waitForCompletedReview(
-  demo: RunningJudgeDemo,
+  demo: JudgeDemoConnection,
   reviewId: string,
 ): Promise<ReviewOperationContract> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -203,33 +238,42 @@ export async function runJudgeDemoSmoke(
   const demo = await startJudgeDemo(options);
 
   try {
-    const repository = repositoryRecordSchema.parse(
-      await requestJson(demo, '/v1/repositories', { method: 'POST', body: '{}' }),
-    );
-    await requestJson(demo, `/v1/repositories/${repository.repositoryId}/index`, {
-      method: 'POST',
-      body: '{}',
-    });
+    const initial = await waitForCompletedReview(demo, demo.initialReviewId);
+    if (initial.status !== 'completed' || initial.review.verdict !== 'ESCALATE') {
+      throw new Error('Judge demo did not retain the expected Ghost Change escalation.');
+    }
     const started = reviewOperationSchema.parse(
       await requestJson(demo, '/v1/reviews/pull-request/start', {
         method: 'POST',
         body: JSON.stringify({ schemaVersion: 1, pullRequestNumber: 12 }),
       }),
     );
-    const operation = await waitForCompletedReview(demo, started.reviewId);
-    if (operation.status !== 'completed' || operation.review.verdict !== 'ESCALATE') {
-      throw new Error('Judge demo did not produce the expected Ghost Change escalation.');
+    const corrected = await waitForCompletedReview(demo, started.reviewId);
+    if (corrected.status !== 'completed' || corrected.review.verdict !== 'FAST_PATH') {
+      throw new Error('Judge demo did not produce the corrected Ghost Change fast path.');
+    }
+    if (corrected.previousReview?.reviewId !== demo.initialReviewId) {
+      throw new Error('Judge demo did not preserve the initial review for its re-review.');
     }
 
     return {
       githubTransport: demo.githubTransport,
       modelCalls: demo.modelCalls,
-      verdict: operation.review.verdict,
-      evidenceIds: operation.evidenceTimeline.map(({ evidence }) => evidence.sourceId),
+      initialReviewId: demo.initialReviewId,
+      initialVerdict: initial.review.verdict,
+      correctedVerdict: corrected.review.verdict,
+      correctedPreviousReviewId: corrected.previousReview.reviewId,
+      evidenceIds: initial.evidenceTimeline.map(({ evidence }) => evidence.sourceId),
+      correctedFindingIds: corrected.review.findings.map(({ id }) => id),
     };
   } finally {
     await demo.close();
   }
+}
+
+interface JudgeDemoConnection {
+  baseUrl: string;
+  bearerToken: string;
 }
 
 async function waitForShutdownSignal(): Promise<void> {
@@ -242,7 +286,7 @@ async function waitForShutdownSignal(): Promise<void> {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const demo = await startJudgeDemo();
   process.stdout.write(
-    `Gatekeeper judge demo is running at ${demo.baseUrl}. Press Ctrl+C to stop.\n`,
+    `Gatekeeper judge demo is ready at ${demo.baseUrl}/reviews/${demo.initialReviewId}. Open the ESCALATE review, then run its re-review to show the corrected FAST_PATH result. Press Ctrl+C to stop.\n`,
   );
   try {
     await waitForShutdownSignal();

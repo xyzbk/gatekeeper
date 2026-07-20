@@ -4,9 +4,15 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type * as ChildProcess from 'node:child_process';
+
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
 
 vi.mock('node:child_process', () => ({ execFile: execFileMock }));
+
+const { execFile: actualExecFile } = await vi.importActual<typeof ChildProcess>(
+  'node:child_process',
+);
 
 import { startJudgeDemo } from './judge-demo.js';
 
@@ -14,15 +20,17 @@ describe('judge demo process safety', () => {
   it('bounds every disposable-repository Git invocation', async () => {
     execFileMock.mockImplementation(
       (
-        _file: string,
+        file: string,
         arguments_: readonly string[],
-        _options: unknown,
+        options: unknown,
         callback: (error: Error | null, result?: { stderr: string; stdout: string }) => void,
       ) =>
-        callback(null, {
-          stderr: '',
-          stdout: arguments_.includes('rev-parse') ? 'a'.repeat(40) : '',
-        }),
+        actualExecFile(file, arguments_, options as never, (error, stdout, stderr) =>
+          callback(error, {
+            stderr: String(stderr),
+            stdout: String(stdout),
+          }),
+        ),
     );
     const dashboardRoot = await createDashboardFixture();
     const demo = await startJudgeDemo({ dashboardRoot });
@@ -30,9 +38,10 @@ describe('judge demo process safety', () => {
     try {
       const options: unknown[] = execFileMock.mock.calls.map((call) => call[2] as unknown);
 
-      expect(options).toEqual(
-        expect.arrayContaining([expect.objectContaining({ timeout: 30_000 })]),
-      );
+      expect(options).not.toHaveLength(0);
+      for (const option of options) {
+        expect(option).toEqual(expect.objectContaining({ timeout: 30_000 }));
+      }
     } finally {
       await demo.close();
       await rm(dashboardRoot, { recursive: true, force: true });

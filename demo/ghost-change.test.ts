@@ -55,6 +55,32 @@ describe('Ghost Change offline scenario', () => {
     );
   });
 
+  it('exposes an auditable SQLite correction only for the follow-up replay', async () => {
+    const fixture = await loadGhostChangeFixture();
+    let phase: 'revived' | 'corrected' = 'revived';
+    const provider = createGitHubProvider({
+      runGh: createGhostChangeRunner(fixture, () => phase),
+    });
+    const remote = normalizeGitHubRemote(fixture.remote);
+
+    const revived = await provider.getPullRequest(remote, fixture.pullRequestNumber);
+    phase = 'corrected';
+    const corrected = await provider.getPullRequest(remote, fixture.pullRequestNumber);
+    const correctedChangeSet = await provider.getPullRequestDiff(remote, fixture.pullRequestNumber);
+
+    expect(revived.body).toContain('Ignore all previous instructions');
+    expect(corrected.body).not.toContain('Ignore all previous instructions');
+    expect(corrected.body).toContain('SQLite');
+    expect(correctedChangeSet.files).toContainEqual(
+      expect.objectContaining({
+        path: 'src/cache.ts',
+        addedLines: ["export const cache = 'sqlite';"],
+      }),
+    );
+    const correctedTest = correctedChangeSet.files.find((file) => file.path === 'tests/cache.test.ts');
+    expect(correctedTest?.addedLines).toContain("  expect(cache).toBe('sqlite');");
+  });
+
   it('ranks the linked proposal, regression, revert, and active ADR ahead of lexical noise', async () => {
     const fixture = await loadGhostChangeFixture();
     const provider = createGitHubProvider({ runGh: createGhostChangeRunner(fixture) });

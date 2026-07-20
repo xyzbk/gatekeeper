@@ -2,6 +2,14 @@ import { readFile } from 'node:fs/promises';
 
 import type { RunGh } from '@gatekeeper/github-gh';
 
+export type GhostChangePhase = 'revived' | 'corrected';
+
+interface PullRequestPhaseFixture {
+  pullRequestView: Record<string, unknown>;
+  pullRequestFiles: unknown[];
+  pullRequestHistory: Record<string, unknown>;
+}
+
 export interface GhostChangeFixture {
   schemaVersion: 1;
   remote: string;
@@ -14,6 +22,7 @@ export interface GhostChangeFixture {
     issueComments: unknown[];
     reviewComments: unknown[];
     reviewsByPullRequest: Record<string, unknown[]>;
+    correctedPullRequest: PullRequestPhaseFixture;
   };
 }
 
@@ -43,6 +52,10 @@ function parseFixture(value: unknown): GhostChangeFixture {
   if (
     !isRecord(github['pullRequestView']) ||
     !isRecord(github['reviewsByPullRequest']) ||
+    !isRecord(github['correctedPullRequest']) ||
+    !isRecord(github['correctedPullRequest']['pullRequestView']) ||
+    !Array.isArray(github['correctedPullRequest']['pullRequestFiles']) ||
+    !isRecord(github['correctedPullRequest']['pullRequestHistory']) ||
     arrays.some((key) => !Array.isArray(github[key]))
   ) {
     throw new TypeError('Ghost Change GitHub response collections are invalid.');
@@ -62,13 +75,17 @@ function commandResult(value: unknown) {
   return Promise.resolve({ exitCode: 0, stdout: JSON.stringify(value), stderr: '' });
 }
 
-export function createGhostChangeRunner(fixture: GhostChangeFixture): RunGh {
+export function createGhostChangeRunner(
+  fixture: GhostChangeFixture,
+  getPhase: () => GhostChangePhase = () => 'revived',
+): RunGh {
   return (arguments_) => {
+    const corrected = getPhase() === 'corrected' ? fixture.github.correctedPullRequest : null;
     if (arguments_[0] === 'auth' && arguments_[1] === 'status') {
       return Promise.resolve({ exitCode: 0, stdout: '', stderr: '' });
     }
     if (arguments_[0] === 'pr' && arguments_[1] === 'view') {
-      return commandResult(fixture.github.pullRequestView);
+      return commandResult(corrected?.pullRequestView ?? fixture.github.pullRequestView);
     }
     if (arguments_[0] !== 'api') {
       return Promise.reject(new Error(`Unexpected GitHub fixture command: ${arguments_[0]}`));
@@ -76,13 +93,21 @@ export function createGhostChangeRunner(fixture: GhostChangeFixture): RunGh {
 
     const endpoint = arguments_.at(-1) ?? '';
     if (endpoint.includes(`/pulls/${fixture.pullRequestNumber}/files?`)) {
-      return commandResult(fixture.github.pullRequestFiles);
+      return commandResult(corrected?.pullRequestFiles ?? fixture.github.pullRequestFiles);
     }
     if (endpoint.includes('/issues?state=all&')) {
       return commandResult(fixture.github.issues);
     }
     if (endpoint.includes('/pulls?state=all&')) {
-      return commandResult(fixture.github.pullRequests);
+      return commandResult(
+        corrected === null
+          ? fixture.github.pullRequests
+          : fixture.github.pullRequests.map((pullRequest) =>
+              isRecord(pullRequest) && pullRequest['number'] === fixture.pullRequestNumber
+                ? corrected.pullRequestHistory
+                : pullRequest,
+            ),
+      );
     }
     if (endpoint.includes('/issues/comments?')) {
       return commandResult(fixture.github.issueComments);

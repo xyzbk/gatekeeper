@@ -170,7 +170,7 @@ export async function evaluateGoldenScenarios(
     toOutcome('auth-escalation', authEscalation),
     {
       scenario: 'redis-revival' as const,
-      verdict: judgeSmoke.verdict,
+      verdict: judgeSmoke.initialVerdict,
       findingIds: [],
       evidenceIds: judgeSmoke.evidenceIds,
     },

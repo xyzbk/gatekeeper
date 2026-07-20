@@ -15,6 +15,7 @@ describe('judge demo', () => {
       expect(demo.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
       expect(demo.githubTransport).toBe('fixture');
       expect(demo.modelCalls).toBe(0);
+      expect(demo.initialReviewId).toMatch(/^review_[a-f0-9]+$/);
       await expect(fetch(`${demo.baseUrl}/health`)).resolves.toMatchObject({ status: 200 });
     } finally {
       await demo.close();
@@ -24,17 +25,23 @@ describe('judge demo', () => {
     await expect(access(demo.root)).rejects.toThrow();
   });
 
-  it('smokes the Ghost Change without network credentials or a model completion', async () => {
+  it('replays the Ghost Change from escalation to a corrected fast path without network credentials or a model completion', async () => {
     const dashboardRoot = await createDashboardFixture();
     try {
       const result = await runJudgeDemoSmoke({ dashboardRoot });
 
       expect(result.githubTransport).toBe('fixture');
       expect(result.modelCalls).toBe(0);
-      expect(result.verdict).toBe('ESCALATE');
+      expect(result.initialVerdict).toBe('ESCALATE');
+      expect(result.correctedVerdict).toBe('FAST_PATH');
+      expect(result.initialReviewId).toMatch(/^review_[a-f0-9]+$/);
+      expect(result.correctedPreviousReviewId).toBe(result.initialReviewId);
       expect(result.evidenceIds).toContain('pull_request:#12');
       expect(result.evidenceIds).toContain('issue:#4');
       expect(result.evidenceIds).toContain('docs/adr/0003-no-required-redis.md');
+      expect(result.correctedFindingIds).not.toContain(
+        'finding:content-security:prompt-injection',
+      );
     } finally {
       await rm(dashboardRoot, { recursive: true, force: true });
     }

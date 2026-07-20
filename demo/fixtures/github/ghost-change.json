@@ -40,6 +40,56 @@
         "patch": "@@ -1 +1,4 @@\n import { cache } from '../src/cache.js';\n+test('uses Redis', () => {\n+  expect(cache).toBeDefined();\n+});"
       }
     ],
+    "correctedPullRequest": {
+      "pullRequestView": {
+        "number": 12,
+        "title": "Keep the cache local and durable",
+        "body": "<!-- gatekeeper-demo:ghost-change:pull_request:12 -->\nPreserves SQLite for offline local reviews after the earlier Redis regression.\n\nGatekeeper-Relation: resolves issue #9\nGatekeeper-Relation: reverts pull_request #8\nGatekeeper-Relation: mentions adr docs/adr/0003-no-required-redis.md",
+        "state": "OPEN",
+        "url": "https://github.com/xyzbk/gatekeeper-ghost-change/pull/12",
+        "author": { "login": "gatekeeper-demo" },
+        "baseRefName": "master",
+        "headRefName": "keep-local-sqlite",
+        "headRefOid": "3434343434343434343434343434343434343434",
+        "additions": 3,
+        "deletions": 6,
+        "changedFiles": 2,
+        "isDraft": false,
+        "closingIssuesReferences": [{ "number": 9 }],
+        "statusCheckRollup": [{ "name": "test", "conclusion": "SUCCESS" }],
+        "createdAt": "2026-07-18T16:00:00.000Z",
+        "updatedAt": "2026-07-19T12:01:00.000Z",
+        "closedAt": null,
+        "mergedAt": null
+      },
+      "pullRequestFiles": [
+        {
+          "filename": "src/cache.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 4,
+          "patch": "@@ -1 +1 @@\n-import Redis from 'ioredis';\n-export const cache = new Redis();\n-export const required = true;\n-export const backend = 'redis';\n+export const cache = 'sqlite';"
+        },
+        {
+          "filename": "tests/cache.test.ts",
+          "status": "modified",
+          "additions": 2,
+          "deletions": 2,
+          "patch": "@@ -1,4 +1,4 @@\n import { cache } from '../src/cache.js';\n-test('uses Redis', () => {\n+test('uses the local SQLite cache', () => {\n-  expect(cache).toBeDefined();\n+  expect(cache).toBe('sqlite');\n });"
+        }
+      ],
+      "pullRequestHistory": {
+        "number": 12,
+        "title": "Keep the cache local and durable",
+        "body": "<!-- gatekeeper-demo:ghost-change:pull_request:12 -->\nPreserves SQLite for offline local reviews after the earlier Redis regression.\n\nGatekeeper-Relation: resolves issue #9\nGatekeeper-Relation: reverts pull_request #8\nGatekeeper-Relation: mentions adr docs/adr/0003-no-required-redis.md",
+        "state": "open",
+        "html_url": "https://github.com/xyzbk/gatekeeper-ghost-change/pull/12",
+        "created_at": "2026-07-18T16:00:00.000Z",
+        "updated_at": "2026-07-19T12:01:00.000Z",
+        "base": { "ref": "master" },
+        "head": { "ref": "keep-local-sqlite" }
+      }
+    },
     "issues": [
       {
         "number": 4,
