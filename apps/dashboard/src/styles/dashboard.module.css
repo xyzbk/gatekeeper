@@ -1236,6 +1236,45 @@
   overflow-wrap: anywhere;
 }
 
+.authorityLedger {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.authorityLedger > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.authorityLedger > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.authorityLedger dt {
+  color: var(--ink-tertiary);
+  font-size: 0.75rem;
+}
+
+.authorityLedger dd {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.authorityInvariant {
+  margin: 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--ink-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 .reviewSection {
   margin-top: 18px;
   border: 1px solid var(--border);
@@ -1730,6 +1769,16 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .authorityLedger {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .authorityLedger > div:nth-child(3) {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
   .reviewMetrics div:nth-child(3) {
     padding-left: 0;
     border-top: 1px solid var(--border);
@@ -1793,6 +1842,10 @@
     grid-template-columns: 1fr;
   }
 
+  .authorityLedger {
+    grid-template-columns: 1fr;
+  }
+
   .timelineHeading {
     flex-direction: column;
     gap: 8px;
@@ -1820,6 +1873,17 @@
   }
 
   .reviewMetrics div:first-child {
+    border-top: 0;
+  }
+
+  .authorityLedger > div,
+  .authorityLedger > div + div {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .authorityLedger > div:first-child {
     border-top: 0;
   }
 }
