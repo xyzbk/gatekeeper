@@ -13,6 +13,7 @@
   "scripts": {
     "build": "tsc -b --pretty false --force && pnpm --filter @gatekeeper/dashboard build",
     "demo": "tsx demo/judge-demo.ts",
+    "judge": "pnpm install --frozen-lockfile && pnpm build && pnpm demo:smoke && pnpm demo",
     "demo:seed": "tsx demo/scripts/seed-github.ts",
     "demo:smoke": "tsx demo/evaluate.ts --smoke",
     "eval": "tsx demo/evaluate.ts",

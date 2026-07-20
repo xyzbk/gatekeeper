@@ -14,6 +14,10 @@ pnpm model-data:dry-run
 
 The smoke command proves all six golden verdicts without a GitHub credential, external network request, or model call after dependencies are installed. `pnpm eval` regenerates the checked-in golden report.
 
+### One-command evaluator route
+
+For the shortest fresh-clone evaluation, run `pnpm judge`. It runs the pinned install, build, offline smoke proof, and interactive dashboard demo in that order. On Windows, double-click [`Judge Gatekeeper Demo.cmd`](../../Judge%20Gatekeeper%20Demo.cmd) to invoke the same public command. The launcher contains no setup logic of its own.
+
 ## Interactive evaluation
 
 After the same install and build, run:

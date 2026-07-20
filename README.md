@@ -58,9 +58,19 @@ node apps/cli/dist/index.js review worktree demo/fixtures/protected-path --forma
 
 `pnpm fixtures:prepare` recreates only those disposable fixture directories. Once those results make sense, replace the fixture path with your own repository path in the commands above.
 
+### One-command local evaluation
+
+From a fresh clone with the prerequisites above, run:
+
+```powershell
+pnpm judge
+```
+
+It installs only the pinned lockfile dependencies, builds the application, runs the six-outcome smoke proof, then starts the interactive demo. On Windows, you can instead double-click [`Judge Gatekeeper Demo.cmd`](Judge%20Gatekeeper%20Demo.cmd); its three visible lines invoke the same command. There is no installer service, downloaded executable, or hidden setup behavior to audit.
+
 ### Evaluate the dashboard without an account
 
-For the complete dashboard and pull-request experience, run the committed judge demo after the build:
+If Gatekeeper is already built, start the committed judge demo directly:
 
 ```powershell
 pnpm demo
