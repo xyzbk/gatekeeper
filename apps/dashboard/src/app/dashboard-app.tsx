@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { Link, Route, Routes } from 'react-router';
 
 import type { MemoryClient } from '../api/memory-client.js';
 import type { StatusClient } from '../api/status-client.js';
 import type { ReviewClient } from '../api/review-client.js';
 import { AppShell } from '../components/app-shell.js';
-import { OverviewRoute } from '../routes/overview-route.js';
+import { OverviewRoute, type RepositoryControlAction } from '../routes/overview-route.js';
 import { CommitExplorerRoute } from '../routes/commit-explorer-route.js';
 import { MemoryRoute } from '../routes/memory-route.js';
 import { ReviewDetailRoute } from '../routes/review-detail-route.js';
 import { PullRequestReviewRoute } from '../routes/pull-request-review-route.js';
+import { PullRequestExplorerRoute } from '../routes/pull-request-explorer-route.js';
 import { ReviewRoute } from '../routes/review-route.js';
 import styles from '../styles/dashboard.module.css';
 
@@ -19,8 +21,12 @@ interface DashboardAppProps {
   startPullRequestReview: ReviewClient['startPullRequestReview'];
   startCommitReview: ReviewClient['startCommitReview'];
   exploreCommits: MemoryClient['exploreCommits'];
+  explorePullRequests: MemoryClient['explorePullRequests'];
+  getMemoryStatus: MemoryClient['getMemoryStatus'];
+  indexLocalMemory: MemoryClient['indexLocalMemory'];
   recentCommits: MemoryClient['recentCommits'];
   searchMemory: MemoryClient['search'];
+  syncGitHubHistory: MemoryClient['syncGitHubHistory'];
 }
 
 function NotFoundRoute() {
@@ -41,13 +47,32 @@ export function DashboardApp({
   startPullRequestReview,
   startCommitReview,
   exploreCommits,
+  explorePullRequests,
+  getMemoryStatus,
+  indexLocalMemory,
   recentCommits,
   searchMemory,
+  syncGitHubHistory,
 }: DashboardAppProps) {
+  const [lastRepositoryControlAction, setLastRepositoryControlAction] =
+    useState<RepositoryControlAction | null>(null);
+
   return (
     <AppShell>
       <Routes>
-        <Route element={<OverviewRoute loadStatus={loadStatus} />} path="/" />
+        <Route
+          element={
+            <OverviewRoute
+              getMemoryStatus={getMemoryStatus}
+              indexLocalMemory={indexLocalMemory}
+              loadStatus={loadStatus}
+              syncGitHubHistory={syncGitHubHistory}
+              lastAction={lastRepositoryControlAction}
+              onActionResult={setLastRepositoryControlAction}
+            />
+          }
+          path="/"
+        />
         <Route
           element={
             <CommitExplorerRoute
@@ -74,6 +99,15 @@ export function DashboardApp({
         <Route
           element={<PullRequestReviewRoute startPullRequestReview={startPullRequestReview} />}
           path="/reviews/pull-request"
+        />
+        <Route
+          element={
+            <PullRequestExplorerRoute
+              explorePullRequests={explorePullRequests}
+              startPullRequestReview={startPullRequestReview}
+            />
+          }
+          path="/pull-requests"
         />
         <Route
           element={

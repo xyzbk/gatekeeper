@@ -5,8 +5,13 @@ import '@testing-library/jest-dom/vitest';
 import type {
   CommitExplorerInput,
   CommitExplorerResponse,
+  GitHubSyncResult,
+  IndexResult,
   MemorySearchResult,
+  PullRequestExplorerInput,
+  PullRequestExplorerResponse,
   RecentCommitEvidence,
+  RepositoryStatus,
   ReviewLookupContract,
   ReviewOperationContract,
   ReviewRunContract,
@@ -123,16 +128,64 @@ const localCommits: CommitExplorerResponse = {
   nextCursor: null,
 };
 
+const memoryStatus: RepositoryStatus = {
+  schemaVersion: 1,
+  state: 'not_initialized',
+  repository: null,
+  indexState: null,
+};
+
+const indexResult: IndexResult = {
+  schemaVersion: 1,
+  repositoryId: review.repositoryId,
+  head: status.repository.head,
+  indexedAt: review.createdAt,
+  files: { scanned: 0, written: 0, unchanged: 0, deleted: 0 },
+  documents: { scanned: 0, written: 0, unchanged: 0, deleted: 0 },
+  commits: { scanned: 0, written: 0, unchanged: 0, deleted: 0 },
+};
+
+const syncResult: GitHubSyncResult = {
+  schemaVersion: 1,
+  repositoryId: review.repositoryId,
+  provider: 'github',
+  syncedAt: review.createdAt,
+  cursor: null,
+  partial: false,
+  documents: { received: 0, written: 0, unchanged: 0 },
+  links: { received: 0, written: 0, unchanged: 0 },
+  failures: [],
+};
+
+const pullRequests: PullRequestExplorerResponse = {
+  schemaVersion: 1,
+  selection: {
+    schemaVersion: 1,
+    repositoryId: review.repositoryId,
+    state: 'all',
+    reviewState: 'all',
+    sort: 'newest',
+  },
+  pullRequests: [],
+  nextCursor: null,
+};
+
 interface RenderOptions {
   exploreCommits?: (input: CommitExplorerInput) => Promise<CommitExplorerResponse>;
+  explorePullRequests?: (
+    input: Omit<PullRequestExplorerInput, 'repositoryId'>,
+  ) => Promise<PullRequestExplorerResponse>;
+  getMemoryStatus?: () => Promise<RepositoryStatus>;
   getReview?: (reviewId: string) => Promise<ReviewLookupContract>;
   initialEntry?: string;
   loadStatus?: () => Promise<StatusResponse>;
+  indexLocalMemory?: () => Promise<IndexResult>;
   searchMemory?: (query: string) => Promise<MemorySearchResult[]>;
   recentCommits?: () => Promise<RecentCommitEvidence[]>;
   startCommitReview?: (sha: string) => Promise<ReviewOperationContract>;
   startPullRequestReview?: (pullRequestNumber: number) => Promise<ReviewOperationContract>;
   startWorktreeReview?: () => Promise<ReviewOperationContract>;
+  syncGitHubHistory?: () => Promise<GitHubSyncResult>;
 }
 
 async function renderDashboard(options: RenderOptions = {}) {
@@ -147,9 +200,13 @@ async function renderDashboard(options: RenderOptions = {}) {
       <MemoryRouter initialEntries={[options.initialEntry ?? '/']}>
         <DashboardApp
           exploreCommits={options.exploreCommits ?? (() => Promise.resolve(localCommits))}
+          explorePullRequests={options.explorePullRequests ?? (() => Promise.resolve(pullRequests))}
           getReview={options.getReview ?? (() => Promise.resolve(review))}
+          getMemoryStatus={options.getMemoryStatus ?? (() => Promise.resolve(memoryStatus))}
+          indexLocalMemory={options.indexLocalMemory ?? (() => Promise.resolve(indexResult))}
           loadStatus={options.loadStatus ?? (() => Promise.resolve(status))}
           searchMemory={options.searchMemory ?? (() => Promise.resolve([memoryResult]))}
+          syncGitHubHistory={options.syncGitHubHistory ?? (() => Promise.resolve(syncResult))}
           recentCommits={options.recentCommits ?? (() => Promise.resolve(recentCommits))}
           startCommitReview={options.startCommitReview ?? (() => Promise.resolve(queued))}
           startPullRequestReview={
@@ -172,7 +229,7 @@ describe('dashboard application shell', () => {
     await renderDashboard();
     expect(await screen.findByRole('heading', { level: 1, name: 'gatekeeper' })).toBeVisible();
     expect(screen.getAllByText(status.repository.root)).toHaveLength(2);
-    expect(screen.getByText(status.repository.head)).toBeVisible();
+    expect(screen.getAllByText(status.repository.head)).toHaveLength(2);
     await user.tab();
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveFocus();
   });
@@ -193,10 +250,25 @@ describe('dashboard application shell', () => {
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   });
 
+  it('keeps the last repository control result while navigating the dashboard', async () => {
+    const user = userEvent.setup();
+    await renderDashboard();
+
+    await screen.findByRole('heading', { name: 'Repository Control' });
+    await user.click(screen.getByRole('button', { name: 'Index local memory' }));
+    expect(await screen.findByText('Indexed 0 files, 0 documents, and 0 commits.')).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: 'Pull request evidence' }));
+    await screen.findByRole('heading', { name: 'Browse pull requests' });
+    await user.click(screen.getByRole('link', { name: 'Repository overview' }));
+
+    expect(await screen.findByText('Indexed 0 files, 0 documents, and 0 commits.')).toBeVisible();
+  });
+
   it('supports direct entry to the pull-request inspector', async () => {
     await renderDashboard({ initialEntry: '/reviews/pull-request' });
     expect(screen.getByRole('heading', { name: 'Review a GitHub pull request' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Pull request reviews' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Pull request evidence' })).not.toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -206,6 +278,15 @@ describe('dashboard application shell', () => {
     await renderDashboard({ initialEntry: '/commits' });
     expect(await screen.findByRole('heading', { name: 'Browse local commits' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Local commits' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('supports direct entry to the Pull Request Explorer', async () => {
+    await renderDashboard({ initialEntry: '/pull-requests' });
+    expect(await screen.findByRole('heading', { name: 'Browse pull requests' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Pull request evidence' })).toHaveAttribute(
       'aria-current',
       'page',
     );

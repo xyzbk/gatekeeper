@@ -237,6 +237,46 @@
   grid-column: 1 / -1;
 }
 
+.repositoryControlPanel {
+  grid-column: 1 / -1;
+}
+
+.repositoryControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0 22px 18px;
+}
+
+.repositoryControls > div {
+  min-width: 0;
+}
+
+.repositoryControls p,
+.repositoryControlResult,
+.repositoryControlError {
+  margin: 9px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.repositoryControlResult,
+.repositoryControlError {
+  margin: 0 22px 18px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.repositoryControlResult p {
+  margin: 0;
+}
+
+.repositoryControlResult p + p {
+  margin-top: 5px;
+}
+
 .serviceSummary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1004,6 +1044,138 @@
   text-align: center;
 }
 
+.pullRequestExplorerPage {
+  max-width: 1120px;
+}
+
+.pullRequestFilterGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(5, minmax(126px, 0.85fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.pullRequestFilterGrid label {
+  min-width: 0;
+}
+
+.pullRequestFilterGrid label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink-tertiary);
+  font-size: 0.75rem;
+}
+
+.pullRequestFilterGrid input,
+.pullRequestFilterGrid select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.pullRequestFilterGrid input {
+  padding: 0 10px;
+}
+
+.pullRequestFilterGrid select {
+  padding: 0 8px;
+}
+
+.pullRequestFilterGrid input::placeholder {
+  color: var(--ink-tertiary);
+}
+
+.pullRequestFilterGrid input:focus,
+.pullRequestFilterGrid select:focus {
+  border-color: var(--focus);
+}
+
+.pullRequestList {
+  display: grid;
+  gap: 1px;
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.pullRequestRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.pullRequestRow + .pullRequestRow {
+  border-top: 1px solid var(--border);
+}
+
+.pullRequestRowMain {
+  min-width: 0;
+}
+
+.pullRequestRowMeta,
+.pullRequestRowMain > p,
+.pullRequestRowActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pullRequestRowMeta {
+  color: var(--ink-tertiary);
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.pullRequestRowMain h2 {
+  margin: 8px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.pullRequestRowMain > p {
+  margin: 8px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.75rem;
+}
+
+.pullRequestRowMain > p > span::before {
+  margin-right: 8px;
+  color: var(--ink-tertiary);
+  content: '·';
+}
+
+.pullRequestRowActions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.pullRequestRowActions a {
+  text-decoration: none;
+}
+
+.pullRequestKnownLink {
+  margin: 22px 0 0;
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+}
+
+.pullRequestKnownLink a {
+  color: var(--ink);
+}
+
 .storedReviewState {
   max-width: 720px;
   padding-top: 12px;
@@ -1674,7 +1846,15 @@
     grid-template-columns: 1fr;
   }
 
+  .repositoryControls {
+    grid-template-columns: 1fr;
+  }
+
   .commitFilterGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pullRequestFilterGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -1747,6 +1927,19 @@
 
   .commitFilterGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pullRequestFilterGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pullRequestRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pullRequestRowActions {
+    justify-content: flex-start;
   }
 
   .promptSection {
@@ -1827,6 +2020,20 @@
 
   .commitFilterGrid {
     grid-template-columns: 1fr;
+  }
+
+  .pullRequestFilterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pullRequestRowActions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .pullRequestRowActions a,
+  .pullRequestRowActions button {
+    width: 100%;
   }
 
   .commitPagination {

@@ -40,8 +40,12 @@ createRoot(rootElement).render(
           startPullRequestReview={reviewClient.startPullRequestReview}
           startCommitReview={reviewClient.startCommitReview}
           exploreCommits={memoryClient.exploreCommits}
+          explorePullRequests={memoryClient.explorePullRequests}
+          getMemoryStatus={memoryClient.getMemoryStatus}
+          indexLocalMemory={memoryClient.indexLocalMemory}
           recentCommits={memoryClient.recentCommits}
           searchMemory={memoryClient.search}
+          syncGitHubHistory={memoryClient.syncGitHubHistory}
         />
       </BrowserRouter>
     </QueryClientProvider>
