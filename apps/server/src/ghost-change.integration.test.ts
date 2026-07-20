@@ -165,18 +165,22 @@ describe('Ghost Change service integration', () => {
       expect(firstResult.review.verdict).toBe('ESCALATE');
       expect(firstResult.historySync).toMatchObject({
         partial: true,
-        documents: { written: 9 },
+        documents: { written: 11 },
       });
       expect(firstResult.previousReview).toBeNull();
       expect(firstResult.evidenceTimeline.map(({ role }) => role)).toEqual([
         'proposal',
         'implementation',
+        'implementation',
+        'incident',
         'incident',
         'revert',
         'decision',
         'revived_change',
       ]);
       expect(firstResult.evidenceTimeline.map(({ sourceAuthority }) => sourceAuthority)).toEqual([
+        'github',
+        'github',
         'github',
         'github',
         'github',
@@ -195,12 +199,14 @@ describe('Ghost Change service integration', () => {
       expect(secondResult.previousReview?.reviewId).toBe(firstResult.review.reviewId);
 
       const memory = await dashboardMemory.search('pull_request:#12');
-      expect(memory.slice(0, 6).map(({ evidence }) => evidence.sourceId)).toEqual([
+      expect(memory.slice(0, 8).map(({ evidence }) => evidence.sourceId)).toEqual([
         'pull_request:#12',
         'issue:#4',
         'pull_request:#8',
         'issue:#9',
+        'issue:#11',
         'pull_request:#10',
+        'pull_request:#13',
         'docs/adr/0003-no-required-redis.md',
       ]);
 
@@ -212,6 +218,8 @@ describe('Ghost Change service integration', () => {
           'pull_request:#8',
           'issue:#9',
           'pull_request:#10',
+          'issue:#11',
+          'pull_request:#13',
           'docs/adr/0003-no-required-redis.md',
         ]),
       );

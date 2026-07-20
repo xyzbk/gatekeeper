@@ -167,6 +167,9 @@ test.describe('Ghost Change dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Revive required Redis cache' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Revert required Redis cache' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Require Redis cache' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Previous page' }).evaluate((button) => getComputedStyle(button).cursor),
+    ).resolves.toBe('not-allowed');
 
     const currentPullRequest = page
       .getByRole('article')
@@ -188,8 +191,9 @@ test.describe('Ghost Change dashboard', () => {
     await expect(page.getByText('Assembled locally by Gatekeeper')).toBeVisible();
 
     const timeline = page.getByRole('list', { name: 'Evidence timeline' });
-    await expect(timeline.getByRole('listitem')).toHaveCount(6);
+    await expect(timeline.getByRole('listitem')).toHaveCount(8);
     await expect(timeline.getByText('Proposal', { exact: true })).toBeVisible();
+    await expect(timeline.getByText('Incident', { exact: true })).toHaveCount(2);
     await expect(timeline.getByText('Revived change', { exact: true })).toBeVisible();
     await expect(timeline.getByRole('link', { name: 'Revert required Redis cache' })).toHaveAttribute(
       'href',

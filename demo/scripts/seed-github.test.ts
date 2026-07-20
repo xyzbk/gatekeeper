@@ -32,7 +32,7 @@ describe('GitHub Ghost Change seeder', () => {
       write: (line) => lines.push(line),
     });
 
-    expect(outcome).toMatchObject({ mode: 'dry-run', planned: 6, applied: 0, skipped: 0 });
+    expect(outcome).toMatchObject({ mode: 'dry-run', planned: 8, applied: 0, skipped: 0 });
     expect(runGh).not.toHaveBeenCalled();
     expect(lines.join('\n')).toContain('gatekeeper-demo:ghost-change:pull_request:12');
     expect(lines.join('\n')).toContain('No GitHub requests were made.');
@@ -64,6 +64,13 @@ describe('GitHub Ghost Change seeder', () => {
         body: '<!-- gatekeeper-demo:ghost-change:pull_request:10 -->',
         pull_request: {},
       },
+      { number: 47, state: 'closed', body: '<!-- gatekeeper-demo:ghost-change:issue:11 -->' },
+      {
+        number: 48,
+        state: 'closed',
+        body: '<!-- gatekeeper-demo:ghost-change:pull_request:13 -->',
+        pull_request: {},
+      },
       { number: 45, state: 'open', body: '<!-- gatekeeper-demo:ghost-change:issue:99 -->' },
       {
         number: 46,
@@ -87,8 +94,8 @@ describe('GitHub Ghost Change seeder', () => {
       write: () => undefined,
     });
 
-    expect(outcome).toMatchObject({ mode: 'apply', planned: 6, applied: 0, skipped: 6 });
-    expect(runGh).toHaveBeenCalledTimes(5);
+    expect(outcome).toMatchObject({ mode: 'apply', planned: 8, applied: 0, skipped: 8 });
+    expect(runGh).toHaveBeenCalledTimes(6);
     const invoked = runGh.mock.calls.flatMap(([arguments_]) => arguments_);
     expect(invoked).not.toEqual(expect.arrayContaining(['create', 'delete', 'close', 'merge']));
   });
@@ -101,6 +108,8 @@ describe('GitHub Ghost Change seeder', () => {
       'https://github.com/example/ghost-change/pull/104',
       'https://github.com/example/ghost-change/issues/105',
       'https://github.com/example/ghost-change/pull/106',
+      'https://github.com/example/ghost-change/issues/107',
+      'https://github.com/example/ghost-change/pull/108',
     ];
     const runGh = vi.fn<RunSeedGh>((arguments_) => {
       if (arguments_[0] === 'repo') {
@@ -119,11 +128,11 @@ describe('GitHub Ghost Change seeder', () => {
       write: () => undefined,
     });
 
-    expect(outcome).toMatchObject({ mode: 'apply', planned: 6, applied: 6, skipped: 0 });
+    expect(outcome).toMatchObject({ mode: 'apply', planned: 8, applied: 8, skipped: 0 });
     const createCalls = runGh.mock.calls
       .map(([arguments_]) => arguments_)
       .filter((arguments_) => arguments_.includes('create'));
-    expect(createCalls).toHaveLength(6);
+    expect(createCalls).toHaveLength(8);
     expect(createCalls.every((arguments_) => !arguments_.includes('--delete-branch'))).toBe(true);
     const closeCalls = runGh.mock.calls
       .map(([arguments_]) => arguments_)
@@ -133,6 +142,8 @@ describe('GitHub Ghost Change seeder', () => {
       ['pr', 'close', '102', '--repo', 'example/ghost-change'],
       ['issue', 'close', '103', '--repo', 'example/ghost-change'],
       ['pr', 'close', '104', '--repo', 'example/ghost-change'],
+      ['issue', 'close', '105', '--repo', 'example/ghost-change'],
+      ['pr', 'close', '106', '--repo', 'example/ghost-change'],
     ]);
     const revivedCall = createCalls.at(-1)!;
     const revivedBody = revivedCall[revivedCall.indexOf('--body') + 1];
@@ -140,6 +151,8 @@ describe('GitHub Ghost Change seeder', () => {
     expect(revivedBody).toContain('pull_request #102');
     expect(revivedBody).toContain('issue #103');
     expect(revivedBody).toContain('pull_request #104');
+    expect(revivedBody).toContain('issue #105');
+    expect(revivedBody).toContain('pull_request #106');
   });
 
   it('checks every required branch before the first write', async () => {

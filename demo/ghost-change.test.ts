@@ -42,13 +42,15 @@ describe('Ghost Change offline scenario', () => {
       'tests/cache.test.ts',
     ]);
     expect(history.partial).toBe(true);
-    expect(history.failures).toContainEqual({ source: 'issues[4]', code: 'malformed_record' });
+    expect(history.failures).toContainEqual({ source: 'issues[5]', code: 'malformed_record' });
     expect(history.records.map(({ sourceId }) => sourceId)).toEqual(
       expect.arrayContaining([
         'issue:#4',
         'pull_request:#8',
         'issue:#9',
         'pull_request:#10',
+        'issue:#11',
+        'pull_request:#13',
         'pull_request:#12',
         'issue:#99',
       ]),
@@ -130,17 +132,22 @@ describe('Ghost Change offline scenario', () => {
         schemaVersion: 1,
         repositoryId: repository.repositoryId,
         query: `pull_request:#${fixture.pullRequestNumber}`,
-        limit: 10,
+        limit: 20,
       });
 
-      expect(results.slice(0, 6).map(({ evidence }) => evidence.sourceId)).toEqual([
+      expect(results.slice(0, 8).map(({ evidence }) => evidence.sourceId)).toEqual([
         'pull_request:#12',
         'issue:#4',
         'pull_request:#8',
         'issue:#9',
+        'issue:#11',
         'pull_request:#10',
+        'pull_request:#13',
         'docs/adr/0003-no-required-redis.md',
       ]);
+      expect(results.map(({ evidence }) => evidence.sourceId)).toEqual(
+        expect.arrayContaining(['issue:#11', 'pull_request:#13']),
+      );
       expect(results.some(({ evidence }) => evidence.sourceId === 'issue:#99')).toBe(false);
       const [pullRequest, changeSet] = await Promise.all([
         provider.getPullRequest(remote, fixture.pullRequestNumber),
@@ -171,6 +178,8 @@ describe('Ghost Change offline scenario', () => {
           'pull_request:#8',
           'issue:#9',
           'pull_request:#10',
+          'issue:#11',
+          'pull_request:#13',
           'docs/adr/0003-no-required-redis.md',
         ]),
       );

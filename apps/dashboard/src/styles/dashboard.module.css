@@ -1044,6 +1044,10 @@
   text-align: center;
 }
 
+.commitPagination .secondaryButton:disabled {
+  cursor: not-allowed;
+}
+
 .pullRequestExplorerPage {
   max-width: 1120px;
 }

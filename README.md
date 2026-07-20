@@ -112,14 +112,14 @@ The route is deterministic and credential-free in `pnpm demo`; it uses committed
 
 ## Choose your workflow
 
-| If you want to…                        | Start with…                                                                        |
-| -------------------------------------- | ---------------------------------------------------------------------------------- |
-| Review current changes                 | [`review worktree`](docs/reference/cli.md#review-worktree-path)                    |
-| Review one immutable commit            | [`review commit`](docs/reference/cli.md#review-commit-full-sha-path)               |
+| If you want to…                                      | Start with…                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Review current changes                               | [`review worktree`](docs/reference/cli.md#review-worktree-path)                    |
+| Review one immutable commit                          | [`review commit`](docs/reference/cli.md#review-commit-full-sha-path)               |
 | Browse local commits, PR evidence, or Project Memory | [`start`](docs/reference/cli.md#start-path) and open the local dashboard           |
-| Search earlier decisions and evidence  | [Project Memory commands](docs/reference/cli.md#project-memory)                    |
-| Use Gatekeeper from Codex              | [MCP and Codex skill setup](docs/reference/mcp.md#setup)                           |
-| Review a GitHub pull request           | [`review pr`](docs/reference/cli.md#review-pr-number-path) with authenticated `gh` |
+| Search earlier decisions and evidence                | [Project Memory commands](docs/reference/cli.md#project-memory)                    |
+| Use Gatekeeper from Codex                            | [MCP and Codex skill setup](docs/reference/mcp.md#setup)                           |
+| Review a GitHub pull request                         | [`review pr`](docs/reference/cli.md#review-pr-number-path) with authenticated `gh` |
 
 ## Use Gatekeeper with Codex
 
@@ -238,17 +238,17 @@ It proves six committed outcomes—including deterministic `BLOCK` and evidence-
 
 Use the offline judge demo for recorded product proof; it is deterministic and needs no account.
 
-| Time      | Show                                                        | What it proves                                                                                          |
-| --------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 0:00–0:10 | Brief cut of the completed clean-install proof              | The project builds and its offline smoke proof run from a fresh clone.                                  |
-| 0:10–0:25 | `pnpm demo`, then the printed Pull Request Explorer URL     | The judge replay starts locally without an account; browse bounded historical PR evidence.              |
-| 0:25–0:50 | Open PR #12 evidence, then choose **Review pull request #12** | Gatekeeper finds a revived decision, not merely a changed line.                                       |
-| 0:50–1:20 | Evidence timeline: proposal, regression, revert, active ADR | Project Memory links the current change to the repository's prior decisions.                            |
-| 1:20–1:40 | The hostile PR sentence and `content-security` finding      | Prompt injection is displayed and handled as untrusted evidence, never followed as an instruction.      |
-| 1:40–2:00 | **Review authority** ledger                                 | Deterministic policy, Codex evidence, and the locally assembled verdict have distinct authority.        |
-| 2:00–2:30 | Click **Run re-review** and open the corrected review       | The committed SQLite correction changes the real outcome to `FAST_PATH`.                                |
-| 2:30–2:45 | Before/after comparison and remediation                     | Review records preserve what resolved and why.                                                          |
-| 2:45–3:00 | Codex/MCP section and `pnpm demo:codex-replay`              | Codex is a constrained evidence assistant over the normal local service, not a hidden autonomous judge. |
+| Time      | Show                                                                                              | What it proves                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 0:00–0:10 | Brief cut of the completed clean-install proof                                                    | The project builds and its offline smoke proof run from a fresh clone.                                  |
+| 0:10–0:25 | `pnpm demo`, then the printed Pull Request Explorer URL                                           | The judge replay starts locally without an account; browse bounded historical PR evidence.              |
+| 0:25–0:50 | Open PR #12 evidence, then choose **Review pull request #12**                                     | Gatekeeper finds a revived decision, not merely a changed line.                                         |
+| 0:50–1:20 | Evidence timeline: proposal, two prior implementations, two offline incidents, revert, active ADR | Project Memory connects the current change to the full decision-and-incident trail.                     |
+| 1:20–1:40 | The hostile PR sentence and `content-security` finding                                            | Prompt injection is displayed and handled as untrusted evidence, never followed as an instruction.      |
+| 1:40–2:00 | **Review authority** ledger                                                                       | Deterministic policy, Codex evidence, and the locally assembled verdict have distinct authority.        |
+| 2:00–2:30 | Click **Run re-review** and open the corrected review                                             | The committed SQLite correction changes the real outcome to `FAST_PATH`.                                |
+| 2:30–2:45 | Before/after comparison and remediation                                                           | Review records preserve what resolved and why.                                                          |
+| 2:45–3:00 | Codex/MCP section and `pnpm demo:codex-replay`                                                    | Codex is a constrained evidence assistant over the normal local service, not a hidden autonomous judge. |
 
 ## Learn more
 

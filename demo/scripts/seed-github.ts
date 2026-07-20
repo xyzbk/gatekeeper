@@ -169,7 +169,7 @@ function createPlan(fixture: GhostChangeFixture): SeedOperation[] {
       (left, right) =>
         left.createdAt.localeCompare(right.createdAt) || left.logicalNumber - right.logicalNumber,
     );
-  if (operations.length !== 6 || new Set(operations.map(({ marker }) => marker)).size !== 6) {
+  if (operations.length !== 8 || new Set(operations.map(({ marker }) => marker)).size !== 8) {
     throw new TypeError('Ghost Change seed operations are incomplete or duplicated.');
   }
   return operations;

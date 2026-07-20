@@ -26,7 +26,7 @@ After the same install and build, run:
 pnpm demo
 ```
 
-The command starts the compiled dashboard against a disposable local repository and committed GitHub-response fixture. Open the printed `127.0.0.1` URL, select **Pull requests**, review pull request `12`, and inspect the resulting `ESCALATE` evidence timeline and remediation. No account, credential, source repository, external network request, or model call is needed. `Ctrl+C` stops the foreground process and removes the temporary repository and its Project Memory.
+The command starts the compiled dashboard against a disposable local repository and committed GitHub-response fixture. Open the printed `127.0.0.1` URL, select **Pull requests**, review pull request `12`, and inspect the resulting `ESCALATE` timeline: proposal, two prior implementations, two offline incidents, the revert, and the active ADR. No account, credential, source repository, external network request, or model call is needed. `Ctrl+C` stops the foreground process and removes the temporary repository and its Project Memory.
 
 This is the supported hands-on evaluation route for the local developer tool; it avoids asking an evaluator to create data, configure GitHub, or connect a model before seeing a complete review.
 

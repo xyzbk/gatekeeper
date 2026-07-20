@@ -45,9 +45,11 @@ describe('judge demo', () => {
       expect(result.correctedVerdict).toBe('FAST_PATH');
       expect(result.initialReviewId).toMatch(/^review_[a-f0-9]+$/);
       expect(result.correctedPreviousReviewId).toBe(result.initialReviewId);
-      expect(result.historicalPullRequestNumbers).toEqual([12, 10, 8]);
+      expect(result.historicalPullRequestNumbers).toEqual([12, 13, 10, 8]);
       expect(result.evidenceIds).toContain('pull_request:#12');
       expect(result.evidenceIds).toContain('issue:#4');
+      expect(result.evidenceIds).toContain('issue:#11');
+      expect(result.evidenceIds).toContain('pull_request:#13');
       expect(result.evidenceIds).toContain('docs/adr/0003-no-required-redis.md');
       expect(result.correctedFindingIds).not.toContain(
         'finding:content-security:prompt-injection',
