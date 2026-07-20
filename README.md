@@ -108,7 +108,7 @@ For the offline Ghost Change demo, open the printed URL at `/pull-requests` firs
 3. Choose **Review pull request #12** to open the `ESCALATE` review and its authority ledger.
 4. Run the committed correction's re-review and see the before/after result change to `FAST_PATH`.
 
-The route is deterministic and credential-free in `pnpm demo`; it uses committed fixture responses and does not connect to GitHub, Codex, or a model.
+The route is deterministic and credential-free in `pnpm demo`; it uses committed fixture responses and does not connect to GitHub, Codex, or a model. Timeline links stay inside local Project Memory for this replay; real synced GitHub records retain their validated external links.
 
 ## Choose your workflow
 

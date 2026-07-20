@@ -50,6 +50,7 @@ import {
 import { exploreCommits as exploreLocalCommits } from './commit-explorer.js';
 
 export interface StartGatekeeperServiceOptions {
+  allowExternalEvidenceLinks?: boolean;
   bearerToken?: string;
   dashboardRoot: string;
   deterministicOnly?: boolean;
@@ -305,6 +306,9 @@ export async function startGatekeeperService(
         ...operation,
         previousReview,
         evidenceTimeline: buildEvidenceTimeline({
+          ...(options.allowExternalEvidenceLinks === undefined
+            ? {}
+            : { allowExternalEvidenceLinks: options.allowExternalEvidenceLinks }),
           repositoryHead: options.repository.head,
           repositoryRemote: registeredRepository.remote,
           results,

@@ -107,6 +107,7 @@ export async function startJudgeDemo(options: JudgeDemoOptions = {}): Promise<Ru
       storage: join(root, 'app-data', 'storage'),
     };
     const activeService = await startGatekeeperService({
+      allowExternalEvidenceLinks: false,
       dashboardRoot: options.dashboardRoot ?? defaultDashboardRoot(),
       deterministicOnly: true,
       githubProvider: github,

@@ -2,6 +2,7 @@ import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { reviewOperationSchema } from '@gatekeeper/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { runJudgeDemoSmoke, startJudgeDemo } from './judge-demo.js';
@@ -17,6 +18,14 @@ describe('judge demo', () => {
       expect(demo.modelCalls).toBe(0);
       expect(demo.initialReviewId).toMatch(/^review_[a-f0-9]+$/);
       await expect(fetch(`${demo.baseUrl}/health`)).resolves.toMatchObject({ status: 200 });
+      const reviewResponse = await fetch(`${demo.baseUrl}/v1/reviews/${demo.initialReviewId}`, {
+        headers: { authorization: `Bearer ${demo.bearerToken}` },
+      });
+      const review = reviewOperationSchema.parse(await reviewResponse.json());
+      if (review.status !== 'completed') {
+        throw new Error('Expected the judge demo review to be complete.');
+      }
+      expect(review.evidenceTimeline.every(({ href }) => href === undefined)).toBe(true);
     } finally {
       await demo.close();
       await rm(dashboardRoot, { recursive: true, force: true });

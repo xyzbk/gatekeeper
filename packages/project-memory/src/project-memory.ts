@@ -278,6 +278,7 @@ function timelineRole(result: MemorySearchResult): EvidenceTimelineItem['role'] 
 }
 
 export function buildEvidenceTimeline(input: {
+  allowExternalEvidenceLinks?: boolean;
   repositoryHead: string;
   repositoryRemote: string | null;
   results: readonly MemorySearchResult[];
@@ -321,7 +322,10 @@ export function buildEvidenceTimeline(input: {
         repositoryUrl === undefined || path === undefined || !/^[0-9a-f]{40,64}$/u.test(ref)
           ? undefined
           : `${repositoryUrl}/blob/${ref}/${path.map(encodeURIComponent).join('/')}`;
-      const href = safeGitHubHref(result.evidence.remoteUrl) ?? repositoryHref;
+      const href =
+        input.allowExternalEvidenceLinks === false
+          ? undefined
+          : safeGitHubHref(result.evidence.remoteUrl) ?? repositoryHref;
       return [
         {
           item: {

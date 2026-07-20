@@ -82,6 +82,7 @@ test.describe('Ghost Change dashboard', () => {
     const remote = normalizeGitHubRemote(fixture.remote);
     let reviewSequence = 0;
     serviceOptions = {
+      allowExternalEvidenceLinks: false,
       bearerToken: 'e'.repeat(43),
       dashboardRoot,
       githubProvider: github,
@@ -190,6 +191,10 @@ test.describe('Ghost Change dashboard', () => {
     await expect(timeline.getByRole('listitem')).toHaveCount(6);
     await expect(timeline.getByText('Proposal', { exact: true })).toBeVisible();
     await expect(timeline.getByText('Revived change', { exact: true })).toBeVisible();
+    await expect(timeline.getByRole('link', { name: 'Revert required Redis cache' })).toHaveAttribute(
+      'href',
+      '/memory?query=pull_request%3A%2310',
+    );
     await expect(page.getByRole('heading', { name: 'Remediation' })).toBeVisible();
     await page.getByRole('button', { name: 'Copy fix prompt' }).click();
     await expect(page.getByText('Fix prompt copied.')).toBeVisible();
