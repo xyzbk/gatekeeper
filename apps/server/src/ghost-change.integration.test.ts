@@ -215,13 +215,41 @@ describe('Ghost Change service integration', () => {
           'docs/adr/0003-no-required-redis.md',
         ]),
       );
+      const activeAdr = draft.evidenceCandidates.find(
+        ({ sourceId }) => sourceId === 'docs/adr/0003-no-required-redis.md',
+      );
+      expect(activeAdr).toBeDefined();
       const completed = await mcpClient.completeReview({
         reviewId: draft.reviewId,
-        findings: [],
-        model: null,
+        findings: [
+          {
+            id: 'finding:architecture-history:required-redis-conflicts-with-active-adr',
+            category: 'architecture-history',
+            severity: 'high',
+            authority: 'EVIDENCE_SUPPORTED',
+            confidence: 0.95,
+            title: 'Required Redis conflicts with the active ADR',
+            explanation: 'The active ADR keeps Redis optional and SQLite durable.',
+            evidence: [activeAdr!],
+            affectedPaths: ['src/cache.ts'],
+            remediation: ['Keep Redis optional and use SQLite for durable local storage.'],
+            falsePositiveRisk: 'low',
+            humanApprovalRequired: true,
+          },
+        ],
+        model: 'gpt-5.6-codex',
       });
       expect(completed.verdict).toBe('ESCALATE');
       expect(completed.verdict).not.toBe('BLOCK');
+      expect(completed.reasoningProvider).toBe('codex');
+      expect(completed.model).toBe('gpt-5.6-codex');
+      expect(completed.findings).toContainEqual(
+        expect.objectContaining({
+          authority: 'EVIDENCE_SUPPORTED',
+          evidence: [activeAdr],
+          id: 'finding:architecture-history:required-redis-conflicts-with-active-adr',
+        }),
+      );
 
       const forged = await fetch(`${first.baseUrl}/v1/reviews/${completed.reviewId}/complete`, {
         method: 'POST',

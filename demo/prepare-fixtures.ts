@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 
 const execFileAsync = promisify(execFile);
 const fixturesRoot = fileURLToPath(new URL('./fixtures', import.meta.url));
-const fixtureNames = ['clean', 'missing-test', 'protected-path', 'history'] as const;
+const fixtureNames = ['clean', 'missing-test', 'protected-path', 'history', 'replay'] as const;
 const policy = `version: 1
 tests:
   relationships:
@@ -72,7 +72,54 @@ async function prepareFixture(name: (typeof fixtureNames)[number]): Promise<void
   await rm(root, { force: true, recursive: true });
   await createBaseline(root);
 
-  if (name === 'history') {
+  if (name === 'replay') {
+    await writeFixtureFile(
+      root,
+      'docs/cache.md',
+      '# Cache design\n\nThe first proposal required Redis for every local review.\n',
+    );
+    await writeFixtureFile(root, 'src/cache.ts', "export const cache = 'redis-required';\n");
+    await writeFixtureFile(
+      root,
+      'tests/cache.test.ts',
+      "import { cache } from '../src/cache.js';\n\nexpect(cache).toBe('redis-required');\n",
+    );
+    await runGit(root, ['add', '--all']);
+    await runGit(root, ['commit', '--message', 'propose required redis cache']);
+
+    await writeFixtureFile(
+      root,
+      'docs/adr/0003-no-required-redis.md',
+      [
+        '# No required Redis cache',
+        '',
+        'Status: active',
+        '',
+        'Redis remains optional. SQLite remains the durable local store.',
+        '',
+      ].join('\n'),
+    );
+    await writeFixtureFile(
+      root,
+      'docs/cache.md',
+      '# Cache design\n\nRedis is optional; SQLite remains the durable local store.\n',
+    );
+    await writeFixtureFile(root, 'src/cache.ts', "export const cache = 'sqlite';\n");
+    await writeFixtureFile(
+      root,
+      'tests/cache.test.ts',
+      "import { cache } from '../src/cache.js';\n\nexpect(cache).toBe('sqlite');\n",
+    );
+    await runGit(root, ['add', '--all']);
+    await runGit(root, ['commit', '--message', 'keep redis optional with sqlite']);
+
+    await writeFixtureFile(root, 'src/cache.ts', "export const cache = 'redis-required';\n");
+    await writeFixtureFile(
+      root,
+      'tests/cache.test.ts',
+      "import { cache } from '../src/cache.js';\n\nexpect(cache).toBe('redis-required');\n",
+    );
+  } else if (name === 'history') {
     await writeFixtureFile(root, '.gatekeeperignore', 'docs/ignored.md\n');
     await writeFixtureFile(root, '.env', 'REDIS_PASSWORD=fixture-only-secret\n');
     await writeFixtureFile(

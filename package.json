@@ -13,6 +13,7 @@
   "scripts": {
     "build": "tsc -b --pretty false --force && pnpm --filter @gatekeeper/dashboard build",
     "demo": "tsx demo/judge-demo.ts",
+    "demo:codex-replay": "pnpm fixtures:prepare && node apps/cli/dist/index.js start demo/fixtures/replay",
     "judge": "pnpm install --frozen-lockfile && pnpm build && pnpm demo:smoke && pnpm demo",
     "demo:seed": "tsx demo/scripts/seed-github.ts",
     "demo:smoke": "tsx demo/evaluate.ts --smoke",
