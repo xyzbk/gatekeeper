@@ -256,6 +256,7 @@ The built React application supports direct entry and refresh for these fixed lo
 
 - `GET /` — repository overview;
 - `GET /reviews/worktree` — interactive worktree review;
+- `GET /pull-requests` — bounded historical pull-request evidence explorer;
 - `GET /reviews/pull-request` — explicit read-only history sync and pull-request review;
 - `GET /reviews/:reviewId` — one persisted review selected by its validated ID;
 - `GET /commits` — bounded local-branch Commit Explorer and historical-review entry;
