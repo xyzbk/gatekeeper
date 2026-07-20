@@ -5,9 +5,20 @@ import { join } from 'node:path';
 import { reviewOperationSchema } from '@gatekeeper/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { runJudgeDemoSmoke, startJudgeDemo } from './judge-demo.js';
+import { formatJudgeDemoStartup, runJudgeDemoSmoke, startJudgeDemo } from './judge-demo.js';
 
 describe('judge demo', () => {
+  it('prints direct explorer and initial escalation routes for a self-guided replay', () => {
+    expect(
+      formatJudgeDemoStartup({
+        baseUrl: 'http://127.0.0.1:43123',
+        initialReviewId: 'review_initial_escalation',
+      }),
+    ).toContain(
+      'Open the initial ESCALATE review: http://127.0.0.1:43123/reviews/review_initial_escalation',
+    );
+  });
+
   it('starts the real local service with the fixture transport and removes only its disposable root', async () => {
     const dashboardRoot = await createDashboardFixture();
     const demo = await startJudgeDemo({ dashboardRoot });

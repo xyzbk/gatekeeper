@@ -50,6 +50,18 @@ export interface JudgeDemoSmokeResult {
   correctedFindingIds: string[];
 }
 
+export function formatJudgeDemoStartup(
+  demo: Pick<RunningJudgeDemo, 'baseUrl' | 'initialReviewId'>,
+): string {
+  return [
+    'Gatekeeper judge demo is ready.',
+    `Browse project history: ${demo.baseUrl}/pull-requests`,
+    `Open the initial ESCALATE review: ${demo.baseUrl}/reviews/${demo.initialReviewId}`,
+    'Return to Pull requests, then review PR #12 to show the corrected FAST_PATH replay.',
+    'Press Ctrl+C to stop.',
+  ].join('\n');
+}
+
 async function runGit(root: string, arguments_: readonly string[]): Promise<string> {
   const result = await execFileAsync('git', [...arguments_], {
     cwd: root,
@@ -311,9 +323,7 @@ async function waitForShutdownSignal(): Promise<void> {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const demo = await startJudgeDemo();
-  process.stdout.write(
-    `Gatekeeper judge demo is ready at ${demo.baseUrl}/pull-requests. Browse the historical PR evidence, open PR #12, then run its re-review to show the corrected FAST_PATH result. Press Ctrl+C to stop.\n`,
-  );
+  process.stdout.write(`${formatJudgeDemoStartup(demo)}\n`);
   try {
     await waitForShutdownSignal();
   } finally {

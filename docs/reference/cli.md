@@ -161,7 +161,7 @@ pnpm model-data:dry-run
 
 ### Decision Replay fixtures
 
-`pnpm judge` installs pinned dependencies, builds, runs the smoke proof, and starts the offline dashboard replay. `pnpm demo` starts the already-built version. Both print the `/pull-requests` explorer URL; browse the historical proposal, revert, and current PR, open PR #12 evidence, choose its explicit review action, then click **Run re-review** to load the committed SQLite correction and inspect the resulting `FAST_PATH` comparison. They use committed fixture responses only: no network, credentials, model request, or MCP connection.
+`pnpm judge` installs pinned dependencies, builds, runs the smoke proof, and starts the offline dashboard replay. `pnpm demo` starts the already-built version. Both print the `/pull-requests` Explorer URL and the direct initial `ESCALATE` review URL. Open the escalation first, then browse the historical proposal, revert, and current PR; return to PR #12, choose its explicit review action, then click **Run re-review** to inspect the resulting `FAST_PATH` comparison. They use committed fixture responses only: no network, credentials, model request, or MCP connection.
 
 For a real local Codex/MCP replay instead, build then start the normal service for the disposable `replay` repository:
 
