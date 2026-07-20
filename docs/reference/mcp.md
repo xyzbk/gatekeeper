@@ -40,6 +40,14 @@ Gatekeeper's verdict and a remediation plan.
 
 The service owns repository identity, policy, Project Memory, and verdict assembly. MCP is only the typed local bridge. The skill supplies the repeatable consent and evidence workflow. Codex may contribute `EVIDENCE_SUPPORTED` or `INFERENCE` findings, but it cannot submit a verdict, alter deterministic findings, or create `BLOCK`.
 
+## Dashboard controls and MCP boundaries
+
+The dashboard and MCP server use the same foreground service and fixed repository. Use the dashboard when you need to browse stored pull-request metadata or inspect a specific evidence pointer; use the skill/MCP workflow when Codex should retrieve bounded evidence and contribute a typed finding. Neither surface is a GitHub clone.
+
+From **Overview → Repository Control**, explicitly index local memory or sync bounded GitHub history. Sync reads GitHub via the configured `gh` CLI, stores bounded local evidence, and makes no GitHub changes; partial results remain visible for recovery. **Pull Request Explorer** filters and paginates only already-synced metadata, labels repository text as untrusted, and separates **View evidence** from the explicit **Review pull request #N** action. It never switches repositories, polls, writes to GitHub, or renders raw PR bodies/diffs.
+
+For an efficient handoff, sync once with the user's approval, browse or review the target through the dashboard if visual inspection helps, then ask `$gatekeeper` to cite the same local evidence pointers. Codex remains an evidence contributor; Gatekeeper retains deterministic policy and final-verdict authority.
+
 ## Live Codex decision replay
 
 The judge demo is intentionally offline and deterministic. To show the actual Codex/MCP workflow, use the normal local service against the disposable replay fixture:

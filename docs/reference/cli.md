@@ -119,6 +119,18 @@ The command prints the canonical repository root and random `127.0.0.1` URL, rem
 
 `--deterministic-only` retains deterministic review, Project Memory, stored-review, and dashboard behavior, but rejects Codex completion at the local API boundary. Use it for a credential-free judging or security demonstration where no model-authored findings may be accepted.
 
+### Dashboard controls
+
+The dashboard remains bound to the repository passed to `start`; it has no repository switcher or arbitrary GitHub selector. On **Overview → Repository Control**, compare the live HEAD with the indexed Project Memory HEAD, then explicitly choose **Index local memory** or **Sync GitHub history**. The GitHub control is read-only and states: **“Reads GitHub via configured gh; stores bounded local evidence; makes no GitHub changes.”** It reports received counts and partial failures instead of hiding an incomplete sync.
+
+The **Pull requests** route is a bounded explorer over already-synced Project Memory metadata. It supports text, state, update-date, reviewed/not-reviewed, sort, and cursor pagination filters. It shows titles as **untrusted repository content**, evidence pointers, and no raw PR bodies or diffs. **View evidence** only opens a local memory query; **Review pull request #N** is a separate explicit review action. Direct review by known PR number remains available from its compact form.
+
+These controls do not comment, label, merge, close, or otherwise write to GitHub. They do not poll or authenticate in the background. Use the explicit sync command when you need history before browsing it:
+
+```bash
+gatekeeper sync github .
+```
+
 ## Deterministic demo fixtures
 
 Generate the four disposable Git repositories, then run the acceptance matrix:
@@ -149,7 +161,7 @@ pnpm model-data:dry-run
 
 ### Decision Replay fixtures
 
-`pnpm judge` installs pinned dependencies, builds, runs the smoke proof, and starts the offline dashboard replay. `pnpm demo` starts the already-built version. Both print a direct local review URL; open it for the Ghost Change `ESCALATE` review, then click **Run re-review** to load the committed SQLite correction and inspect the resulting `FAST_PATH` comparison. They use committed fixture responses only: no network, credentials, model request, or MCP connection.
+`pnpm judge` installs pinned dependencies, builds, runs the smoke proof, and starts the offline dashboard replay. `pnpm demo` starts the already-built version. Both print the `/pull-requests` explorer URL; browse the historical proposal, revert, and current PR, open PR #12 evidence, choose its explicit review action, then click **Run re-review** to load the committed SQLite correction and inspect the resulting `FAST_PATH` comparison. They use committed fixture responses only: no network, credentials, model request, or MCP connection.
 
 For a real local Codex/MCP replay instead, build then start the normal service for the disposable `replay` repository:
 

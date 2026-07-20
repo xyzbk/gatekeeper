@@ -76,11 +76,39 @@ If Gatekeeper is already built, start the committed judge demo directly:
 pnpm demo
 ```
 
-It creates a temporary local repository, starts a loopback dashboard, and prints a direct local review URL. Open that URL to see the Ghost Change `ESCALATE` review. Its evidence timeline shows the rejected Redis decision, its ADR, and the hostile “ignore instructions” text as untrusted data. The reviewer then clicks **Run re-review**: the committed SQLite correction replaces the Redis revival and the inspector shows `FAST_PATH` with its before/after comparison.
+It creates a temporary local repository, starts a loopback dashboard, and prints the Pull Request Explorer URL. Browse the historical proposal, revert, and current PR metadata, open PR #12's evidence, then choose **Review pull request #12**. Its evidence timeline shows the rejected Redis decision, its ADR, and the hostile “ignore instructions” text as untrusted data. The reviewer then clicks **Run re-review**: the committed SQLite correction replaces the Redis revival and the inspector shows `FAST_PATH` with its before/after comparison.
 
 The judge demo uses committed GitHub-response data: it makes no network request, requires no GitHub account, API key, model call, or Codex connection, and never reads your repository. It is an offline dashboard replay, **not** a live MCP demonstration. Stop it with `Ctrl+C`; its temporary repository and Project Memory are removed.
 
 This is the quickest evaluation route for Gatekeeper as a local developer tool. The verified desktop platform is Windows; see the [clean install and evaluation guide](docs/release/clean-install-uninstall.md) for prerequisites and the exact fresh-clone path.
+
+### Use the dashboard as an evidence control center
+
+The dashboard is scoped to the one repository passed to `gatekeeper start`. It is not a GitHub browser and has no repository switcher. Start it from the Gatekeeper workspace, leave the foreground process running, and use the printed loopback URL:
+
+```powershell
+node apps/cli/dist/index.js start "C:\path\to\your\repository"
+```
+
+On **Overview**, **Repository Control** shows the live `HEAD` beside the Project Memory indexed `HEAD`. The controls are always explicit:
+
+- **Index local memory** reads the fixed local repository and updates only its machine-local Project Memory.
+- **Sync GitHub history** reads GitHub through the configured `gh` CLI and stores bounded local evidence. The dashboard states exactly: **“Reads GitHub via configured gh; stores bounded local evidence; makes no GitHub changes.”** It never comments, labels, merges, closes, or otherwise writes to GitHub.
+
+Each action reports the records received. A partial sync remains visible as a partial result; valid records are retained and the dashboard tells you to resolve local `gh` access and retry. There is no automatic polling, background sync, hidden authentication, or remote/repository selector.
+
+Choose **Pull requests** to open the bounded Pull Request Explorer. It lists only pull-request metadata already stored in Project Memory: number, title, state, update date, review state, and an evidence pointer. Titles and other repository/GitHub values are labelled **untrusted repository content**; raw bodies and diffs are not shown. Filter by text, open/closed state, update date, reviewed/not reviewed, and sort order, then move through bounded pages. **View evidence** opens the matching local Project Memory query. **Review pull request #N** is a separate, explicit action that starts a review; it is never triggered by browsing. If you already know a number, the compact direct review form remains available.
+
+### Judge dashboard path
+
+For the offline Ghost Change demo, open the printed URL at `/pull-requests` first:
+
+1. Browse the historical proposal, revert, and current pull request records.
+2. Open PR **#12**, choose **View evidence**, and inspect the stored evidence and the inert prompt-injection text.
+3. Choose **Review pull request #12** to open the `ESCALATE` review and its authority ledger.
+4. Run the committed correction's re-review and see the before/after result change to `FAST_PATH`.
+
+The route is deterministic and credential-free in `pnpm demo`; it uses committed fixture responses and does not connect to GitHub, Codex, or a model.
 
 ## Choose your workflow
 
@@ -88,7 +116,7 @@ This is the quickest evaluation route for Gatekeeper as a local developer tool. 
 | -------------------------------------- | ---------------------------------------------------------------------------------- |
 | Review current changes                 | [`review worktree`](docs/reference/cli.md#review-worktree-path)                    |
 | Review one immutable commit            | [`review commit`](docs/reference/cli.md#review-commit-full-sha-path)               |
-| Browse local commits or Project Memory | [`start`](docs/reference/cli.md#start-path) and open the local dashboard           |
+| Browse local commits, PR evidence, or Project Memory | [`start`](docs/reference/cli.md#start-path) and open the local dashboard           |
 | Search earlier decisions and evidence  | [Project Memory commands](docs/reference/cli.md#project-memory)                    |
 | Use Gatekeeper from Codex              | [MCP and Codex skill setup](docs/reference/mcp.md#setup)                           |
 | Review a GitHub pull request           | [`review pr`](docs/reference/cli.md#review-pr-number-path) with authenticated `gh` |
@@ -213,8 +241,8 @@ Use the offline judge demo for recorded product proof; it is deterministic and n
 | Time      | Show                                                        | What it proves                                                                                          |
 | --------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | 0:00–0:10 | Brief cut of the completed clean-install proof              | The project builds and its offline smoke proof run from a fresh clone.                                  |
-| 0:10–0:25 | `pnpm demo`, then the printed direct local review URL       | The judge replay starts locally without an account; open the printed URL.                               |
-| 0:25–0:50 | The `ESCALATE` review for PR #12                            | Gatekeeper finds a revived decision, not merely a changed line.                                         |
+| 0:10–0:25 | `pnpm demo`, then the printed Pull Request Explorer URL     | The judge replay starts locally without an account; browse bounded historical PR evidence.              |
+| 0:25–0:50 | Open PR #12 evidence, then choose **Review pull request #12** | Gatekeeper finds a revived decision, not merely a changed line.                                       |
 | 0:50–1:20 | Evidence timeline: proposal, regression, revert, active ADR | Project Memory links the current change to the repository's prior decisions.                            |
 | 1:20–1:40 | The hostile PR sentence and `content-security` finding      | Prompt injection is displayed and handled as untrusted evidence, never followed as an instruction.      |
 | 1:40–2:00 | **Review authority** ledger                                 | Deterministic policy, Codex evidence, and the locally assembled verdict have distinct authority.        |
